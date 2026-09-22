@@ -1,0 +1,14 @@
+node_modules/
+dist/
+output/
+.playwright-cli/
+.env
+.env.*
+
+# Lokale Kartenprojekte enthalten eingebettete Bilder und werden nicht veröffentlicht.
+*.georeferenzierung.json
+
+# Historische Einzeldatei-Sicherungen; die Versionsgeschichte übernimmt künftig Git.
+kartenprojektion_prototyp_v2_1.original.html
+kartenprojektion_prototyp_v2_1.sicherung-vor-vereinfachung-2026-09-20.html
+kartenprojektion_prototyp_v2_1.vor-parametersuche.html
