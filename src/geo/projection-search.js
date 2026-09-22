@@ -68,25 +68,5 @@ export const ProjectionSearch = (() => {
       best.g.rot=((best.g.rot+Math.PI)%(2*Math.PI)+2*Math.PI)%(2*Math.PI)-Math.PI;
       return { code:'CUSTOM:'+family, model:best.model, g:best.g, ...GeoFit.evaluate(points,best.g,best.def,width,height), warning:failures ? `${failures} Startversuch(e) ohne vollständige Optimierung; beste gefundene Lösung.` : '', starts:attempted };
     }
-    async function crossValidate(points,code,model,width,height,options={}) {
-      const fit=points.filter(p=>p.fit);
-      if(fit.length<(model?5:4)) throw new Error(model?'Mindestens fünf Fit-Punkte für die Auslassprüfung mit Parametersuche.':'Mindestens vier Fit-Punkte für die Auslassprüfung.');
-      const rows=[];
-      for(let i=0;i<fit.length;i++) {
-        await new Promise(resolve=>setTimeout(resolve,0));
-        if(options.cancelled?.()) throw new Error('Prüfung abgebrochen.');
-        options.progress?.(i+1,fit.length);
-        const training=fit.filter((_,j)=>i!==j);
-        try {
-          const result=model ? await search(training,model.family,width,height,{cancelled:options.cancelled}) : GeoFit.solve(training,code,width,height);
-          const def=result.model ? definition(result.model) : code;
-          const test=GeoFit.evaluate([fit[i]],result.g,def,width,height).rows[0];rows.push(test);
-        } catch(err) {
-          if(options.cancelled?.()) throw err;
-          rows.push({id:fit[i].id,error:Infinity,pixelError:Infinity});
-        }
-      }
-      return {rows,rms:Math.sqrt(rows.reduce((s,r)=>s+r.error**2,0)/rows.length),max:Math.max(...rows.map(r=>r.error)),pixelRms:Math.sqrt(rows.reduce((s,r)=>s+r.pixelError**2,0)/rows.length)};
-    }
-    return { names, keys, definition, search, crossValidate, minimumPoints };
+    return { names, keys, definition, search, minimumPoints };
   })();

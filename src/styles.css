@@ -33,7 +33,7 @@
     button svg { width: 16px; height: 16px; vertical-align: middle; flex-shrink: 0; }
     .icon { width: 32px; height: 32px; padding: 6px; flex: 0 0 32px; display: inline-flex; justify-content: center; align-items: center; }
     .check { display: flex; gap: 8px; align-items: center; font-size: 13px; margin: 10px 0; }
-    #captureStatus, #notice, #comparisonNote, #renderNote { font-size: 12px; line-height: 1.45; overflow-wrap: anywhere; }
+    #captureStatus, #notice, #automationInfo, #renderNote { font-size: 12px; line-height: 1.45; overflow-wrap: anywhere; }
     #captureStatus:not(:empty), #notice:not(:empty) { padding: 8px; background: #fff2c9; margin: 8px 0; border-left: 3px solid #bd8914; }
     #captureStatus:empty, #notice:empty, #renderNote:empty { display: none; }
     table { width: 100%; border-collapse: collapse; font-size: 12px; table-layout: fixed; }
@@ -42,14 +42,9 @@
     .point-number { width: 28px; } .point-fit { width: 36px; } .point-actions { width: 72px; }
     #pointList .icon { width: 30px; flex-basis: 30px; height: 30px; }
     #metrics { font-size: 12px; line-height: 1.6; margin: 8px 0; white-space: pre-line; }
-    #ranking button { display: flex; align-items: center; justify-content: space-between; gap: 8px; text-align: left; margin: 4px 0; font-size: 12px; }
-    #ranking button span:first-child { min-width: 0; overflow-wrap: anywhere; }
-    #ranking button span:last-child { white-space: nowrap; }
-    #parameterInfo, #validationInfo { font-size: 12px; line-height: 1.5; overflow-wrap: anywhere; white-space: pre-line; margin: 8px 0; }
+    #automationInfo { line-height: 1.5; overflow-wrap: anywhere; white-space: pre-line; margin: 8px 0; }
     #searchAvailability { font-size: 12px; line-height: 1.45; color: #555; overflow-wrap: anywhere; }
     #searchAvailability:empty { display: none; }
-    #ranking small { display: block; font-size: 11px; color: #555; }
-    #ranking button[aria-pressed="true"] { border-color: #176c65; background: #e8f4f1; }
     .point-marker { --marker-color: #176c65; width: 32px !important; height: 32px !important; margin: -16px 0 0 -16px !important; color: var(--marker-color); cursor: crosshair; }
     .point-marker::before, .point-marker::after { content: ""; position: absolute; background: var(--marker-color); box-shadow: 0 0 0 1px rgba(255,255,255,.85); }
     .point-marker::before { left: 0; top: 15px; width: 32px; height: 2px; }

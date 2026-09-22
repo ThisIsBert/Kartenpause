@@ -19,7 +19,7 @@ test('vereinfachter Georeferenzierungs-Workflow', async ({ page }) => {
   await openApp(page);
 
   await expect(page.getByRole('heading', { name: '2. Referenzpunkte' })).toBeVisible();
-  for (const id of ['fitView', 'rotation', 'crs', 'prev', 'next', 'mesh']) {
+  for (const id of ['fitView', 'rotation', 'crs', 'prev', 'next', 'mesh', 'compare', 'searchParameters', 'validateFit', 'ranking']) {
     await expect(page.locator(`#${id}`)).toHaveCount(0);
   }
 
@@ -41,13 +41,35 @@ test('vereinfachter Georeferenzierungs-Workflow', async ({ page }) => {
   await expect(page.locator('#sourceFit svg')).toHaveCount(1);
 
   await page.locator('#fitCrs').click();
-  await expect(page.locator('#ranking button')).toHaveCount(14, { timeout: 45_000 });
-  await expect(page.locator('#fitCrs')).toBeEnabled();
+  await expect(page.locator('#fitCrs')).toBeEnabled({ timeout: 120_000 });
+  await expect(page.locator('#automationInfo')).toContainText('Projektionsmodell');
   await expect(page.locator('#alignmentLabel')).toHaveText('Automatisch angepasst');
   await expect.poll(() => paintedPixels(overlay)).toBeGreaterThan(1_000);
 
   await page.screenshot({ path: 'output/playwright/workflow-smoke.png', fullPage: true });
   expect(pageErrors).toEqual([]);
+});
+
+test('eskaliert bei lokalen Verzerrungen automatisch zu TPS', async ({ page }) => {
+  test.setTimeout(150_000);
+  await openApp(page);
+  await loadSyntheticProject(page, true);
+  await expect(page.locator('#pointList tr')).toHaveCount(9);
+
+  await page.locator('#fitCrs').click();
+  await expect(page.locator('#fitCrs')).toBeEnabled({ timeout: 120_000 });
+  await expect(page.locator('#automationInfo')).toContainText('TPS-Korrektur verwendet');
+  await expect(page.locator('#status')).toContainText('Projektionsmodell mit TPS-Korrektur');
+  await expect.poll(() => paintedPixels(page.locator('.leaflet-warped-image-layer'))).toBeGreaterThan(1_000);
+
+  const downloadEvent = page.waitForEvent('download');
+  await page.locator('#saveProject').click();
+  const download = await downloadEvent;
+  const savedProject = await download.path();
+  await page.reload();
+  await page.locator('#projectFile').setInputFiles(savedProject);
+  await expect(page.locator('#automationInfo')).toContainText('Gespeichertes Projektionsmodell mit TPS-Korrektur');
+  await expect(page.locator('#pointList tr')).toHaveCount(9);
 });
 
 test('Originalbild zoomt ohne seitlichen Versatz', async ({ page }) => {
@@ -98,8 +120,8 @@ async function openApp(page) {
   await expect(page.locator('#map.leaflet-container')).toBeVisible();
 }
 
-async function loadSyntheticProject(page) {
-  const project = await page.evaluate(() => {
+async function loadSyntheticProject(page, distorted = false) {
+  const project = await page.evaluate(useDistortion => {
     const canvas = document.createElement('canvas');
     canvas.width = 180;
     canvas.height = 120;
@@ -115,11 +137,17 @@ async function loadSyntheticProject(page) {
       context.beginPath(); context.moveTo(0, y); context.lineTo(canvas.width, y); context.stroke();
     }
 
-    const points = [[.1,.1], [.9,.1], [.1,.9], [.9,.9], [.5,.5]].map(([u, v], index) => ({
+    const coordinates = useDistortion
+      ? [[.08,.08], [.5,.08], [.92,.08], [.08,.5], [.5,.5], [.92,.5], [.08,.92], [.5,.92], [.92,.92]]
+      : [[.1,.1], [.9,.1], [.1,.9], [.9,.9], [.5,.5]];
+    const points = coordinates.map(([u, v], index) => ({
       id: index + 1,
       fit: true,
       source: { u, v },
-      target: { lon: 10 + (u * 2 - 1) * 10, lat: 50 + (1 - v * 2) * (10 * 2 / 3) }
+      target: {
+        lon: 10 + (u * 2 - 1) * 10 + (useDistortion ? 2.5 * Math.sin(2 * Math.PI * u) * Math.sin(Math.PI * v) : 0),
+        lat: 50 + (1 - v * 2) * (10 * 2 / 3) + (useDistortion ? 1.8 * Math.sin(Math.PI * u) * Math.sin(2 * Math.PI * v) : 0)
+      }
     }));
     return {
       format: 'pixelkarte-georeferenzierung',
@@ -129,7 +157,7 @@ async function loadSyntheticProject(page) {
       alignment: { code: 'EPSG:4326', center: { lat: 50, lon: 10 }, halfWidth: 10, rotation: 0 },
       view: { center: { lat: 50, lon: 10 }, zoom: 4, basemap: 'esriTopo', opacity: 55, mesh: 20, showSource: true, showResiduals: true }
     };
-  });
+  }, distorted);
   await page.locator('#projectFile').setInputFiles({
     name: 'synthetische-karte.georeferenzierung.json',
     mimeType: 'application/json',

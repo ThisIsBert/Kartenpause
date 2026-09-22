@@ -22,7 +22,9 @@ Geprüft werden unter anderem:
 - unsichtbare Bildüberlagerung vor einer Anpassung
 - Laden und Darstellen eines Projekts
 - nummerierte Fadenkreuz-Markierungen einschließlich Farbkontrast
-- automatische Auswahl aus allen festen Projektionskandidaten
+- gemeinsame automatische Suche über feste und parametrisierte Projektionsmodelle
+- automatische TPS-Eskalation bei lokalen Verzerrungen
+- Speichern und erneutes Laden einer TPS-korrigierten Projektdatei
 - gezeichnete Bildüberlagerung nach erfolgreicher Anpassung
 - stabiles Zoomen des Originalbilds ohne seitliches Springen
 - JavaScript-Seitenfehler

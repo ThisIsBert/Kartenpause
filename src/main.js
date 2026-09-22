@@ -5,18 +5,16 @@ import {
   createIcons,
   Crosshair,
   FolderOpen,
-  ListOrdered,
   MapPinPlus,
   Pencil,
   Save,
   Scan,
-  ScanSearch,
-  ShieldCheck,
   Trash2,
   X
 } from 'lucide';
 import { GeoFit } from './geo/geo-fit.js';
 import { ProjectionSearch } from './geo/projection-search.js';
+import { ThinPlateSpline } from './geo/thin-plate-spline.js';
 import './styles.css';
 
 
@@ -66,10 +64,11 @@ import './styles.css';
     let image = null;
     let imageName = '';
     let imageData = '';
-    let points = [], nextPointId = 1, capture = null, results = [], busy = false;
+    let points = [], nextPointId = 1, capture = null, busy = false;
     let fitted = false, imageLoadVersion = 0, searchCancelled = false, cancellable = false;
+    let transformMode = 'projection', tpsCorrection = null;
     let currentCrsIndex = 3, rotation = 0, renderMesh = 20;
-    const ui = Object.fromEntries(['workspace','showSource','showResiduals','sourceFit','addPoint','cancelPoint','clearPoints','captureStatus','pointList','metrics','fitCrs','compare','comparisonNote','ranking','saveProject','loadProject','projectFile','notice','renderNote','alignmentLabel','searchParameters','cancelSearch','parameterInfo','validateFit','validationInfo'].map(id => [id, document.getElementById(id)]));
+    const ui = Object.fromEntries(['workspace','showSource','showResiduals','sourceFit','addPoint','cancelPoint','clearPoints','captureStatus','pointList','metrics','fitCrs','automationInfo','saveProject','loadProject','projectFile','notice','renderNote','alignmentLabel','cancelSearch'].map(id => [id, document.getElementById(id)]));
     const sourceMap = L.map('sourceMap', {
       crs: L.CRS.Simple,
       minZoom: -8,
@@ -115,11 +114,19 @@ import './styles.css';
       return L.latLng(ll[1], ll[0]);
     }
 
-    function uvToLatLng(u, v, g, code = currentCrs().code) {
+    function projectionUvToLatLng(u, v, g, code = currentCrs().code) {
       let x = g.cx + (u * 2 - 1) * g.hw;
       let y = g.cy + (1 - v * 2) * g.hh;
       [x, y] = rotatePoint(x, y, g);
       return sourceToLatLng(x, y, code);
+    }
+
+    function uvToLatLng(u, v, g = sourceGeometry(), code = currentCrs().code) {
+      if (transformMode === 'projection+tps' && tpsCorrection) {
+        const point = tpsCorrection.transform(u, v);
+        return L.latLng(point.lat, point.lon);
+      }
+      return projectionUvToLatLng(u, v, g, code);
     }
 
     class WarpedImageLayer extends L.Layer {
@@ -205,12 +212,13 @@ import './styles.css';
 
     function updateStatus(extra='') {
       const imageText = image ? `Bild: ${imageName} (${image.naturalWidth}×${image.naturalHeight} px)` : 'Noch kein Bild geladen.';
-      const fitText = fitted ? `\nProjektion: ${currentCrs().label}\nAutomatisch angepasst.` : image ? '\nNoch nicht angepasst. Referenzpunkte setzen und die Projektion automatisch anpassen.' : '';
+      const method = transformMode === 'projection+tps' ? 'Projektionsmodell mit TPS-Korrektur' : 'Projektionsmodell';
+      const fitText = fitted ? `\nMethode: ${method}\nAutomatisch angepasst.` : image ? '\nNoch nicht angepasst. Referenzpunkte setzen und die Projektion automatisch anpassen.' : '';
       els.status.textContent = `${imageText}${fitText}${extra ? '\n' + extra : ''}`;
     }
     function showError(err) { ui.notice.textContent = 'Fehler: ' + (err?.message || err); }
 
-    const appIcons = { Crosshair, FolderOpen, ListOrdered, MapPinPlus, Pencil, Save, Scan, ScanSearch, ShieldCheck, Trash2, X };
+    const appIcons = { Crosshair, FolderOpen, MapPinPlus, Pencil, Save, Scan, Trash2, X };
     function icons() { createIcons({ icons: appIcons }); }
     function formatDistance(value) {
       if (!Number.isFinite(value)) return 'nicht berechenbar';
@@ -226,32 +234,21 @@ import './styles.css';
     }
     function updateAvailability() {
       const enough = points.filter(p => p.fit).length >= 3;
-      const count = points.filter(p=>p.fit).length;
       ui.addPoint.disabled = !image || busy || !!capture;
       ui.clearPoints.disabled = !points.length || busy;
       ui.fitCrs.disabled = !image || !enough || busy || !!capture;
-      ui.compare.disabled = !image || !enough || busy || !!capture;
-      const searchBlock = !image ? 'Kein Bild geladen.' : busy ? 'Berechnung oder Laden läuft.' : capture ? `Punktpaar ${capture.id} noch unvollständig. Punktaufnahme abschließen oder abbrechen.` : count<ProjectionSearch.minimumPoints ? `${count} von ${points.length} Punktpaaren für den Fit aktiv. Mindestens ${ProjectionSearch.minimumPoints} angehakte Fit-Punkte erforderlich.` : '';
-      ui.searchParameters.disabled = !!searchBlock;
-      ui.searchParameters.title = searchBlock;
-      document.getElementById('searchAvailability').textContent = searchBlock || (count===ProjectionSearch.minimumPoints ? '4 aktive Fit-Punkte. Für eine Auslassprüfung wird ein weiterer Fit-Punkt benötigt.' : '');
-      ui.validateFit.disabled = !image || count<(currentCrs().model?5:4) || busy || !!capture;
       ui.cancelSearch.hidden = !busy || !cancellable; ui.cancelSearch.disabled = !busy || !cancellable || searchCancelled;
       ui.saveProject.disabled = !image || !fitted || busy || !!capture;
       ui.sourceFit.disabled = !image || busy;
       document.getElementById('zoomImage').disabled = !image || !fitted || busy;
       ui.cancelPoint.hidden = !capture;
       ui.alignmentLabel.textContent = fitted ? 'Automatisch angepasst' : 'Noch nicht angepasst';
-      const model=currentCrs().model;
-      ui.parameterInfo.textContent = model ? `${ProjectionSearch.names[model.family]}\n${Object.entries(model.parameters).map(([k,v])=>`${k} = ${v.toFixed(4)}°`).join(' · ')}\n${model.family==='lcc'?'Äquivalenter Standardbreitenkreis; keine eindeutige Rekonstruktion der ursprünglichen Parameter.':'Numerisch angepasste Variante; Parameter nicht eindeutig als Original nachgewiesen.'}` : '';
     }
     function invalidateResults() {
-      results = []; fitted = false; ui.ranking.replaceChildren();
-      ui.validationInfo.textContent = '';
-      ui.comparisonNote.textContent = 'Referenzpunkte geändert. Vergleich neu berechnen.';
+      fitted = false; transformMode = 'projection'; tpsCorrection = null;
+      ui.automationInfo.textContent = points.length ? 'Referenzpunkte geändert. Anpassung neu berechnen.' : '';
     }
     function refresh() {
-      if(!fitted) ui.validationInfo.textContent = '';
       overlay.redraw(); renderPoints(); updateStatus(); updateAvailability();
     }
     function pointsChanged() { invalidateResults(); ui.notice.textContent = ''; refresh(); }
@@ -259,7 +256,7 @@ import './styles.css';
       sourceMarks.clearLayers(); targetMarks.clearLayers(); residualMarks.clearLayers(); ui.pointList.replaceChildren();
       let evaluation = null;
       if (image && fitted) {
-        try { evaluation = GeoFit.evaluate(points, sourceGeometry(), currentCrs().code, image.naturalWidth, image.naturalHeight); }
+        try { evaluation = transformMode === 'projection+tps' ? tpsCorrection : GeoFit.evaluate(points, sourceGeometry(), currentCrs().code, image.naturalWidth, image.naturalHeight); }
         catch (err) { showError(err); }
       }
       for (const point of points) {
@@ -293,7 +290,11 @@ import './styles.css';
       }
       if (capture?.source && image) L.marker([(1-capture.source.v)*image.naturalHeight, capture.source.u*image.naturalWidth], { icon: markerIcon({ id: capture.id, fit: true }, 'pending'), interactive: false }).addTo(sourceMarks);
       const lines = [];
-      if (evaluation?.fit) lines.push(`Fit (${evaluation.fit.count}): RMS ${formatDistance(evaluation.fit.rms)}\nMittel ${formatDistance(evaluation.fit.mean)} · Maximum ${formatDistance(evaluation.fit.max)}`);
+      if (transformMode === 'projection+tps' && evaluation?.fit) {
+        lines.push(`TPS (${evaluation.fit.count} Stützpunkte): an den Fit-Punkten passgenau\nGenauigkeit zwischen und außerhalb der Punkte hängt von deren Verteilung ab.`);
+      } else if (evaluation?.fit) {
+        lines.push(`Fit (${evaluation.fit.count}): RMS ${formatDistance(evaluation.fit.rms)}\nMittel ${formatDistance(evaluation.fit.mean)} · Maximum ${formatDistance(evaluation.fit.max)}`);
+      }
       if (Number.isFinite(evaluation?.pixel?.rms)) lines.push(`RMS im Originalbild: ${evaluation.pixel.rms.toFixed(2)} px`);
       if (evaluation?.control) lines.push(`Kontrolle (${evaluation.control.count}): RMS ${formatDistance(evaluation.control.rms)}\nMittel ${formatDistance(evaluation.control.mean)} · Maximum ${formatDistance(evaluation.control.max)}`);
       if (image && points.length) { const warning = GeoFit.distribution(points, image.naturalWidth, image.naturalHeight); if (warning) lines.push(warning); }
@@ -305,14 +306,14 @@ import './styles.css';
     }
     function startCapture(id = nextPointId) {
       if (!image || busy) return;
-      capture = { id, phase: 'source', source: null }; setSourceVisible(true); updateCapture(); renderPoints(); renderRanking();
+      capture = { id, phase: 'source', source: null }; setSourceVisible(true); updateCapture(); renderPoints();
     }
     function updateCapture() {
       document.body.classList.toggle('capture-source', capture?.phase === 'source'); document.body.classList.toggle('capture-target', capture?.phase === 'target');
       ui.captureStatus.textContent = capture ? capture.phase === 'source' ? `Punkt ${capture.id}: Ort im Originalbild wählen.` : `Punkt ${capture.id}: Denselben Ort auf der Basiskarte wählen.` : '';
       updateAvailability();
     }
-    function cancelCapture() { capture = null; updateCapture(); renderPoints(); renderRanking(); }
+    function cancelCapture() { capture = null; updateCapture(); renderPoints(); }
     sourceMap.on('click', e => {
       if (!capture || capture.phase !== 'source' || busy) return;
       const u = e.latlng.lng/image.naturalWidth, v = 1-e.latlng.lat/image.naturalHeight;
@@ -329,33 +330,16 @@ import './styles.css';
     });
     function applyResult(result) {
       if(result.model) registerModel(result.model);
-      ui.validationInfo.textContent = '';
       const index = candidates.findIndex(c => c.code === result.code);
       const ll = sourceToLatLng(result.g.cx, result.g.cy, result.code);
       currentCrsIndex = index; imageCenter = ll; halfWidthSource = result.g.hw;
-      rotation = result.g.rot*180/Math.PI; fitted = true;
-      ui.notice.textContent = result.warning || ''; refresh(); renderRanking();
-    }
-    function renderRanking() {
-      ui.ranking.replaceChildren();
-      const valid = results.filter(r => !r.error), best = valid[0];
-      for (const result of results) {
-        const button = document.createElement('button'), label = document.createElement('span'), value = document.createElement('span');
-        label.textContent = result.label || candidates.find(c => c.code === result.code)?.label || result.code;
-        if(result.model){const detail=document.createElement('small');detail.textContent=ProjectionSearch.keys(result.model.family).map(k=>`${k} ${result.model.parameters[k].toFixed(2)}°`).join(' · ');label.appendChild(detail);}
-        value.textContent = result.error ? 'nicht bewertbar' : formatDistance(result.fit.rms);
-        button.append(label, value); button.disabled = !!result.error || busy || !!capture;
-        button.title = result.error || [result.warning, result.control ? `Kontroll-RMS: ${formatDistance(result.control.rms)}` : ''].filter(Boolean).join(' · ');
-        button.setAttribute('aria-pressed', String(fitted && result.code === currentCrs().code)); button.onclick = () => { try { applyResult(result); } catch (err) { showError(err); } }; ui.ranking.appendChild(button);
-      }
-      if (!best) { if (results.length) ui.comparisonNote.textContent = 'Keine getestete Variante konnte angepasst werden.'; return; }
-      const second = valid[1], near = second && second.fit.rms-best.fit.rms <= Math.max(1, best.fit.rms*.05);
-      ui.comparisonNote.textContent = (near ? 'Mehrere Varianten haben ähnliche Fit-Fehler (Abstand ≤ 5 % oder 1 m). Mit diesen Punkten keine eindeutige Unterscheidung.' : 'Sortiert nach Fit-RMS. Beste getestete Variante; kein Nachweis der ursprünglichen Projektion.') + (results.some(r=>r.model) ? ' Variable Modelle haben zusätzliche Freiheitsgrade. Kontrollpunkte oder Auslassprüfung berücksichtigen.' : '');
+      rotation = result.g.rot*180/Math.PI; fitted = true; transformMode = 'projection'; tpsCorrection = null;
+      ui.notice.textContent = result.warning || ''; refresh();
     }
     function setBusy(value) {
       busy = value;
       document.querySelectorAll('#sidebar button, #sidebar select, #sidebar input').forEach(el => { el.disabled = value; });
-      renderPoints(); renderRanking(); updateAvailability();
+      renderPoints(); updateAvailability();
     }
     function registerModel(model) {
       const def=ProjectionSearch.definition(model),code='CUSTOM:'+model.family;
@@ -366,65 +350,81 @@ import './styles.css';
       else candidates.push(entry);
       return entry;
     }
-    async function searchParameters() {
-      if(busy||capture||!image||points.filter(p=>p.fit).length<ProjectionSearch.minimumPoints)return;
-      searchCancelled=false;cancellable=true;setBusy(true);ui.notice.textContent='';
-      const computed=[];
+    async function automaticFit() {
+      const fitCount = points.filter(point => point.fit).length;
+      if (busy || capture || !image || fitCount < 3) return;
+      searchCancelled = false; cancellable = true; setBusy(true); ui.notice.textContent = '';
+      const computed = [];
       try {
-        for(const code of fixedCodes){
-          await new Promise(resolve=>setTimeout(resolve,0));
-          if(searchCancelled)throw new Error('Suche abgebrochen; bisherige Ausrichtung bleibt erhalten.');
-          try{computed.push(GeoFit.solve(points,code,image.naturalWidth,image.naturalHeight));}
-          catch(err){computed.push({code,error:err.message});}
+        for (let index = 0; index < fixedCodes.length; index++) {
+          await new Promise(resolve => setTimeout(resolve, 0));
+          if (searchCancelled) throw new Error('Suche abgebrochen; bisherige Ausrichtung bleibt erhalten.');
+          ui.automationInfo.textContent = `Stufe 1/3: Projektionsmodelle prüfen (${index + 1}/${fixedCodes.length})`;
+          const code = fixedCodes[index];
+          try { computed.push(GeoFit.solve(points, code, image.naturalWidth, image.naturalHeight)); }
+          catch (error) { computed.push({ code, error: error.message }); }
         }
-        const families=Object.keys(ProjectionSearch.names);
-        for(let i=0;i<families.length;i++){
-          const family=families[i];
-          if(searchCancelled)throw new Error('Suche abgebrochen; bisherige Ausrichtung bleibt erhalten.');
-          const progress=(start,total)=>{ui.comparisonNote.textContent=`Familie ${i+1}/${families.length}: ${ProjectionSearch.names[family]} · Start ${start}/${total}`;};
-          try{
-            const result=await ProjectionSearch.search(points,family,image.naturalWidth,image.naturalHeight,{cancelled:()=>searchCancelled,progress});
-            computed.push({...result,label:ProjectionSearch.names[family]+' · variabel'});
-          } catch(err){
-            if(searchCancelled)throw err;
-            computed.push({code:'CUSTOM:'+family,label:ProjectionSearch.names[family],error:err.message});
+
+        if (fitCount >= ProjectionSearch.minimumPoints) {
+          const families = Object.keys(ProjectionSearch.names);
+          for (let index = 0; index < families.length; index++) {
+            const family = families[index];
+            if (searchCancelled) throw new Error('Suche abgebrochen; bisherige Ausrichtung bleibt erhalten.');
+            const progress = (start, total) => {
+              ui.automationInfo.textContent = `Stufe 2/3: Projektionsparameter optimieren (${index + 1}/${families.length}, Versuch ${start}/${total})`;
+            };
+            try {
+              const result = await ProjectionSearch.search(points, family, image.naturalWidth, image.naturalHeight, { cancelled: () => searchCancelled, progress });
+              computed.push({ ...result, label: ProjectionSearch.names[family] });
+            } catch (error) {
+              if (searchCancelled) throw error;
+              computed.push({ code: `CUSTOM:${family}`, label: ProjectionSearch.names[family], error: error.message });
+            }
           }
         }
-        if(searchCancelled)throw new Error('Suche abgebrochen; bisherige Ausrichtung bleibt erhalten.');
-        computed.sort((a,b)=>(a.error?Infinity:a.fit.rms)-(b.error?Infinity:b.fit.rms));
-        const best=computed.find(r=>!r.error);
-        if(!best)throw new Error('Keine Projektionsvariante konnte angepasst werden.');
-        for(const result of computed)if(result.model)registerModel(result.model);
-        results=computed;applyResult(best);
-      }catch(err){showError(err);}
-      finally{cancellable=false;setBusy(false);}
-    }
-    async function validateFit() {
-      if(busy||capture||!image)return;
-      searchCancelled=false;cancellable=true;setBusy(true);ui.notice.textContent='';
-      const current=currentCrs();
-      try{
-        const check=await ProjectionSearch.crossValidate(points,current.code,current.model,image.naturalWidth,image.naturalHeight,{cancelled:()=>searchCancelled,progress:(i,n)=>{ui.validationInfo.textContent=`Auslassprüfung: Punkt ${i}/${n}`;}});
-        ui.validationInfo.textContent=`Auslassprüfung (jeweils neu angepasst):\nRMS ${formatDistance(check.rms)} · Maximum ${formatDistance(check.max)}\nOriginalbild: ${Number.isFinite(check.pixelRms)?check.pixelRms.toFixed(2):'nicht berechenbar'} px RMS\n${check.rows.map(r=>`Punkt ${r.id}: ${formatDistance(r.error)}`).join('\n')}`;
-      }catch(err){ui.validationInfo.textContent='';showError(err);}
-      finally{cancellable=false;setBusy(false);}
-    }
-    async function fitProjections(all) {
-      if (busy || capture || !image || points.filter(p => p.fit).length < 3) return;
-      ui.notice.textContent = ''; setBusy(true);
-      const codes = all ? fixedCodes : [currentCrs().code], computed = [];
-      try {
-        for (let i=0; i<codes.length; i++) {
-          ui.comparisonNote.textContent = `Berechne ${i+1} / ${codes.length}: ${codes[i]}`;
+
+        computed.sort((left, right) => (left.error ? Infinity : left.fit.rms) - (right.error ? Infinity : right.fit.rms));
+        const best = computed.find(result => !result.error);
+        if (!best) throw new Error('Keine Projektionsvariante konnte angepasst werden.');
+        for (const result of computed) if (result.model) registerModel(result.model);
+        applyResult(best);
+
+        const pixelRms = best.pixel?.rms;
+        const threshold = Math.max(3, Math.min(12, Math.hypot(image.naturalWidth, image.naturalHeight) * .004));
+        const needsCorrection = Number.isFinite(pixelRms) && pixelRms > threshold;
+        if (needsCorrection && fitCount >= ThinPlateSpline.minimumPoints) {
+          ui.automationInfo.textContent = 'Stufe 3/3: Lokale TPS-Korrektur berechnen';
           await new Promise(resolve => setTimeout(resolve, 0));
-          try { computed.push({...GeoFit.solve(points, codes[i], image.naturalWidth, image.naturalHeight),model:candidates.find(c=>c.code===codes[i])?.model}); }
-          catch (err) { computed.push({ code: codes[i], error: err.message || String(err) }); }
+          try {
+            const geometry = sourceGeometry();
+            const code = currentCrs().code;
+            const basePredict = (u, v) => {
+              const latLng = projectionUvToLatLng(u, v, geometry, code);
+              return { lat: latLng.lat, lon: latLng.lng };
+            };
+            tpsCorrection = ThinPlateSpline.fitResiduals(points, image.naturalWidth, image.naturalHeight, basePredict);
+            transformMode = 'projection+tps';
+            ui.automationInfo.textContent = `TPS-Korrektur verwendet · ${fitCount} Fit-Punkte · vorheriger Restfehler ${pixelRms.toFixed(1)} px`;
+            ui.notice.textContent = 'Die Projektionsanpassung allein war nicht genau genug. Lokale Abweichungen werden deshalb geometrisch korrigiert.';
+            refresh();
+          } catch (error) {
+            transformMode = 'projection'; tpsCorrection = null;
+            ui.automationInfo.textContent = `Projektionsmodell verwendet · Restfehler ${pixelRms.toFixed(1)} px`;
+            ui.notice.textContent = `TPS-Korrektur nicht stabil möglich: ${error.message}`;
+          }
+        } else {
+          const stage = best.model ? 'Optimiertes Projektionsmodell' : 'Festes Projektionsmodell';
+          ui.automationInfo.textContent = `${stage} verwendet · Restfehler ${Number.isFinite(pixelRms) ? pixelRms.toFixed(1) + ' px' : 'nicht berechenbar'}`;
+          if (needsCorrection) {
+            ui.notice.textContent = `Für eine automatische TPS-Korrektur werden mindestens ${ThinPlateSpline.minimumPoints} aktive, gut verteilte Referenzpunkte benötigt.`;
+          }
         }
-        results = all ? computed : [...results.filter(r => r.code !== codes[0]), ...computed];
-        results.sort((a,b) => (a.error ? Infinity : a.fit.rms)-(b.error ? Infinity : b.fit.rms));
-        const best = all ? results.find(r => !r.error) : computed.find(r => !r.error);
-        if (best) applyResult(best); else showError(computed.map(r => `${r.code}: ${r.error}`).join('\n'));
-      } finally { setBusy(false); }
+      } catch (error) {
+        showError(error);
+        if (!fitted) ui.automationInfo.textContent = '';
+      } finally {
+        cancellable = false; setBusy(false);
+      }
     }
     function fitSource() { if (image) sourceMap.fitBounds([[0,0],[image.naturalHeight,image.naturalWidth]], { padding: [20,20], animate: false }); }
     function readDataUrl(file) { return new Promise((resolve,reject) => { const reader = new FileReader(); reader.onload = () => resolve(reader.result); reader.onerror = () => reject(new Error('Datei konnte nicht gelesen werden.')); reader.readAsDataURL(file); }); }
@@ -438,14 +438,14 @@ import './styles.css';
     function saveProject() {
       if (!image || busy || capture) return;
       const viewCenter = map.getCenter().wrap();
-      const project = { format: 'pixelkarte-georeferenzierung', version: 2, image: { name: imageName, data: imageData }, points, alignment: { code: currentCrs().code, projection: currentCrs().model, center: { lat: imageCenter.lat, lon: imageCenter.lng }, halfWidth: halfWidthSource, rotation }, view: { center: { lat: Math.max(-85,Math.min(85,viewCenter.lat)), lon: viewCenter.lng }, zoom: map.getZoom(), basemap: els.basemap.value, opacity: Number(els.opacity.value), mesh: renderMesh, showSource: ui.showSource.checked, showResiduals: ui.showResiduals.checked } };
+      const project = { format: 'pixelkarte-georeferenzierung', version: 3, image: { name: imageName, data: imageData }, points, alignment: { method: transformMode, code: currentCrs().code, projection: currentCrs().model, center: { lat: imageCenter.lat, lon: imageCenter.lng }, halfWidth: halfWidthSource, rotation, tpsRegularization: transformMode === 'projection+tps' ? tpsCorrection.regularization : undefined }, view: { center: { lat: Math.max(-85,Math.min(85,viewCenter.lat)), lon: viewCenter.lng }, zoom: map.getZoom(), basemap: els.basemap.value, opacity: Number(els.opacity.value), mesh: renderMesh, showSource: ui.showSource.checked, showResiduals: ui.showResiduals.checked } };
       const url = URL.createObjectURL(new Blob([JSON.stringify(project, null, 2)], { type: 'application/json' }));
       const link = document.createElement('a'); link.href = url; link.download = imageName.replace(/\.[^.]+$/, '') + '.georeferenzierung.json'; document.body.appendChild(link); link.click(); link.remove(); setTimeout(() => URL.revokeObjectURL(url), 1000);
     }
     function validateProject(data) {
       const finite = Number.isFinite;
       const ll = p => p && finite(p.lat) && finite(p.lon) && Math.abs(p.lat) <= 85.05112878 && Math.abs(p.lon) <= 180;
-      if (!data || data.format !== 'pixelkarte-georeferenzierung' || ![1,2].includes(data.version)) throw new Error('Unbekanntes Projektformat oder unbekannte Version.');
+      if (!data || data.format !== 'pixelkarte-georeferenzierung' || ![1,2,3].includes(data.version)) throw new Error('Unbekanntes Projektformat oder unbekannte Version.');
       if (typeof data.image?.name !== 'string' || typeof data.image?.data !== 'string' || !/^data:image\/(png|jpeg|webp|gif);base64,[A-Za-z0-9+/=\r\n]+$/.test(data.image.data)) throw new Error('Projekt enthält kein unterstütztes eingebettetes Bild.');
       if (!Array.isArray(data.points)) throw new Error('Referenzpunktliste fehlt.');
       const ids = new Set();
@@ -455,6 +455,9 @@ import './styles.css';
       }
       const a = data.alignment, v = data.view;
       if (!a || !ll(a.center) || !finite(a.halfWidth) || a.halfWidth <= 0 || !finite(a.rotation) || Math.abs(a.rotation) > 180) throw new Error('Ungültige Ausrichtung.');
+      const method = data.version >= 3 ? a.method : 'projection';
+      if (!['projection','projection+tps'].includes(method)) throw new Error('Unbekannte Transformationsmethode.');
+      if (method === 'projection+tps' && data.points.filter(point => point.fit).length < ThinPlateSpline.minimumPoints) throw new Error('Zu wenige Fit-Punkte für die gespeicherte TPS-Korrektur.');
       if(a.projection){
         ProjectionSearch.definition(a.projection);
         if(a.code!=='CUSTOM:'+a.projection.family)throw new Error('Projektionscode und Parameter widersprechen sich.');
@@ -477,7 +480,20 @@ import './styles.css';
         els.opacity.value = v.opacity; els.opacityValue.textContent = v.opacity+' %';
         map.removeLayer(activeBasemap); els.basemap.value = v.basemap; activeBasemap = basemaps[v.basemap].addTo(map);
         map.setView([v.center.lat,v.center.lon],v.zoom, { animate: false }); ui.showResiduals.checked = v.showResiduals; setSourceVisible(v.showSource);
-        results = []; fitted = true; updateCapture(); ui.notice.textContent = 'Projekt geladen.'; refresh();
+        fitted = true; transformMode = 'projection'; tpsCorrection = null;
+        if (a.method === 'projection+tps') {
+          const geometry = sourceGeometry();
+          const code = currentCrs().code;
+          const basePredict = (u, v) => {
+            const latLng = projectionUvToLatLng(u, v, geometry, code);
+            return { lat: latLng.lat, lon: latLng.lng };
+          };
+          tpsCorrection = ThinPlateSpline.fitResiduals(points, image.naturalWidth, image.naturalHeight, basePredict, a.tpsRegularization || 1e-8);
+          transformMode = 'projection+tps';
+        }
+        updateCapture(); ui.notice.textContent = 'Projekt geladen.';
+        ui.automationInfo.textContent = transformMode === 'projection+tps' ? 'Gespeichertes Projektionsmodell mit TPS-Korrektur' : 'Gespeichertes Projektionsmodell';
+        refresh();
       } catch (err) { showError(err); }
       finally { ui.projectFile.value = ''; setBusy(false); }
     }
@@ -525,11 +541,8 @@ import './styles.css';
         if(bounds.isValid())map.fitBounds(bounds,{padding:[24,24],animate:false,maxZoom:16});
       }catch(err){showError(err);}
     };
-    ui.fitCrs.onclick = () => fitProjections(true);
-    ui.compare.onclick = () => fitProjections(true);
-    ui.searchParameters.onclick = searchParameters;
-    ui.cancelSearch.onclick = () => {searchCancelled=true;ui.cancelSearch.disabled=true;ui.comparisonNote.textContent='Wird abgebrochen …';};
-    ui.validateFit.onclick = validateFit;
+    ui.fitCrs.onclick = automaticFit;
+    ui.cancelSearch.onclick = () => {searchCancelled=true;ui.cancelSearch.disabled=true;ui.automationInfo.textContent='Wird abgebrochen …';};
     ui.saveProject.onclick = saveProject;
     ui.loadProject.onclick = () => ui.projectFile.click();
     ui.projectFile.onchange = () => loadProject(ui.projectFile.files[0]);
