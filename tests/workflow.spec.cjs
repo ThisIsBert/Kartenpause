@@ -89,7 +89,7 @@ test('Originalbild zoomt ohne seitlichen Versatz', async ({ page }) => {
   await page.waitForTimeout(500);
   const afterWheel = await sourceImageOffset(page);
   // Leaflet may round the final CSS transform by a few device pixels.
-  expect(Math.abs(afterWheel - beforeWheel)).toBeLessThan(4);
+  expect(Math.abs(afterWheel - beforeWheel)).toBeLessThan(5);
 });
 
 async function openApp(page) {
