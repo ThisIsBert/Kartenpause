@@ -42,6 +42,8 @@ Der einzige Anpassungsbutton arbeitet in bis zu drei Stufen:
 
 TPS korrigiert nur die Restabweichung des besten Projektionsmodells. So bleibt die Extrapolation außerhalb der Referenzpunkte stabiler als bei einer rein geometrischen TPS-Transformation. Projektdateien der Versionen 1 und 2 bleiben ladbar; neue Projekte verwenden Version 3 und speichern die gewählte Transformationsstufe.
 
-## Datenschutz der Beispieldaten
+## Testkarten
 
-Lokale `*.georeferenzierung.json`-Dateien können eingebettete, urheberrechtlich geschützte Kartenbilder enthalten. Sie werden durch `.gitignore` nicht in das öffentliche Repository aufgenommen. Die Tests erzeugen ihre Rasterkarte stattdessen vollständig synthetisch.
+Die vorhandenen manuellen Testprojekte liegen unter [`examples/`](examples/). Jede Projektdatei enthält das Rasterbild und die Referenzpunkte, kann also direkt über „Laden“ geöffnet werden. Neue `*.georeferenzierung.json`-Dateien im Projektstamm bleiben standardmäßig ignoriert und werden nicht versehentlich veröffentlicht.
+
+Die automatisierten Tests erzeugen zusätzlich eine vollständig synthetische Rasterkarte. Vor einer Weiterverwendung der eingebetteten Kartenbilder sind die jeweiligen Nutzungsrechte und Quellenhinweise zu prüfen.

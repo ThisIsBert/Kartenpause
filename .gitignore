@@ -5,8 +5,9 @@ output/
 .env
 .env.*
 
-# Lokale Kartenprojekte enthalten eingebettete Bilder und werden nicht veröffentlicht.
-*.georeferenzierung.json
+# Neue lokale Kartenprojekte im Projektstamm bleiben privat. Bewusst
+# veröffentlichte Testkarten liegen dagegen versioniert unter examples/.
+/*.georeferenzierung.json
 
 # Historische Einzeldatei-Sicherungen; die Versionsgeschichte übernimmt künftig Git.
 kartenprojektion_prototyp_v2_1.original.html
