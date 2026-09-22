@@ -1,336 +1,25 @@
-<!doctype html>
-<html lang="de">
-<head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Pixelkarte auf Basiskarte – Georeferenzierung</title>
-  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.css" />
-  <style>
-    :root { font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
-    html, body { height: 100%; margin: 0; }
-    body { display: grid; grid-template-columns: 360px minmax(0, 1fr); overflow: hidden; background: #f6f6f6; }
-    #sidebar { box-sizing: border-box; height: 100%; overflow: auto; padding: 16px; border-right: 1px solid #ccc; background: white; }
-    #map { height: 100%; width: 100%; }
-    h1 { font-size: 20px; margin: 0 0 12px; }
-    h2 { font-size: 14px; margin: 20px 0 8px; }
-    p, .hint { font-size: 13px; line-height: 1.4; }
-    .hint { color: #555; }
-    .row { display: grid; grid-template-columns: 1fr auto; gap: 8px; align-items: center; margin: 8px 0; }
-    .stack { display: grid; gap: 8px; }
-    input[type="file"], select, button { width: 100%; box-sizing: border-box; font: inherit; }
-    button, select, input[type="file"] { padding: 8px; }
-    input[type="range"] { width: 100%; }
-    .value { min-width: 64px; text-align: right; font-variant-numeric: tabular-nums; color: #333; }
-    #status { margin-top: 12px; padding: 10px; background: #f1f3f5; border-radius: 6px; font-size: 12px; white-space: pre-wrap; }
-    details { font-size: 12px; margin-top: 14px; }
-    code { font-size: 11px; }
-    * { letter-spacing: 0; }
-    #workspace { min-width: 0; min-height: 0; display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
-    #workspace.single { grid-template-columns: minmax(0, 1fr); }
-    #workspace.single #sourcePanel { display: none; }
-    .map-panel { min-width: 0; min-height: 0; display: grid; grid-template-rows: 42px minmax(0, 1fr); }
-    .panelbar { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 4px 12px; border-bottom: 1px solid #ccc; background: #fff; font-size: 13px; }
-    .panelbar span { font-size: 11px; min-width: 0; overflow-wrap: anywhere; text-align: right; }
-    #sourceMap { background: #e7eaed; height: 100%; }
-    #sourcePanel { border-right: 1px solid #bbb; }
-    .commands { display: flex; gap: 6px; align-items: center; margin: 8px 0; }
-    button { cursor: pointer; border: 1px solid #aeb5bc; background: #fff; border-radius: 4px; color: #20252a; }
-    button:hover { background: #edf4f4; }
-    button:disabled { cursor: default; opacity: .45; }
-    button.primary { background: #176c65; border-color: #176c65; color: white; }
-    button svg { width: 16px; height: 16px; vertical-align: middle; flex-shrink: 0; }
-    .icon { width: 32px; height: 32px; padding: 6px; flex: 0 0 32px; display: inline-flex; justify-content: center; align-items: center; }
-    .check { display: flex; gap: 8px; align-items: center; font-size: 13px; margin: 10px 0; }
-    #captureStatus, #notice, #comparisonNote, #renderNote { font-size: 12px; line-height: 1.45; overflow-wrap: anywhere; }
-    #captureStatus:not(:empty), #notice:not(:empty) { padding: 8px; background: #fff2c9; margin: 8px 0; border-left: 3px solid #bd8914; }
-    #captureStatus:empty, #notice:empty, #renderNote:empty { display: none; }
-    table { width: 100%; border-collapse: collapse; font-size: 12px; table-layout: fixed; }
-    th, td { border-bottom: 1px solid #e1e4e7; padding: 6px 3px; text-align: left; overflow-wrap: anywhere; }
-    th { font-weight: 600; }
-    .point-number { width: 28px; } .point-fit { width: 36px; } .point-actions { width: 72px; }
-    #pointList .icon { width: 30px; flex-basis: 30px; height: 30px; }
-    #metrics { font-size: 12px; line-height: 1.6; margin: 8px 0; white-space: pre-line; }
-    #ranking button { display: flex; align-items: center; justify-content: space-between; gap: 8px; text-align: left; margin: 4px 0; font-size: 12px; }
-    #ranking button span:first-child { min-width: 0; overflow-wrap: anywhere; }
-    #ranking button span:last-child { white-space: nowrap; }
-    #parameterInfo, #validationInfo { font-size: 12px; line-height: 1.5; overflow-wrap: anywhere; white-space: pre-line; margin: 8px 0; }
-    #searchAvailability { font-size: 12px; line-height: 1.45; color: #555; overflow-wrap: anywhere; }
-    #searchAvailability:empty { display: none; }
-    #ranking small { display: block; font-size: 11px; color: #555; }
-    #ranking button[aria-pressed="true"] { border-color: #176c65; background: #e8f4f1; }
-    .point-marker { --marker-color: #176c65; width: 32px !important; height: 32px !important; margin: -16px 0 0 -16px !important; color: var(--marker-color); cursor: crosshair; }
-    .point-marker::before, .point-marker::after { content: ""; position: absolute; background: var(--marker-color); box-shadow: 0 0 0 1px rgba(255,255,255,.85); }
-    .point-marker::before { left: 0; top: 15px; width: 32px; height: 2px; }
-    .point-marker::after { left: 15px; top: 0; width: 2px; height: 32px; }
-    .point-marker span { position: absolute; z-index: 1; left: 20px; top: -7px; min-width: 15px; height: 15px; padding: 0 3px; box-sizing: border-box; border-radius: 8px; background: var(--marker-color); color: #fff; font: bold 10px/15px system-ui; text-align: center; box-shadow: 0 0 0 1px #fff; }
-    .point-marker.control { --marker-color: #675694; }
-    .point-marker.pending { --marker-color: #a76a00; }
-    .predicted-marker { --marker-color: #b0273f; }
-    .capture-source #sourceMap, .capture-target #map { cursor: crosshair; }
-    [hidden] { display: none !important; }
-    @media (max-width: 800px) {
-      body { grid-template-columns: 1fr; grid-template-rows: 310px 1fr; }
-      #sidebar { border-right: 0; border-bottom: 1px solid #ccc; }
-      #workspace { grid-template-columns: minmax(0, 1fr); grid-template-rows: minmax(0, 1fr) minmax(0, 1fr); }
-      #workspace.single { grid-template-rows: minmax(0, 1fr); }
-      #sourcePanel { border-right: 0; border-bottom: 1px solid #bbb; }
-    }
-  </style>
-</head>
-<body>
-  <aside id="sidebar">
-    <h1>Pixelkarte → Basiskarte</h1>
+import L from 'leaflet';
+import 'leaflet/dist/leaflet.css';
+import proj4 from 'proj4';
+import {
+  createIcons,
+  Crosshair,
+  FolderOpen,
+  ListOrdered,
+  MapPinPlus,
+  Pencil,
+  Save,
+  Scan,
+  ScanSearch,
+  ShieldCheck,
+  Trash2,
+  X
+} from 'lucide';
+import { GeoFit } from './geo/geo-fit.js';
+import { ProjectionSearch } from './geo/projection-search.js';
+import './styles.css';
 
-    <h2>Basiskarte</h2>
-    <select id="basemap">
-      <option value="esriStreet" selected>Esri World Street Map</option>
-      <option value="esriTopo">Esri World Topographic Map</option>
-      <option value="osm">OpenStreetMap (kann bei Direktstart 403 liefern)</option>
-    </select>
 
-    <h2>1. Vorlage</h2>
-    <input id="file" type="file" accept="image/png,image/jpeg,image/webp,image/gif" />
-    <div class="row">
-      <label for="opacity">Deckkraft</label><span id="opacityValue" class="value">55 %</span>
-    </div>
-    <input id="opacity" type="range" min="0" max="100" value="55" />
-
-    <h2>2. Referenzpunkte</h2>
-    <label class="check"><input id="showSource" type="checkbox" checked />Originalbild anzeigen</label>
-    <div class="commands">
-      <button id="addPoint" class="primary"><i data-lucide="map-pin-plus"></i> Referenzpunkt hinzufügen</button>
-      <button id="cancelPoint" class="icon" title="Punktaufnahme abbrechen" aria-label="Punktaufnahme abbrechen" hidden><i data-lucide="x"></i></button>
-      <button id="clearPoints" class="icon" title="Alle Referenzpunkte löschen" aria-label="Alle Referenzpunkte löschen"><i data-lucide="trash-2"></i></button>
-    </div>
-    <div id="captureStatus" role="status" aria-live="polite"></div>
-    <table aria-label="Referenzpunktpaare"><thead><tr><th class="point-number">Nr.</th><th class="point-fit" title="Für Anpassung verwenden; ohne Haken nur Kontrollpunkt">Fit</th><th>Abweichung</th><th class="point-actions">Aktion</th></tr></thead><tbody id="pointList"></tbody></table>
-    <label class="check"><input id="showResiduals" type="checkbox" checked />Abweichungen anzeigen</label>
-    <div id="metrics" aria-live="polite"></div>
-    <div class="stack">
-      <button id="fitCrs"><i data-lucide="crosshair"></i> Projektion automatisch anpassen</button>
-      <button id="compare"><i data-lucide="list-ordered"></i> Projektionen vergleichen</button>
-      <button id="searchParameters" aria-describedby="searchAvailability"><i data-lucide="scan-search"></i> Projektionsparameter suchen</button>
-      <div id="searchAvailability" role="status" aria-live="polite"></div>
-      <button id="cancelSearch" hidden><i data-lucide="x"></i> Suche abbrechen</button>
-    </div>
-    <div id="parameterInfo"></div>
-    <button id="validateFit"><i data-lucide="shield-check"></i> Auslassprüfung</button>
-    <div id="validationInfo" role="status"></div>
-    <h2>Projektionsvergleich</h2>
-    <div id="comparisonNote" role="status"></div>
-    <div id="ranking"></div>
-    <h2>Projekt</h2>
-    <div class="commands">
-      <button id="saveProject"><i data-lucide="save"></i> Speichern</button>
-      <button id="loadProject"><i data-lucide="folder-open"></i> Laden</button>
-    </div>
-    <input id="projectFile" type="file" accept=".json,application/json" hidden />
-    <div id="notice" role="alert"></div>
-    <div id="renderNote"></div>
-    <div id="status">Noch kein Bild geladen.</div>
-  </aside>
-
-  <main id="workspace">
-    <section id="sourcePanel" class="map-panel"><div class="panelbar"><strong>Originalbild</strong><button id="sourceFit" class="icon" title="Ganzes Bild anzeigen" aria-label="Ganzes Bild anzeigen"><i data-lucide="scan"></i></button></div><div id="sourceMap" aria-label="Originalbild mit Referenzpunkten"></div></section>
-    <section class="map-panel"><div class="panelbar"><strong>Basiskarte</strong><span id="alignmentLabel">Noch nicht angepasst</span><button id="zoomImage" class="icon" title="Auf die angepasste Vorlage zoomen" aria-label="Auf die angepasste Vorlage zoomen"><i data-lucide="scan"></i></button></div><div id="map" aria-label="Georeferenzierte Karte"></div></section>
-  </main>
-
-  <script src="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/proj4@2.21.0/dist/proj4.js"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/numeric/1.2.6/numeric.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/lucide@0.468.0/dist/umd/lucide.min.js"></script>
-  <script>
-  const GeoFit = (() => {
-    const radians = Math.PI / 180;
-    function distance(a, b) {
-      const dlat = (a.lat - b.lat) * radians, dlon = (a.lon - b.lon) * radians;
-      const h = Math.sin(dlat / 2) ** 2 + Math.cos(a.lat * radians) * Math.cos(b.lat * radians) * Math.sin(dlon / 2) ** 2;
-      return 12742000 * Math.asin(Math.sqrt(Math.max(0, Math.min(1, h))));
-    }
-    function xy(point, width, height) {
-      return [(point.source.u - .5) * width, (.5 - point.source.v) * height];
-    }
-    function predict(point, g, code, width, height) {
-      const [x, y] = xy(point, width, height), scale = 2 * g.hw / width;
-      const c = Math.cos(g.rot), s = Math.sin(g.rot);
-      const ll = proj4(code, 'EPSG:4326', [g.cx + scale * (c * x - s * y), g.cy + scale * (s * x + c * y)]);
-      if (!ll.every(Number.isFinite) || Math.abs(ll[1]) > 90) throw new Error('Punkt außerhalb des Projektionsbereichs.');
-      return { lon: ll[0], lat: ll[1] };
-    }
-    function stats(rows) {
-      if (!rows.length) return null;
-      if (rows.some(r => !Number.isFinite(r.error))) return { rms: Infinity, mean: Infinity, max: Infinity, count: rows.length };
-      return { rms: Math.sqrt(rows.reduce((s, r) => s + r.error ** 2, 0) / rows.length), mean: rows.reduce((s, r) => s + r.error, 0) / rows.length, max: Math.max(...rows.map(r => r.error)), count: rows.length };
-    }
-    function evaluate(points, g, code, width, height) {
-      const rows = points.map(point => {
-        try {
-          const predicted = predict(point, g, code, width, height);
-          const target = proj4('EPSG:4326', code, [point.target.lon,point.target.lat]);
-          const dx=target[0]-g.cx, dy=target[1]-g.cy, c=Math.cos(g.rot), s=Math.sin(g.rot), scale=2*g.hw/width;
-          const [x,y]=xy(point,width,height);
-          const pixelError=Math.hypot((c*dx+s*dy)/scale-x,(-s*dx+c*dy)/scale-y);
-          return { id: point.id, fit: point.fit, predicted, error: distance(predicted, point.target), pixelError };
-        }
-        catch (_) { return { id: point.id, fit: point.fit, predicted: null, error: Infinity }; }
-      });
-      return { rows, fit: stats(rows.filter(r => r.fit)), control: stats(rows.filter(r => !r.fit)), pixel: stats(rows.filter(r=>r.fit).map(r=>({error:r.pixelError}))) };
-    }
-    function distribution(points, width, height) {
-      const fit = points.filter(p => p.fit), coords = fit.map(p => xy(p, width, height));
-      if (fit.length < 3) return 'Mindestens drei aktive Fit-Punktpaare erforderlich.';
-      const mx = coords.reduce((s, p) => s + p[0], 0) / fit.length, my = coords.reduce((s, p) => s + p[1], 0) / fit.length;
-      let xx = 0, yy = 0, cross = 0;
-      coords.forEach(([x, y]) => { xx += (x - mx) ** 2; yy += (y - my) ** 2; cross += (x - mx) * (y - my); });
-      const trace = xx + yy;
-      if (trace / fit.length < 4) return 'Fit-Punkte liegen nahezu aufeinander.';
-      if ((xx * yy - cross ** 2) / (trace ** 2) < .0025) return 'Fit-Punkte liegen fast auf einer Linie. Die Fläche ist schlecht abgesichert.';
-      if (trace / fit.length / (width ** 2 + height ** 2) < .01) return 'Fit-Punkte liegen eng beieinander. Die übrige Bildfläche ist schlecht abgesichert.';
-      return '';
-    }
-    function solve(points, code, width, height, refine = true) {
-      const fit = points.filter(p => p.fit);
-      if (fit.length < 3) throw new Error('Mindestens drei aktive Fit-Punktpaare erforderlich.');
-      const src = fit.map(p => xy(p, width, height));
-      const dst = fit.map(p => {
-        const q = proj4('EPSG:4326', code, [p.target.lon, p.target.lat]);
-        if (!q.every(Number.isFinite)) throw new Error('Zielpunkt nicht projizierbar.');
-        const back = proj4(code, 'EPSG:4326', q);
-        if (!back.every(Number.isFinite) || distance(p.target, { lon: back[0], lat: back[1] }) > 2) throw new Error('Zielpunkt außerhalb des zuverlässig transformierbaren Bereichs.');
-        return q;
-      });
-      const mean = data => [0, 1].map(k => data.reduce((s, p) => s + p[k], 0) / data.length);
-      const sm = mean(src), dm = mean(dst);
-      let den = 0, dot = 0, cross = 0;
-      src.forEach((p, i) => {
-        const x = p[0] - sm[0], y = p[1] - sm[1], X = dst[i][0] - dm[0], Y = dst[i][1] - dm[1];
-        den += x*x + y*y; dot += x*X + y*Y; cross += x*Y - y*X;
-      });
-      if (den / fit.length < 4) throw new Error('Fit-Punkte liegen nahezu aufeinander.');
-      // Complex multiplication encodes rotation and a single scale, with no reflection.
-      const a = dot / den, b = cross / den, scale = Math.hypot(a, b);
-      if (!Number.isFinite(scale) || scale < 1e-12) throw new Error('Zielpunkte ergeben keinen brauchbaren Maßstab.');
-      const initial = { cx: dm[0] - a*sm[0] + b*sm[1], cy: dm[1] - b*sm[0] - a*sm[1], hw: scale*width/2, hh: scale*height/2, rot: Math.atan2(b, a) };
-      if (!refine) return { code, g: initial, ...evaluate(points,initial,code,width,height), warning: '' };
-      const reference = Math.max(1, fit.reduce((s, p) => s + distance(p.target, fit[0].target) ** 2, 0) / fit.length);
-      const geometry = v => ({ cx: initial.cx + v[0]*initial.hw, cy: initial.cy + v[1]*initial.hw, hw: initial.hw*Math.exp(v[2]), hh: initial.hh*Math.exp(v[2]), rot: initial.rot + v[3] });
-      const loss = v => {
-        if (!v.every(Number.isFinite) || Math.abs(v[2]) > 10) return 1e12;
-        const result = evaluate(fit, geometry(v), code, width, height).fit.rms;
-        return Number.isFinite(result) ? result ** 2 / reference : 1e12;
-      };
-      if (!window.numeric?.uncmin) throw new Error('Optimierungsbibliothek nicht geladen. Internetverbindung prüfen und neu laden.');
-      const start = [0, 0, 0, 0], initialLoss = loss(start);
-      if (initialLoss >= 1e12) throw new Error('Anfangsanpassung nicht rücktransformierbar.');
-      let g = initial, warning = '';
-      try {
-        const opt = numeric.uncmin(loss, start, 1e-9, undefined, 250);
-        if (loss(opt.solution) <= initialLoss) g = geometry(opt.solution);
-        if (opt.iterations >= 250) warning = 'Iterationsgrenze erreicht; beste gefundene Anpassung.';
-      } catch (_) { warning = 'Numerische Verfeinerung fehlgeschlagen; Ausgangsanpassung verwendet.'; }
-      g.rot = ((g.rot + Math.PI) % (2*Math.PI) + 2*Math.PI) % (2*Math.PI) - Math.PI;
-      return { code, g, ...evaluate(points, g, code, width, height), warning };
-    }
-    return { distance, evaluate, solve, distribution };
-  })();
-  </script>
-  <script>
-  const ProjectionSearch = (() => {
-    const minimumPoints = 4;
-    const names = { eqc: 'Längentreue Zylinderprojektion', lcc: 'Lambert konisch', aea: 'Albers flächentreu', eqdc: 'Längentreue Kegelprojektion', laea: 'Lambert azimutal', aeqd: 'Azimutal längentreu', stere: 'Stereografisch', ortho: 'Orthografisch', gnom: 'Gnomonisch', tmerc: 'Transversale Mercatorprojektion', robin: 'Robinson', moll: 'Mollweide', eqearth: 'Equal Earth', sinu: 'Sinusoidal', poly: 'Polykonisch' };
-    const keys = family => family === 'eqc' ? ['lat_ts'] : family === 'lcc' ? ['lat_1'] : ['aea','eqdc'].includes(family) ? ['lat_1','lat_2'] : ['laea','aeqd','stere','ortho','gnom'].includes(family) ? ['lon_0','lat_0'] : ['lon_0'];
-    const wrap = lon => ((lon+180)%360+360)%360-180;
-    const clamp = lat => Math.max(-80,Math.min(80,lat));
-    function definition(model) {
-      if (!model || !Object.hasOwn(names,model.family) || !model.parameters) throw new Error('Unbekannte Projektionsfamilie.');
-      const p=model.parameters, required=[...new Set(['lon_0',...keys(model.family)])];
-      if (Object.keys(p).some(k=>!required.includes(k)) || required.some(k=>!Number.isFinite(p[k]))) throw new Error('Ungültige Projektionsparameter.');
-      if (Math.abs(p.lon_0)>180 || required.some(k=>k!=='lon_0'&&Math.abs(p[k])>85)) throw new Error('Projektionsparameter außerhalb der Suchgrenzen.');
-      if (model.family==='eqc'&&(p.lat_ts<0||p.lat_ts>80)) throw new Error('Ungültiger Standardbreitenkreis.');
-      if (model.family==='lcc'&&Math.abs(p.lat_1)<.05) throw new Error('Lambert-Kegel degeneriert am Äquator.');
-      if (['aea','eqdc'].includes(model.family)&&Math.abs(p.lat_1+p.lat_2)<.1) throw new Error('Kegelparameter degeneriert.');
-      const parameters={...p};
-      if (model.family==='lcc') parameters.lat_2=p.lat_1;
-      if (!Object.hasOwn(parameters,'lat_0')) parameters.lat_0=0;
-      return `+proj=${model.family} ${Object.entries(parameters).map(([k,v])=>`+${k}=${v}`).join(' ')} +x_0=0 +y_0=0 +datum=WGS84 +units=m +no_defs`;
-    }
-    function seeds(family,points) {
-      const fit=points.filter(p=>p.fit), lat=fit.reduce((s,p)=>s+p.target.lat,0)/fit.length;
-      const sin=fit.reduce((s,p)=>s+Math.sin(p.target.lon*Math.PI/180),0),cos=fit.reduce((s,p)=>s+Math.cos(p.target.lon*Math.PI/180),0);
-      const lon=wrap(Math.atan2(sin,cos)*180/Math.PI);
-      let starts;
-      if(family==='eqc') starts=[[10],[30],[55]];
-      else if(family==='lcc') starts=[lat-20,lat,lat+20].map(v=>[Math.abs(v)<.1 ? 1 : clamp(v)]);
-      else if(['aea','eqdc'].includes(family)) starts=[[clamp(lat-15),clamp(lat+15)],[clamp(lat),clamp(lat)],[clamp(lat-30),clamp(lat+30)]];
-      else if(['laea','aeqd','stere','ortho','gnom'].includes(family)) starts=[[lon,clamp(lat)],[wrap(lon-20),clamp(lat-20)],[wrap(lon+20),clamp(lat+20)]];
-      else starts=[[lon],[wrap(lon-25)],[wrap(lon+25)]];
-      return {lon,starts};
-    }
-    async function search(points,family,width,height,options={}) {
-      if (points.filter(p=>p.fit).length<minimumPoints) throw new Error('Mindestens vier Fit-Punkte für die Parametersuche erforderlich.');
-      if (!window.numeric?.uncmin) throw new Error('Optimierungsbibliothek fehlt.');
-      const fit=points.filter(p=>p.fit),{lon,starts}=seeds(family,fit),parameterKeys=keys(family);
-      const reference=Math.max(1,fit.reduce((s,p)=>s+GeoFit.distance(p.target,fit[0].target)**2,0)/fit.length);
-      let best=null, attempted=0, failures=0;
-      const makeModel=values=>({family,parameters:{lon_0:lon,...Object.fromEntries(parameterKeys.map((k,i)=>[k,values[i]]))}});
-      for(let seedIndex=0;seedIndex<starts.length;seedIndex++) {
-        await new Promise(resolve=>setTimeout(resolve,0));
-        if(options.cancelled?.()) throw new Error('Suche abgebrochen.');
-        options.progress?.(seedIndex+1,starts.length);
-        const values=starts[seedIndex];
-        try {
-          const initial=GeoFit.solve(fit,definition(makeModel(values)),width,height,false).g;
-          const geometry=v=>({cx:initial.cx+v[0]*initial.hw,cy:initial.cy+v[1]*initial.hw,hw:initial.hw*Math.exp(v[2]),hh:initial.hh*Math.exp(v[2]),rot:initial.rot+v[3]});
-          const loss=v=>{
-            if(!v.every(Number.isFinite)||Math.abs(v[2])>8) return 1e8;
-            try {
-              const model=makeModel(v.slice(4).map(x=>x*20)),def=definition(model),g=geometry(v);
-              const evaluation=GeoFit.evaluate(fit,g,def,width,height),rms=evaluation.fit.rms;
-              if(!Number.isFinite(rms)) return 1e8;
-              if(!best||rms<best.fit.rms) best={model,def,g,...evaluation};
-              return rms**2/reference;
-            } catch(_) {return 1e8;}
-          };
-          const start=[0,0,0,0,...values.map(x=>x/20)];loss(start);attempted++;
-          numeric.uncmin(loss,start,1e-9,undefined,220);
-        } catch(_) {failures++;}
-      }
-      if(!best) throw new Error('Keine gültige Anpassung innerhalb der Suchgrenzen.');
-      // Refine the alignment at the best parameters before publishing this candidate.
-      const refined=GeoFit.solve(points,best.def,width,height);
-      if(refined.fit.rms<=best.fit.rms) best.g=refined.g;
-      best.g.rot=((best.g.rot+Math.PI)%(2*Math.PI)+2*Math.PI)%(2*Math.PI)-Math.PI;
-      return { code:'CUSTOM:'+family, model:best.model, g:best.g, ...GeoFit.evaluate(points,best.g,best.def,width,height), warning:failures ? `${failures} Startversuch(e) ohne vollständige Optimierung; beste gefundene Lösung.` : '', starts:attempted };
-    }
-    async function crossValidate(points,code,model,width,height,options={}) {
-      const fit=points.filter(p=>p.fit);
-      if(fit.length<(model?5:4)) throw new Error(model?'Mindestens fünf Fit-Punkte für die Auslassprüfung mit Parametersuche.':'Mindestens vier Fit-Punkte für die Auslassprüfung.');
-      const rows=[];
-      for(let i=0;i<fit.length;i++) {
-        await new Promise(resolve=>setTimeout(resolve,0));
-        if(options.cancelled?.()) throw new Error('Prüfung abgebrochen.');
-        options.progress?.(i+1,fit.length);
-        const training=fit.filter((_,j)=>i!==j);
-        try {
-          const result=model ? await search(training,model.family,width,height,{cancelled:options.cancelled}) : GeoFit.solve(training,code,width,height);
-          const def=result.model ? definition(result.model) : code;
-          const test=GeoFit.evaluate([fit[i]],result.g,def,width,height).rows[0];rows.push(test);
-        } catch(err) {
-          if(options.cancelled?.()) throw err;
-          rows.push({id:fit[i].id,error:Infinity,pixelError:Infinity});
-        }
-      }
-      return {rows,rms:Math.sqrt(rows.reduce((s,r)=>s+r.error**2,0)/rows.length),max:Math.max(...rows.map(r=>r.error)),pixelRms:Math.sqrt(rows.reduce((s,r)=>s+r.pixelError**2,0)/rows.length)};
-    }
-    return { names, keys, definition, search, crossValidate, minimumPoints };
-  })();
-  </script>
-  <script>
-  (() => {
-    if (!window.L || !window.proj4) {
-      document.getElementById('notice').textContent = 'Kartenbibliotheken konnten nicht geladen werden. Internetverbindung prüfen und die Datei erneut öffnen.';
-      return;
-    }
     const map = L.map('map', { preferCanvas: true }).setView([51.1, 10.3], 6);
 
     const basemaps = {
@@ -521,7 +210,8 @@
     }
     function showError(err) { ui.notice.textContent = 'Fehler: ' + (err?.message || err); }
 
-    function icons() { if (window.lucide) lucide.createIcons(); }
+    const appIcons = { Crosshair, FolderOpen, ListOrdered, MapPinPlus, Pencil, Save, Scan, ScanSearch, ShieldCheck, Trash2, X };
+    function icons() { createIcons({ icons: appIcons }); }
     function formatDistance(value) {
       if (!Number.isFinite(value)) return 'nicht berechenbar';
       return value >= 1000 ? (value / 1000).toLocaleString('de-DE', { maximumFractionDigits: 2 }) + ' km' : value.toLocaleString('de-DE', { maximumFractionDigits: 1 }) + ' m';
@@ -850,7 +540,3 @@
     });
 
     refresh(); icons();
-  })();
-  </script>
-</body>
-</html>

@@ -1,0 +1,69 @@
+:root { font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
+    html, body { height: 100%; margin: 0; }
+    body { display: grid; grid-template-columns: 360px minmax(0, 1fr); overflow: hidden; background: #f6f6f6; }
+    #sidebar { box-sizing: border-box; height: 100%; overflow: auto; padding: 16px; border-right: 1px solid #ccc; background: white; }
+    #map { height: 100%; width: 100%; }
+    h1 { font-size: 20px; margin: 0 0 12px; }
+    h2 { font-size: 14px; margin: 20px 0 8px; }
+    p, .hint { font-size: 13px; line-height: 1.4; }
+    .hint { color: #555; }
+    .row { display: grid; grid-template-columns: 1fr auto; gap: 8px; align-items: center; margin: 8px 0; }
+    .stack { display: grid; gap: 8px; }
+    input[type="file"], select, button { width: 100%; box-sizing: border-box; font: inherit; }
+    button, select, input[type="file"] { padding: 8px; }
+    input[type="range"] { width: 100%; }
+    .value { min-width: 64px; text-align: right; font-variant-numeric: tabular-nums; color: #333; }
+    #status { margin-top: 12px; padding: 10px; background: #f1f3f5; border-radius: 6px; font-size: 12px; white-space: pre-wrap; }
+    details { font-size: 12px; margin-top: 14px; }
+    code { font-size: 11px; }
+    * { letter-spacing: 0; }
+    #workspace { min-width: 0; min-height: 0; display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+    #workspace.single { grid-template-columns: minmax(0, 1fr); }
+    #workspace.single #sourcePanel { display: none; }
+    .map-panel { min-width: 0; min-height: 0; display: grid; grid-template-rows: 42px minmax(0, 1fr); }
+    .panelbar { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 4px 12px; border-bottom: 1px solid #ccc; background: #fff; font-size: 13px; }
+    .panelbar span { font-size: 11px; min-width: 0; overflow-wrap: anywhere; text-align: right; }
+    #sourceMap { background: #e7eaed; height: 100%; }
+    #sourcePanel { border-right: 1px solid #bbb; }
+    .commands { display: flex; gap: 6px; align-items: center; margin: 8px 0; }
+    button { cursor: pointer; border: 1px solid #aeb5bc; background: #fff; border-radius: 4px; color: #20252a; }
+    button:hover { background: #edf4f4; }
+    button:disabled { cursor: default; opacity: .45; }
+    button.primary { background: #176c65; border-color: #176c65; color: white; }
+    button svg { width: 16px; height: 16px; vertical-align: middle; flex-shrink: 0; }
+    .icon { width: 32px; height: 32px; padding: 6px; flex: 0 0 32px; display: inline-flex; justify-content: center; align-items: center; }
+    .check { display: flex; gap: 8px; align-items: center; font-size: 13px; margin: 10px 0; }
+    #captureStatus, #notice, #comparisonNote, #renderNote { font-size: 12px; line-height: 1.45; overflow-wrap: anywhere; }
+    #captureStatus:not(:empty), #notice:not(:empty) { padding: 8px; background: #fff2c9; margin: 8px 0; border-left: 3px solid #bd8914; }
+    #captureStatus:empty, #notice:empty, #renderNote:empty { display: none; }
+    table { width: 100%; border-collapse: collapse; font-size: 12px; table-layout: fixed; }
+    th, td { border-bottom: 1px solid #e1e4e7; padding: 6px 3px; text-align: left; overflow-wrap: anywhere; }
+    th { font-weight: 600; }
+    .point-number { width: 28px; } .point-fit { width: 36px; } .point-actions { width: 72px; }
+    #pointList .icon { width: 30px; flex-basis: 30px; height: 30px; }
+    #metrics { font-size: 12px; line-height: 1.6; margin: 8px 0; white-space: pre-line; }
+    #ranking button { display: flex; align-items: center; justify-content: space-between; gap: 8px; text-align: left; margin: 4px 0; font-size: 12px; }
+    #ranking button span:first-child { min-width: 0; overflow-wrap: anywhere; }
+    #ranking button span:last-child { white-space: nowrap; }
+    #parameterInfo, #validationInfo { font-size: 12px; line-height: 1.5; overflow-wrap: anywhere; white-space: pre-line; margin: 8px 0; }
+    #searchAvailability { font-size: 12px; line-height: 1.45; color: #555; overflow-wrap: anywhere; }
+    #searchAvailability:empty { display: none; }
+    #ranking small { display: block; font-size: 11px; color: #555; }
+    #ranking button[aria-pressed="true"] { border-color: #176c65; background: #e8f4f1; }
+    .point-marker { --marker-color: #176c65; width: 32px !important; height: 32px !important; margin: -16px 0 0 -16px !important; color: var(--marker-color); cursor: crosshair; }
+    .point-marker::before, .point-marker::after { content: ""; position: absolute; background: var(--marker-color); box-shadow: 0 0 0 1px rgba(255,255,255,.85); }
+    .point-marker::before { left: 0; top: 15px; width: 32px; height: 2px; }
+    .point-marker::after { left: 15px; top: 0; width: 2px; height: 32px; }
+    .point-marker span { position: absolute; z-index: 1; left: 20px; top: -7px; min-width: 15px; height: 15px; padding: 0 3px; box-sizing: border-box; border-radius: 8px; background: var(--marker-color); color: #fff; font: bold 10px/15px system-ui; text-align: center; box-shadow: 0 0 0 1px #fff; }
+    .point-marker.control { --marker-color: #675694; }
+    .point-marker.pending { --marker-color: #a76a00; }
+    .predicted-marker { --marker-color: #b0273f; }
+    .capture-source #sourceMap, .capture-target #map { cursor: crosshair; }
+    [hidden] { display: none !important; }
+    @media (max-width: 800px) {
+      body { grid-template-columns: 1fr; grid-template-rows: 310px 1fr; }
+      #sidebar { border-right: 0; border-bottom: 1px solid #ccc; }
+      #workspace { grid-template-columns: minmax(0, 1fr); grid-template-rows: minmax(0, 1fr) minmax(0, 1fr); }
+      #workspace.single { grid-template-rows: minmax(0, 1fr); }
+      #sourcePanel { border-right: 0; border-bottom: 1px solid #bbb; }
+    }

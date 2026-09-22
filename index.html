@@ -1,0 +1,68 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="description" content="Historische und thematische Rasterkarten automatisch auf einer Basiskarte ausrichten." />
+  <title>Kartenpause – Karten georeferenzieren</title>
+</head>
+<body>
+<aside id="sidebar">
+    <h1>Pixelkarte → Basiskarte</h1>
+
+    <h2>Basiskarte</h2>
+    <select id="basemap">
+      <option value="esriStreet" selected>Esri World Street Map</option>
+      <option value="esriTopo">Esri World Topographic Map</option>
+      <option value="osm">OpenStreetMap (kann bei Direktstart 403 liefern)</option>
+    </select>
+
+    <h2>1. Vorlage</h2>
+    <input id="file" type="file" accept="image/png,image/jpeg,image/webp,image/gif" />
+    <div class="row">
+      <label for="opacity">Deckkraft</label><span id="opacityValue" class="value">55 %</span>
+    </div>
+    <input id="opacity" type="range" min="0" max="100" value="55" />
+
+    <h2>2. Referenzpunkte</h2>
+    <label class="check"><input id="showSource" type="checkbox" checked />Originalbild anzeigen</label>
+    <div class="commands">
+      <button id="addPoint" class="primary"><i data-lucide="map-pin-plus"></i> Referenzpunkt hinzufügen</button>
+      <button id="cancelPoint" class="icon" title="Punktaufnahme abbrechen" aria-label="Punktaufnahme abbrechen" hidden><i data-lucide="x"></i></button>
+      <button id="clearPoints" class="icon" title="Alle Referenzpunkte löschen" aria-label="Alle Referenzpunkte löschen"><i data-lucide="trash-2"></i></button>
+    </div>
+    <div id="captureStatus" role="status" aria-live="polite"></div>
+    <table aria-label="Referenzpunktpaare"><thead><tr><th class="point-number">Nr.</th><th class="point-fit" title="Für Anpassung verwenden; ohne Haken nur Kontrollpunkt">Fit</th><th>Abweichung</th><th class="point-actions">Aktion</th></tr></thead><tbody id="pointList"></tbody></table>
+    <label class="check"><input id="showResiduals" type="checkbox" checked />Abweichungen anzeigen</label>
+    <div id="metrics" aria-live="polite"></div>
+    <div class="stack">
+      <button id="fitCrs"><i data-lucide="crosshair"></i> Projektion automatisch anpassen</button>
+      <button id="compare"><i data-lucide="list-ordered"></i> Projektionen vergleichen</button>
+      <button id="searchParameters" aria-describedby="searchAvailability"><i data-lucide="scan-search"></i> Projektionsparameter suchen</button>
+      <div id="searchAvailability" role="status" aria-live="polite"></div>
+      <button id="cancelSearch" hidden><i data-lucide="x"></i> Suche abbrechen</button>
+    </div>
+    <div id="parameterInfo"></div>
+    <button id="validateFit"><i data-lucide="shield-check"></i> Auslassprüfung</button>
+    <div id="validationInfo" role="status"></div>
+    <h2>Projektionsvergleich</h2>
+    <div id="comparisonNote" role="status"></div>
+    <div id="ranking"></div>
+    <h2>Projekt</h2>
+    <div class="commands">
+      <button id="saveProject"><i data-lucide="save"></i> Speichern</button>
+      <button id="loadProject"><i data-lucide="folder-open"></i> Laden</button>
+    </div>
+    <input id="projectFile" type="file" accept=".json,application/json" hidden />
+    <div id="notice" role="alert"></div>
+    <div id="renderNote"></div>
+    <div id="status">Noch kein Bild geladen.</div>
+  </aside>
+
+  <main id="workspace">
+    <section id="sourcePanel" class="map-panel"><div class="panelbar"><strong>Originalbild</strong><button id="sourceFit" class="icon" title="Ganzes Bild anzeigen" aria-label="Ganzes Bild anzeigen"><i data-lucide="scan"></i></button></div><div id="sourceMap" aria-label="Originalbild mit Referenzpunkten"></div></section>
+    <section class="map-panel"><div class="panelbar"><strong>Basiskarte</strong><span id="alignmentLabel">Noch nicht angepasst</span><button id="zoomImage" class="icon" title="Auf die angepasste Vorlage zoomen" aria-label="Auf die angepasste Vorlage zoomen"><i data-lucide="scan"></i></button></div><div id="map" aria-label="Georeferenzierte Karte"></div></section>
+  </main>
+  <script type="module" src="/src/main.js"></script>
+</body>
+</html>

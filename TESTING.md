@@ -1,4 +1,4 @@
-# UI-Test
+# Tests
 
 ## Einmalige Installation
 
@@ -6,7 +6,7 @@
 npm.cmd install
 ```
 
-`npm.cmd` wird bewusst statt `npm` verwendet, weil PowerShell auf diesem Rechner die Datei `npm.ps1` durch die Ausführungsrichtlinie blockiert.
+`npm.cmd` wird unter Windows verwendet, falls die PowerShell-Ausführungsrichtlinie `npm.ps1` blockiert.
 
 ## Headless-Test
 
@@ -14,16 +14,17 @@ npm.cmd install
 npm.cmd run test:ui
 ```
 
-Der Test verwendet den lokal installierten Microsoft Edge. Er startet seinen eigenen Server, lädt die benötigten CDN-Bibliotheken reproduzierbar aus `node_modules` und beendet den Server anschließend wieder.
+Playwright startet einen Vite-Entwicklungsserver. Lokal läuft der Test mit Microsoft Edge, in GitHub Actions mit Chromium. Die Testkarte und ihre fünf Referenzpunkte werden zur Laufzeit erzeugt; private lokale Projektdateien und CDN-Abhängigkeiten sind nicht erforderlich.
 
 Geprüft werden unter anderem:
 
 - Entfernung der alten manuellen Projektionssteuerung
 - unsichtbare Bildüberlagerung vor einer Anpassung
-- Laden eines vorhandenen Projekts
+- Laden und Darstellen eines Projekts
 - nummerierte Fadenkreuz-Markierungen einschließlich Farbkontrast
 - automatische Auswahl aus allen festen Projektionskandidaten
 - gezeichnete Bildüberlagerung nach erfolgreicher Anpassung
+- stabiles Zoomen des Originalbilds ohne seitliches Springen
 - JavaScript-Seitenfehler
 
 Der Prüfscreenshot wird unter `output/playwright/workflow-smoke.png` gespeichert. Bei Fehlern landen Screenshot und Trace unter `output/playwright/test-results/`.
