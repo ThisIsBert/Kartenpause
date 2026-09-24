@@ -55,10 +55,51 @@
     .predicted-marker { --marker-color: #b0273f; }
     .capture-source #sourceMap, .capture-target #map { cursor: crosshair; }
     [hidden] { display: none !important; }
+    body { grid-template-columns: 360px minmax(0, 1fr) 0px; transition: grid-template-columns .32s ease; }
+    #sidebar { min-width: 0; transition: transform .32s ease, visibility .32s; }
+    #workspace { transition: grid-template-columns .32s ease; }
+    #sourcePanel { overflow: hidden; transition: transform .32s ease, visibility .32s; }
+    #drawingSidebar { box-sizing: border-box; min-width: 0; overflow: auto; padding: 16px; background: white; border-left: 1px solid #ccc; }
+    #drawingSidebar h1 { margin-top: 20px; }
+    #drawingSidebar label, #drawingSidebar legend { font-size: 13px; }
+    #drawingSidebar fieldset { margin: 20px 0 0; padding: 10px; min-width: 0; border: 1px solid #ccd5d3; border-radius: 6px; }
+    #drawingName { box-sizing: border-box; width: 100%; padding: 8px; margin-top: 6px; font: inherit; }
+    #drawingObjects { max-height: 180px; overflow: auto; }
+    #drawingObjects button { text-align: left; overflow-wrap: anywhere; }
+    #drawingSidebar button[aria-pressed="true"] { background: #e1f1ed; border-color: #176c65; color: #12544e; box-shadow: inset 3px 0 #176c65; }
+    #drawingStatus { font-size: 13px; line-height: 1.5; }
+    button:focus-visible, input:focus-visible { outline: 3px solid #287ac7; outline-offset: 2px; }
+    body.drawing-mode { grid-template-columns: 0px minmax(0, 1fr) 320px; }
+    .drawing-mode #sidebar { transform: translateX(-100%); visibility: hidden; }
+    .drawing-mode #workspace { grid-template-columns: 0fr minmax(0, 1fr); }
+    .drawing-mode #workspace.single { grid-template-columns: minmax(0, 1fr); }
+    .drawing-mode #sourcePanel { transform: translateX(-100%); visibility: hidden; border: 0; }
+    .drawing-crosshair { cursor: crosshair; }
+    .drawing-mode .drawing-vertex, .drawing-mode .drawing-midpoint { cursor: default; background: transparent; border: 0; }
+    .drawing-vertex span { position: absolute; left: 5px; top: 5px; width: 8px; height: 8px; box-sizing: border-box; border: 1px solid white; background: #ce4b13; box-shadow: 0 0 0 1px #954119; }
+    .drawing-mode .drawing-vertex.chosen { cursor: grab; }
+    .drawing-mode .drawing-vertex.chosen:active { cursor: grabbing; }
+    .drawing-vertex.chosen span { background: #163e73; box-shadow: 0 0 0 1px #163e73; }
+    .drawing-midpoint span { position: absolute; left: 4px; top: 4px; width: 10px; height: 10px; box-sizing: border-box; background: #ffffffbb; color: #746b63; border: 1px solid #998c7e99; text-align: center; font: 10px/8px system-ui; }
+    .drawing-midpoint:hover span { background: white; color: #9b3b10; }
+    .drawing-vertex.draft span { background: #176c65; }
+    .tracing-brush { position: absolute; inset: 0; z-index: 650; cursor: crosshair; touch-action: none; }
+    #brushSettings { margin-top: 12px; }
+    #magneticSettings { margin-top: 12px; padding-top: 4px; border-top: 1px solid #ccd5d3; }
+    #magneticSettings output { font-size: 12px; }
+    #magneticStatus { font-size: 13px; line-height: 1.45; }
+    #magneticLoupe { display: block; width: 180px; height: 180px; margin: 12px auto 0; border: 1px solid #ccd5d3; background: #e9eceb; image-rendering: pixelated; }
+    #magneticSwatch { width: 24px; height: 18px; border: 1px solid #89948f; }
+    @media (prefers-reduced-motion: reduce) { body, #sidebar, #workspace, #sourcePanel { transition: none; } }
     @media (max-width: 800px) {
       body { grid-template-columns: 1fr; grid-template-rows: 310px 1fr; }
       #sidebar { border-right: 0; border-bottom: 1px solid #ccc; }
       #workspace { grid-template-columns: minmax(0, 1fr); grid-template-rows: minmax(0, 1fr) minmax(0, 1fr); }
       #workspace.single { grid-template-rows: minmax(0, 1fr); }
       #sourcePanel { border-right: 0; border-bottom: 1px solid #bbb; }
+      body.drawing-mode { grid-template-columns: minmax(0, 1fr) 240px; grid-template-rows: 1fr; }
+      .drawing-mode #sidebar { display: none; }
+      .drawing-mode #workspace { grid-template-columns: minmax(0, 1fr); grid-template-rows: minmax(0, 1fr); }
+      .drawing-mode #sourcePanel { display: none; }
+      #drawingSidebar { padding: 10px; }
     }

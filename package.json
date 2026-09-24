@@ -5,6 +5,7 @@
   "private": true,
   "description": "Lokale Tests für den Kartenprojektions-Prototyp",
   "scripts": {
+    "test:trace": "node --test tests/trace.unit.mjs",
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",

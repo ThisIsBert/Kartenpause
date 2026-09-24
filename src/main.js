@@ -16,6 +16,8 @@ import { GeoFit } from './geo/geo-fit.js';
 import { ProjectionSearch } from './geo/projection-search.js';
 import { ThinPlateSpline } from './geo/thin-plate-spline.js';
 import './styles.css';
+import { createDrawingEditor } from './drawing/editor.js';
+import { createRasterInverse } from './drawing/raster-source.js';
 
 
     const map = L.map('map', { preferCanvas: true }).setView([51.1, 10.3], 6);
@@ -143,7 +145,7 @@ import './styles.css';
         map.off('move zoom resize viewreset', this.redraw, this);
         this._canvas.remove();
       }
-      redraw() {
+      redraw(alphaOverride) {
         if (!this._map || !this._canvas) return;
         const map = this._map, size = map.getSize();
         this._canvas.width = size.x; this._canvas.height = size.y;
@@ -153,8 +155,8 @@ import './styles.css';
         const ctx = this._canvas.getContext('2d');
         ctx.clearRect(0, 0, size.x, size.y);
         if (!image || !fitted) return;
-        ctx.globalAlpha = Number(els.opacity.value) / 100;
-        ctx.imageSmoothingEnabled = true;
+        ctx.globalAlpha = typeof alphaOverride === 'number' ? alphaOverride : Number(els.opacity.value) / 100;
+        ctx.imageSmoothingEnabled = !document.getElementById('pixelView').checked;
 
         const crs = currentCrs();
         const n = renderMesh;
@@ -233,6 +235,7 @@ import './styles.css';
       return button;
     }
     function updateAvailability() {
+      document.getElementById('enterDrawing').disabled = !image || !fitted || busy || !!capture;
       const enough = points.filter(p => p.fit).length >= 3;
       ui.addPoint.disabled = !image || busy || !!capture;
       ui.clearPoints.disabled = !points.length || busy;
@@ -552,4 +555,38 @@ import './styles.css';
       if (e.key === 'Escape' && capture) { cancelCapture(); return; }
     });
 
+    let originalRasterImage = null, originalRasterCanvas = null, originalRasterData = null;
+    document.getElementById('pixelView').onchange = () => overlay.redraw();
+    createDrawingEditor({ map, sourceMap, opacity: els.opacity, canEnter: () => fitted && !busy && !capture,
+      getOriginalRaster() {
+        if (!image || !fitted) throw new Error('Bitte zuerst eine Pixelkarte einpassen.');
+        if (originalRasterImage !== image) {
+          const canvas = document.createElement('canvas');
+          canvas.width = image.naturalWidth; canvas.height = image.naturalHeight;
+          const context = canvas.getContext('2d', { willReadFrequently: true });
+          context.drawImage(image, 0, 0);
+          originalRasterData = context.getImageData(0, 0, canvas.width, canvas.height);
+          originalRasterCanvas = canvas; originalRasterImage = image;
+        }
+        const width = image.naturalWidth, height = image.naturalHeight, g = sourceGeometry();
+        const pixelToLatLng = p => uvToLatLng((p[0] + .5) / width, (p[1] + .5) / height, g);
+        const forward = p => { const ll = L.CRS.EPSG3857.project(pixelToLatLng(p)); return [ll.x, ll.y]; };
+        const inverse = createRasterInverse(width, height, forward);
+        return { raster: originalRasterData, canvas: originalRasterCanvas, pixelToLatLng,
+          latLngToPixel(ll) { const p = L.CRS.EPSG3857.project(ll); return inverse([p.x, p.y]); }
+        };
+      },
+      getRaster() {
+        try {
+          overlay.redraw(1);
+          return overlay._canvas.getContext('2d').getImageData(0, 0, overlay._canvas.width, overlay._canvas.height);
+        } finally { overlay.redraw(); }
+      },
+      onModeChange(active) {
+        for (const layer of [targetMarks, residualMarks]) {
+          if (active) map.removeLayer(layer);
+          else if (!map.hasLayer(layer)) layer.addTo(map);
+        }
+      }
+    });
     refresh(); icons();

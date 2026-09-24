@@ -3,12 +3,13 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <meta name="description" content="Historische und thematische Rasterkarten automatisch auf einer Basiskarte ausrichten." />
-  <title>Kartenpause – Karten georeferenzieren</title>
+  <meta name="description" content="Rasterkarten georeferenzieren, manuell nachzeichnen und als GeoJSON speichern." />
+  <title>Kartenpause – Karten georeferenzieren und nachzeichnen</title>
 </head>
 <body>
 <aside id="sidebar">
     <h1>Pixelkarte → Basiskarte</h1>
+    <button id="enterDrawing" class="primary" disabled>Nachzeichnen →</button>
 
     <h2>Basiskarte</h2>
     <select id="basemap">
@@ -55,6 +56,61 @@
     <section id="sourcePanel" class="map-panel"><div class="panelbar"><strong>Originalbild</strong><button id="sourceFit" class="icon" title="Ganzes Bild anzeigen" aria-label="Ganzes Bild anzeigen"><i data-lucide="scan"></i></button></div><div id="sourceMap" aria-label="Originalbild mit Referenzpunkten"></div></section>
     <section class="map-panel"><div class="panelbar"><strong>Basiskarte</strong><span id="alignmentLabel">Noch nicht angepasst</span><button id="zoomImage" class="icon" title="Auf die angepasste Vorlage zoomen" aria-label="Auf die angepasste Vorlage zoomen"><i data-lucide="scan"></i></button></div><div id="map" aria-label="Georeferenzierte Karte"></div></section>
   </main>
+  <aside id="drawingSidebar" aria-label="Zeichenwerkzeuge" hidden>
+    <button id="leaveDrawing">← Karte einpassen</button>
+    <h1>Nachzeichnen</h1>
+    <p class="hint">Die angepasste Pixelkarte bleibt als Vorlage auf der Basiskarte sichtbar.</p>
+    <div id="drawingTools" class="stack" role="group" aria-label="Zeichenwerkzeug">
+      <button data-tool="select" aria-pressed="true">↖ Auswählen / Bearbeiten</button>
+      <button data-tool="point" aria-pressed="false">• Punkt setzen</button>
+      <button data-tool="line" aria-pressed="false">╱ Linie zeichnen</button>
+      <button data-tool="polygon" aria-pressed="false">△ Polygon zeichnen</button>
+      <button data-tool="curve" aria-pressed="false">∿ Geschwungene Linie zeichnen</button>
+      <button data-tool="curvePolygon" aria-pressed="false">◯ Geschwungenes Polygon zeichnen</button>
+      <button data-tool="brush" aria-pressed="false">▰ Linie mit Pinsel erkennen</button>
+      <button data-tool="magnetic" aria-pressed="false">⌁ Magnetisch nachzeichnen</button>
+    </div>
+    <div id="magneticSettings" hidden>
+      <p class="hint">Startpunkt und nächsten Anker auf der Bildlinie anklicken. Orange Vorschau prüfen und übernehmen. Bei einem falschen Verlauf einen näheren Zwischenanker anklicken.</p>
+      <div class="row"><label for="magneticRadius">Suchraum neben dem Abschnitt</label><output id="magneticRadiusValue">32 Originalpixel</output></div>
+      <input id="magneticRadius" type="range" min="8" max="100" value="32" step="4" />
+      <div class="commands"><button id="magneticPick" aria-pressed="false">Farbpipette</button><button id="magneticClearColor" disabled>Farbe löschen</button></div>
+      <div class="row"><span id="magneticColor" class="hint">Ohne Farbvorgabe</span><span id="magneticSwatch" aria-hidden="true"></span></div>
+      <div class="row"><label for="magneticTolerance">Farbtoleranz</label><output id="magneticToleranceValue">50</output></div>
+      <input id="magneticTolerance" type="range" min="15" max="120" value="50" step="5" />
+      <canvas id="magneticLoupe" width="180" height="180" aria-label="Lupe der Originalpixel"></canvas>
+      <p id="magneticPixel" class="hint">Maus über die Vorlage bewegen: 8-fache Pixellupe.</p>
+      <div class="commands"><button id="magneticAccept" class="primary" disabled>Abschnitt übernehmen</button><button id="magneticReject" disabled>Vorschau verwerfen</button></div>
+      <button id="magneticClose" disabled>Polygon schließen …</button>
+      <p id="magneticStatus" role="status" aria-live="polite"></p>
+    </div>
+    <div id="brushSettings" hidden>
+      <div class="row"><label for="brushWidth">Pinselbreite</label><output id="brushWidthValue">40 px</output></div>
+      <input id="brushWidth" type="range" min="12" max="120" value="40" step="2" />
+      <p class="hint">Mit gedrückter Maustaste eine Bildlinie abfahren. Zum Polygon zum Anfang zurückkehren. Beim Loslassen wird die Linie innerhalb der Pinselspur gesucht. Das Ergebnis lässt sich anschließend bearbeiten oder rückgängig machen.</p>
+    </div>
+    <p id="drawingHelp" class="hint"></p>
+    <div class="commands">
+      <button id="finishDrawing" class="primary" disabled>Fertig (Enter)</button>
+      <button id="cancelDrawing" disabled>Abbrechen (Esc)</button>
+    </div>
+    <div class="commands"><button id="undoDrawing" disabled>Rückgängig</button><button id="redoDrawing" disabled>Wiederholen</button></div>
+    <label for="drawingOpacity">Deckkraft der Vorlage</label>
+    <input id="drawingOpacity" type="range" min="0" max="100" value="55" />
+    <label class="check"><input id="pixelView" type="checkbox" />Vorlage ohne Glättung anzeigen</label>
+    <h2 id="drawingCount">Objekte (0)</h2>
+    <div id="drawingObjects" class="stack" aria-label="Gezeichnete Objekte"></div>
+    <fieldset id="drawingSelection" disabled>
+      <legend>Ausgewähltes Objekt</legend>
+      <label for="drawingName">Name</label><input id="drawingName" type="text" maxlength="200" />
+      <div class="commands"><button id="copyDrawing">Kopieren (Strg+C)</button><button id="deleteDrawing">Löschen</button></div>
+      <button id="deleteVertex" disabled>Gewählten Stützpunkt löschen</button>
+    </fieldset>
+    <h2>GeoJSON</h2>
+    <button id="saveDrawing" class="primary" disabled>Zeichnung speichern</button>
+    <p class="hint">Speichert alle fertigen Objekte als GeoJSON-FeatureCollection. Kurven werden als fein aufgelöste Geometrien exportiert.</p>
+    <p id="drawingStatus" role="status" aria-live="polite"></p>
+  </aside>
   <script type="module" src="/src/main.js"></script>
 </body>
 </html>
