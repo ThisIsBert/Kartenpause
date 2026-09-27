@@ -1,5 +1,8 @@
 import L from 'leaflet';
+import { setBusy } from './busy.js';
 import { cropSearch } from './magnetic-path.js';
+import { continuesSegment } from './magnetic-click.js';
+import { removeSpurs } from './path-cleanup.js';
 
 export function densifyPixels(points) {
   const result = [];
@@ -15,8 +18,10 @@ export function createMagneticTool({ map, renderer, getOriginalRaster, onState, 
   const el = id => document.getElementById(id), group = L.layerGroup().addTo(map);
   let enabled = false, source = null, anchors = [], segments = [], preview = null, worker = null, target = null;
   let picking = false, color = null, generation = 0, closing = false, moveFrame = 0, mouse = null;
+  let color2 = null;
+  let segmentHandler = null;
   const status = text => { el('magneticStatus').textContent = text; };
-  const path = () => segments.flatMap((segment, i) => i ? segment.slice(1) : segment);
+  const path = () => removeSpurs(segments.flatMap((segment, i) => i ? segment.slice(1) : segment));
   function paint() {
     group.clearLayers();
     if (!enabled || !source) return;
@@ -32,13 +37,18 @@ export function createMagneticTool({ map, renderer, getOriginalRaster, onState, 
     el('magneticAccept').disabled = !preview || !!worker || picking;
     el('magneticReject').disabled = !target && !preview && !worker;
     el('magneticClose').disabled = anchors.length < 3 || !!preview || !!worker || picking;
-    el('magneticPick').setAttribute('aria-pressed', String(picking));
+    el('magneticPick').setAttribute('aria-pressed', String(picking === 1));
+    el('magneticPick2').setAttribute('aria-pressed', String(picking === 2));
+    el('magneticClearColor2').disabled = !color2;
+    el('magneticColor2').textContent = color2 ? `Zweite Farbe: #${color2.map(v => v.toString(16).padStart(2, '0')).join('')}` : 'Optional: zweite Flächenfarbe';
+    el('magneticSwatch2').style.backgroundColor = color2 ? `rgb(${color2.join(',')})` : 'transparent';
+    el('magneticColorMode').textContent = color && color2 ? 'Suche nach dem Übergang zwischen beiden Farben.' : 'Suche nach einer abgesetzten Bildlinie.';
     el('magneticClearColor').disabled = !color;
     el('magneticColor').textContent = color ? `Linienfarbe: #${color.map(v => v.toString(16).padStart(2, '0')).join('')}` : 'Ohne Farbvorgabe';
     el('magneticSwatch').style.backgroundColor = color ? `rgb(${color.join(',')})` : 'transparent';
     paint(); onState();
   }
-  function stopSearch() { generation++; worker?.terminate(); worker = null; }
+  function stopSearch() { generation++; worker?.terminate(); worker = null; setBusy('magnetic', false); }
   function reset() {
     stopSearch(); anchors = []; segments = []; preview = null; target = null; closing = false; picking = false;
     status(''); changed();
@@ -53,33 +63,40 @@ export function createMagneticTool({ map, renderer, getOriginalRaster, onState, 
       const crop = cropSearch(source.raster, anchors.at(-1), end, Number(el('magneticRadius').value));
       const requestId = generation;
       worker = new Worker(new URL('./magnetic-worker.js', import.meta.url), { type: 'module' });
+      setBusy('magnetic', true);
       worker.onmessage = ({ data }) => {
         if (requestId !== generation) return;
         worker.terminate(); worker = null;
+        setBusy('magnetic', false);
         if (data.error) status(data.error);
         else {
           preview = data.result.pixels.map(p => [p[0] + crop.offset[0], p[1] + crop.offset[1]]);
           // Keep shared anchor coordinates exact across independently searched segments.
           preview[0] = [...anchors.at(-1)]; preview[preview.length - 1] = [...end];
-          status(close ? 'Schließenden Abschnitt prüfen. „Abschnitt übernehmen“ erstellt das Polygon.' : 'Orange Vorschau prüfen und übernehmen. Ein weiterer Kartenklick ersetzt den vorgeschlagenen Endanker.');
+          status(close ? 'Schließenden Abschnitt prüfen. „Abschnitt übernehmen“ erstellt das Polygon.' : 'Weiterklicken übernimmt diesen Abschnitt. Ein Klick zurück in den Abschnitt korrigiert ihn. Alt: immer korrigieren; Umschalt: immer fortsetzen.');
         }
         changed();
       };
       worker.onerror = () => { if (requestId !== generation) return; stopSearch(); status('Die Suche konnte nicht ausgeführt werden. Bitte erneut versuchen.'); changed(); };
       worker.postMessage({ raster: crop.raster, start: crop.start, end: crop.end,
-        radius: Number(el('magneticRadius').value), color, tolerance: Number(el('magneticTolerance').value) }, [crop.raster.data.buffer]);
+        radius: Number(el('magneticRadius').value), color, color2, tolerance: Number(el('magneticTolerance').value) }, [crop.raster.data.buffer]);
       status('Suche in den Originalpixeln …');
     } catch (error) { stopSearch(); status(error.message); }
     changed();
   }
   function complete(closed) {
-    const pixels = path();
+    const pixels = closed ? removeSpurs(path(), 1e-7, true) : path();
     if (pixels.length < (closed ? 4 : 2)) return;
     const result = { pixels, source, closed };
     reset(); onComplete(result);
   }
   function accept() {
     if (!preview || worker || picking) return;
+    if (segmentHandler) {
+      const pixels = preview, end = target;
+      preview = null; target = null; anchors = [end]; segments = []; closing = false;
+      segmentHandler({ pixels, source }); changed(); return;
+    }
     segments.push(preview); anchors.push(target); preview = null; target = null;
     if (closing) complete(true);
     else { status('Abschnitt übernommen. Nächsten Anker setzen oder mit „Fertig“ die Linie abschließen.'); changed(); }
@@ -90,15 +107,32 @@ export function createMagneticTool({ map, renderer, getOriginalRaster, onState, 
   el('magneticReject').onclick = reject;
   el('magneticClose').onclick = () => { if (anchors.length >= 3 && !worker && !preview) request(anchors[0], true); };
   el('magneticPick').onclick = () => {
-    picking = !picking;
+    picking = picking === 1 ? false : 1;
     status(picking ? 'Mit der Pixellupe auf ein typisches Pixel der gewünschten Linie klicken. Dies setzt keinen Anker.' : 'Farbaufnahme beendet.'); changed();
   };
   el('magneticClearColor').onclick = () => { color = null; picking = false; recompute(); };
+  el('magneticPick2').onclick = () => { picking = picking === 2 ? false : 2; status('Auf die andere Farbfläche neben der Grenze klicken. Dies setzt keinen Anker.'); changed(); };
+  el('magneticClearColor2').onclick = () => { color2 = null; picking = false; recompute(); };
   for (const id of ['magneticRadius', 'magneticTolerance']) {
     el(id).oninput = () => { el(`${id}Value`).textContent = el(id).value + (id === 'magneticRadius' ? ' Originalpixel' : ''); };
     el(id).onchange = recompute;
   }
   return {
+    get pendingSegment() { return !!preview || !!target || !!worker || !!picking; },
+    get isPicking() { return !!picking; },
+    toAnchor(ll) {
+      ensureSource(); const point = source.latLngToPixel(ll, .5);
+      if (!point) throw new Error('Der Endpunkt liegt außerhalb der Pixelkarte. Bitte manuell verbinden.');
+      if (segmentHandler && preview) accept();
+      request(point);
+    },
+    setSegmentHandler(handler) { segmentHandler = handler; },
+    seed(ll) {
+      ensureSource();
+      const point = source.latLngToPixel(ll, .5);
+      if (!point) throw new Error('Der Anker liegt außerhalb der Pixelkarte. Hier bitte manuell zeichnen.');
+      stopSearch(); anchors = [point]; segments = []; preview = null; target = null; closing = false; picking = false; changed();
+    },
     get hasDraft() { return anchors.length > 0 || !!worker; },
     get canFinish() { return segments.length > 0 && !preview && !worker && !target && !picking; },
     get canUndo() { return anchors.length > 0; },
@@ -108,16 +142,26 @@ export function createMagneticTool({ map, renderer, getOriginalRaster, onState, 
       if (!enabled) { reset(); source = null; cancelAnimationFrame(moveFrame); moveFrame = 0; }
       else { status('Startanker auf die Bildlinie setzen oder zuerst mit der Farbpipette eine Linienfarbe aufnehmen.'); }
     },
-    click(ll) {
+    click(ll, modifiers = {}) {
       try {
         ensureSource();
         const pixel = source.latLngToPixel(ll);
         if (!pixel) { status('Bitte innerhalb der eingepassten Pixelkarte klicken.'); return; }
         const rounded = pixel.map(Math.round), index = (rounded[1] * source.raster.width + rounded[0]) * 4;
         if (source.raster.data[index + 3] < 128) { status('Dieses Bildpixel ist transparent. Bitte auf die sichtbare Bildlinie klicken.'); return; }
-        if (picking) { color = [...source.raster.data.slice(index, index + 3)]; picking = false; status('Linienfarbe aufgenommen.'); recompute(); return; }
+        if (picking) {
+          const sample = [...source.raster.data.slice(index, index + 3)];
+          if (picking === 2) color2 = sample; else color = sample;
+          picking = false; status('Farbe aufgenommen.'); recompute(); return;
+        }
         if (!anchors.length) { anchors = [rounded]; status('Startanker gesetzt. Nun den nächsten Anker auf derselben Bildlinie anklicken.'); changed(); }
-        else request(rounded);
+        else {
+          if (preview && !closing && !modifiers.altKey && (modifiers.shiftKey || continuesSegment(anchors.at(-1), target, rounded))) {
+            if (segmentHandler) accept();
+            else { segments.push(preview); anchors.push(target); preview = null; target = null; }
+          }
+          request(rounded);
+        }
       } catch (error) { status(error.message); }
     },
     move(ll) {

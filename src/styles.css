@@ -55,6 +55,7 @@
     .predicted-marker { --marker-color: #b0273f; }
     .capture-source #sourceMap, .capture-target #map { cursor: crosshair; }
     [hidden] { display: none !important; }
+    html.app-busy, html.app-busy * { cursor: progress !important; }
     body { grid-template-columns: 360px minmax(0, 1fr) 0px; transition: grid-template-columns .32s ease; }
     #sidebar { min-width: 0; transition: transform .32s ease, visibility .32s; }
     #workspace { transition: grid-template-columns .32s ease; }
@@ -89,7 +90,9 @@
     #magneticSettings output { font-size: 12px; }
     #magneticStatus { font-size: 13px; line-height: 1.45; }
     #magneticLoupe { display: block; width: 180px; height: 180px; margin: 12px auto 0; border: 1px solid #ccd5d3; background: #e9eceb; image-rendering: pixelated; }
-    #magneticSwatch { width: 24px; height: 18px; border: 1px solid #89948f; }
+    #magneticSwatch, #magneticSwatch2 { width: 24px; height: 18px; border: 1px solid #89948f; }
+    #wandSettings { border-top: 1px solid #ccd5d3; margin-top: 12px; }
+    #wandSettings output, #wandStatus { font-size: 12px; line-height: 1.5; }
     @media (prefers-reduced-motion: reduce) { body, #sidebar, #workspace, #sourcePanel { transition: none; } }
     @media (max-width: 800px) {
       body { grid-template-columns: 1fr; grid-template-rows: 310px 1fr; }

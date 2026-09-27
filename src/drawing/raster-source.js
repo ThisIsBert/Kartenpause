@@ -6,7 +6,7 @@ export function createRasterInverse(width, height, forward) {
     const pixel = [x * (width - 1) / 8, y * (height - 1) / 8];
     try { const point = forward(pixel); if (point.every(Number.isFinite)) seeds.push({ pixel, point }); } catch { /* Outside projection. */ }
   }
-  return target => {
+  return (target, margin = 0) => {
     const nearest = [...seeds].sort((a, b) => Math.hypot(a.point[0] - target[0], a.point[1] - target[1]) - Math.hypot(b.point[0] - target[0], b.point[1] - target[1])).slice(0, 4);
     for (const seed of nearest) {
       let pixel = [...seed.pixel];
@@ -18,8 +18,8 @@ export function createRasterInverse(width, height, forward) {
         if (!Number.isFinite(det) || Math.abs(det) < 1e-12) break;
         const ex = target[0] - p[0], ey = target[1] - p[1];
         const dx = (d * ex - b * ey) / det, dy = (-c * ex + a * ey) / det;
-        if (Math.hypot(dx, dy) < .03 && pixel[0] >= -.01 && pixel[1] >= -.01 && pixel[0] <= width - 1 + .01 && pixel[1] <= height - 1 + .01) {
-          return [Math.max(0, Math.min(width - 1, pixel[0])), Math.max(0, Math.min(height - 1, pixel[1]))];
+        if (Math.hypot(dx, dy) < .03 && pixel[0] >= -margin - .01 && pixel[1] >= -margin - .01 && pixel[0] <= width - 1 + margin + .01 && pixel[1] <= height - 1 + margin + .01) {
+          return [Math.max(-margin, Math.min(width - 1 + margin, pixel[0])), Math.max(-margin, Math.min(height - 1 + margin, pixel[1]))];
         }
         const damping = Math.min(1, Math.max(width, height) / 4 / Math.max(1, Math.hypot(dx, dy)));
         pixel = [pixel[0] + damping * dx, pixel[1] + damping * dy];

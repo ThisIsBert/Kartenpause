@@ -134,20 +134,45 @@ import { createRasterInverse } from './drawing/raster-source.js';
     class WarpedImageLayer extends L.Layer {
       onAdd(map) {
         this._map = map;
-        this._canvas = L.DomUtil.create('canvas', 'leaflet-warped-image-layer');
+        this._canvas = L.DomUtil.create('canvas', 'leaflet-warped-image-layer leaflet-zoom-animated');
         this._canvas.style.position = 'absolute';
         this._canvas.style.pointerEvents = 'none';
         map.getPanes().overlayPane.appendChild(this._canvas);
-        map.on('move zoom resize viewreset', this.redraw, this);
+        map.on('move resize viewreset', this.redraw, this);
+        map.on('zoomstart', this._startZoom, this);
+        map.on('zoomanim', this._animateZoom, this);
+        map.on('zoom', this._updateZoom, this);
+        map.on('zoomend', this._endZoom, this);
         this.redraw();
       }
       onRemove(map) {
-        map.off('move zoom resize viewreset', this.redraw, this);
+        map.off('move resize viewreset', this.redraw, this);
+        map.off('zoomstart', this._startZoom, this);
+        map.off('zoomanim', this._animateZoom, this);
+        map.off('zoom', this._updateZoom, this);
+        map.off('zoomend', this._endZoom, this);
         this._canvas.remove();
       }
+      _startZoom() { this._zooming = true; }
+      _animateZoom(event) {
+        if (!this._origin || !this._canvas) return;
+        const map = this._map, scale = map.getZoomScale(event.zoom, this._renderZoom);
+        // Same pixel origin and CSS transition as Leaflet's vector/tile renderers.
+        // containerPointToLayerPoint(0,0) is the negative map-pane displacement.
+        const origin = map.project(event.center, event.zoom).subtract(map.getSize().divideBy(2))
+          .subtract(map.containerPointToLayerPoint([0, 0])).round();
+        const offset = map.project(this._origin, event.zoom).subtract(origin);
+        L.DomUtil.setTransform(this._canvas, offset, scale);
+      }
+      _updateZoom() {
+        this._animateZoom({ center: this._map.getCenter(), zoom: this._map.getZoom() });
+      }
+      _endZoom() { this._zooming = false; this.redraw(); }
       redraw(alphaOverride) {
-        if (!this._map || !this._canvas) return;
+        if (!this._map || !this._canvas || this._zooming) return;
         const map = this._map, size = map.getSize();
+        this._renderZoom = map.getZoom();
+        this._origin = map.containerPointToLatLng([0, 0]);
         this._canvas.width = size.x; this._canvas.height = size.y;
         this._canvas.style.width = size.x + 'px'; this._canvas.style.height = size.y + 'px';
         const topLeft = map.containerPointToLayerPoint([0, 0]);
@@ -573,7 +598,7 @@ import { createRasterInverse } from './drawing/raster-source.js';
         const forward = p => { const ll = L.CRS.EPSG3857.project(pixelToLatLng(p)); return [ll.x, ll.y]; };
         const inverse = createRasterInverse(width, height, forward);
         return { raster: originalRasterData, canvas: originalRasterCanvas, pixelToLatLng,
-          latLngToPixel(ll) { const p = L.CRS.EPSG3857.project(ll); return inverse([p.x, p.y]); }
+          latLngToPixel(ll, margin = 0) { const p = L.CRS.EPSG3857.project(ll); return inverse([p.x, p.y], margin); }
         };
       },
       getRaster() {

@@ -120,6 +120,48 @@ async function openApp(page) {
   await expect(page.locator('#map.leaflet-container')).toBeVisible();
 }
 
+test('Pixelkarte zoomt während der Animation synchron mit Polygonen', async ({ page }) => {
+  test.setTimeout(120_000);
+  const errors = []; page.on('pageerror', error => errors.push(error.message));
+  await openApp(page); await loadSyntheticProject(page);
+  await page.locator('#enterDrawing').click();
+  const map = page.locator('#map');
+  await expect.poll(async () => Math.round((await map.boundingBox()).width)).toBe(1120);
+  await page.locator('[data-tool="polygon"]').click();
+  for (const position of [{ x: 400, y: 350 }, { x: 650, y: 350 }, { x: 525, y: 550 }]) await map.click({ position });
+  await page.keyboard.press('Enter');
+  for (const action of ['in', 'out', 'wheel']) {
+    const samples = await page.locator('#map').evaluate(async (container, action) => {
+      const raster = container.querySelector('.leaflet-warped-image-layer');
+      const polygon = container.querySelector('.leaflet-drawingShapes-pane path');
+      const initial = raster.getBoundingClientRect(), shape = polygon.getBoundingClientRect();
+      const u = (shape.x + shape.width / 2 - initial.x) / initial.width;
+      const v = (shape.y + shape.height / 2 - initial.y) / initial.height;
+      const samples = [];
+      if (action === 'wheel') {
+        const box = container.getBoundingClientRect();
+        container.dispatchEvent(new WheelEvent('wheel', { bubbles: true, cancelable: true, deltaY: -120, clientX: box.x + 700, clientY: box.y + 300 }));
+      } else container.querySelector(`.leaflet-control-zoom-${action}`).click();
+      const until = performance.now() + 650;
+      while (performance.now() < until) {
+        await new Promise(requestAnimationFrame);
+        if (!container.querySelector('.leaflet-zoom-anim')) continue;
+        const image = raster.getBoundingClientRect(), current = polygon.getBoundingClientRect();
+        samples.push({ error: Math.hypot(image.x + image.width * u - current.x - current.width / 2,
+          image.y + image.height * v - current.y - current.height / 2),
+          scale: new DOMMatrix(getComputedStyle(raster).transform).a });
+      }
+      return samples;
+    }, action);
+    expect(samples.length).toBeGreaterThan(0);
+    expect(samples.some(sample => Math.abs(sample.scale - 1) > .05)).toBe(true);
+    expect(Math.max(...samples.map(sample => sample.error))).toBeLessThan(2);
+    await expect.poll(() => page.locator('.leaflet-warped-image-layer').evaluate(canvas => new DOMMatrix(getComputedStyle(canvas).transform).a)).toBe(1);
+    expect(await paintedPixels(page.locator('.leaflet-warped-image-layer'))).toBeGreaterThan(1000);
+  }
+  expect(errors).toEqual([]);
+});
+
 async function loadSyntheticProject(page, distorted = false, traceKind = null) {
   const project = await page.evaluate(({ useDistortion, traceKind }) => {
     const canvas = document.createElement('canvas');
@@ -140,7 +182,20 @@ async function loadSyntheticProject(page, distorted = false, traceKind = null) {
     if (traceKind) {
       context.fillStyle = '#fff'; context.fillRect(0, 0, 180, 120);
       context.strokeStyle = '#111'; context.lineWidth = 2;
-      if (traceKind === 'polygon') context.strokeRect(25, 25, 130, 70);
+      if (traceKind === 'denseWand') {
+        context.fillStyle = '#111';
+        for (let y = 20; y < 100; y += 4) for (let x = 20; x < 160; x += 4) context.fillRect(x, y, 2, 2);
+      }
+      else if (traceKind === 'wand') {
+        context.fillStyle = '#111'; context.fillRect(20, 20, 100, 80); context.fillRect(140, 30, 20, 20);
+        context.fillStyle = '#323232'; context.fillRect(70, 20, 50, 80);
+        context.fillStyle = '#fff'; context.fillRect(40, 40, 25, 25);
+      }
+      else if (traceKind === 'boundary') {
+        context.fillStyle = '#dda96e'; context.fillRect(0, 0, 90, 120);
+        context.fillStyle = '#6eb4dc'; context.fillRect(90, 0, 90, 120);
+      }
+      else if (traceKind === 'polygon') context.strokeRect(25, 25, 130, 70);
       else { context.beginPath(); context.moveTo(20, 60); context.lineTo(160, 60); context.stroke(); }
     }
     const coordinates = useDistortion
@@ -337,7 +392,7 @@ for (const kind of ['line', 'polygon']) test(`Pinsel erkennt ${kind} aus der Pix
   await page.mouse.move(box.x + 80, box.y + 80); await page.mouse.down();
   await page.mouse.move(box.x + 180, box.y + 80, { steps: 5 });
   await page.keyboard.press('Escape'); await page.mouse.up();
-  await expect(page.locator('.tracing-brush')).toBeHidden();
+  await expect(page.getByLabel('Pinselbereich zur Linienerkennung', { exact: true })).toBeHidden();
   await expect(page.locator('#drawingObjects button')).toHaveCount(1);
   expect(errors).toEqual([]);
 });
@@ -443,6 +498,175 @@ test('Magnetisch: Polygon erst nach bestätigter Schließkante', async ({ page, 
   await expect(page.locator('.drawing-vertex')).toHaveCount(feature.properties.controlPoints.length);
 });
 
+test('Magnetisch: Weiterklicken übernimmt, Zurückklicken korrigiert', async ({ page, context }) => {
+  await openApp(page); await loadSyntheticProject(page, false, 'line');
+  await page.locator('#enterDrawing').click();
+  const map = page.locator('#map');
+  await expect.poll(async () => Math.round((await map.boundingBox()).width)).toBe(1120);
+  const { left, right, top, bottom } = await darkRasterBounds(page), y = (top + bottom) / 2, span = right - left;
+  await page.locator('[data-tool="magnetic"]').click();
+  await map.click({ position: { x: left + 8, y } });
+  await map.click({ position: { x: left + span * .45, y } });
+  await expect(page.locator('#magneticAccept')).toBeEnabled();
+  await map.click({ position: { x: left + span * .25, y } });
+  await expect(page.locator('#magneticAccept')).toBeEnabled();
+  await page.locator('#magneticReject').click();
+  await expect(page.locator('#finishDrawing')).toBeDisabled();
+  await map.click({ position: { x: left + span * .45, y } });
+  await expect(page.locator('#magneticAccept')).toBeEnabled();
+  await map.click({ position: { x: right - 8, y } });
+  await expect(page.locator('#magneticAccept')).toBeEnabled();
+  // Reject only the new segment: the preceding one was accepted by that click.
+  await page.locator('#magneticReject').click();
+  await expect(page.locator('#finishDrawing')).toBeEnabled();
+  await page.locator('#finishDrawing').click();
+  await context.grantPermissions(['clipboard-read', 'clipboard-write']);
+  await page.locator('#copyDrawing').click();
+  const feature = JSON.parse(await page.evaluate(() => navigator.clipboard.readText()));
+  expect(feature.geometry.coordinates.at(-1)[0]).toBeLessThan(11);
+  expect(feature.geometry.coordinates[0][0]).toBeLessThan(4);
+});
+
+test('Magnetisch: zwei Pipettenfarben erkennen eine reine Flächengrenze', async ({ page, context }) => {
+  const errors = []; page.on('pageerror', e => errors.push(e.message));
+  await openApp(page); await loadSyntheticProject(page, false, 'boundary');
+  await page.locator('#enterDrawing').click();
+  const map = page.locator('#map');
+  await expect.poll(async () => Math.round((await map.boundingBox()).width)).toBe(1120);
+  const size = await map.boundingBox(), center = { x: size.width / 2, y: size.height / 2 };
+  await page.locator('[data-tool="magnetic"]').click();
+  await page.locator('#magneticPick').click(); await map.click({ position: { x: center.x - 50, y: center.y } });
+  await page.locator('#magneticPick2').click(); await map.click({ position: { x: center.x + 50, y: center.y } });
+  await expect(page.locator('#magneticColorMode')).toContainText('Übergang');
+  await map.click({ position: { x: center.x, y: center.y - 60 } });
+  await map.click({ position: { x: center.x, y: center.y + 60 } });
+  await expect(page.locator('#magneticAccept')).toBeEnabled();
+  await page.locator('#magneticAccept').click(); await page.locator('#finishDrawing').click();
+  await context.grantPermissions(['clipboard-read', 'clipboard-write']); await page.locator('#copyDrawing').click();
+  const feature = JSON.parse(await page.evaluate(() => navigator.clipboard.readText()));
+  expect(feature.geometry.coordinates.every(p => Math.abs(p[0] - 10) < .15)).toBe(true);
+  expect(errors).toEqual([]);
+});
+
+test('Zauberstab: Auswahl, Inseln, Löcher, Korrekturpinsel und bearbeitbarer Export', async ({ page, context }) => {
+  test.setTimeout(150_000);
+  const errors = []; page.on('pageerror', e => errors.push(e.message));
+  await openApp(page); await loadSyntheticProject(page, false, 'wand');
+  await page.locator('#enterDrawing').click();
+  const map = page.locator('#map');
+  await expect.poll(async () => Math.round((await map.boundingBox()).width)).toBe(1120);
+  const { left, right, top, bottom } = await darkRasterBounds(page), sx = (right - left) / 140;
+  const sample = { x: left + 10 * sx, y: top + (bottom - top) * .16 };
+  await page.locator('[data-tool="wand"]').click();
+  await map.click({ position: sample });
+  await expect(page.locator('#wandStatus')).toContainText('2 Fläche(n)');
+  await expect(page.locator('#finishDrawing')).toBeEnabled();
+  const selectedCount = async () => Number((await page.locator('#wandStatus').textContent()).match(/^[\d.]+/)[0].replaceAll('.', ''));
+  const broadCount = await selectedCount();
+  await setRange(page, '#wandTolerance', 0);
+  await page.locator('#wandTolerance').dispatchEvent('change');
+  await expect.poll(selectedCount).toBe(broadCount);
+  await page.locator('#wandMode').selectOption('subtract');
+  await map.click({ position: sample });
+  await expect.poll(selectedCount).toBe(4000); // Only the exact dark color was removed, not the gray half.
+  await page.locator('#undoDrawing').click(); await expect.poll(selectedCount).toBe(broadCount);
+  await setRange(page, '#wandTolerance', 18);
+  await page.locator('#wandMode').selectOption('replace');
+  await page.locator('#wandContiguous').check();
+  await expect(page.locator('#wandStatus')).not.toContainText('1 Fläche(n)');
+  await map.click({ position: sample });
+  await expect(page.locator('#wandStatus')).toContainText('1 Fläche(n)');
+  const originalCount = await selectedCount();
+  await page.locator('#wandMode').selectOption('paintSubtract');
+  const box = await map.boundingBox(), location = { x: box.x + left + 70 * sx, y: box.y + top + (bottom - top) * .78 };
+  await page.mouse.click(location.x, location.y);
+  await expect(page.locator('#finishDrawing')).toBeEnabled();
+  await expect.poll(selectedCount).toBeLessThan(originalCount);
+  const removedCount = await selectedCount();
+  await page.locator('#undoDrawing').click(); await expect.poll(selectedCount).toBe(originalCount);
+  await page.locator('#redoDrawing').click(); await expect.poll(selectedCount).toBe(removedCount);
+  await page.locator('#wandMode').selectOption('paintAdd');
+  await page.mouse.click(location.x, location.y);
+  await expect.poll(selectedCount).toBe(originalCount);
+  await page.locator('#wandMode').selectOption('paintSubtract'); await page.mouse.click(location.x, location.y);
+  await expect.poll(selectedCount).toBe(removedCount);
+  await page.screenshot({ path: 'output/playwright/wand-selection.png', fullPage: true });
+  await page.locator('#finishDrawing').click();
+  await expect(page.locator('#drawingObjects button')).toHaveCount(1);
+  await context.grantPermissions(['clipboard-read', 'clipboard-write']); await page.locator('#copyDrawing').click();
+  const before = JSON.parse(await page.evaluate(() => navigator.clipboard.readText()));
+  expect(before.geometry.type).toBe('Polygon'); expect(before.geometry.coordinates).toHaveLength(3);
+  const hole = page.locator('.drawing-vertex[title^="Loch 1:"]').first(), vertex = await hole.boundingBox();
+  await page.mouse.move(vertex.x + 9, vertex.y + 9); await page.mouse.down();
+  await page.mouse.move(vertex.x + 20, vertex.y + 9, { steps: 5 }); await page.mouse.up();
+  await page.locator('#copyDrawing').click();
+  const after = JSON.parse(await page.evaluate(() => navigator.clipboard.readText()));
+  expect(after.geometry.coordinates[1]).not.toEqual(before.geometry.coordinates[1]);
+  expect(after.geometry.coordinates[0]).toEqual(before.geometry.coordinates[0]);
+  await page.locator('[data-tool="wand"]').click();
+  await page.locator('#wandMode').selectOption('replace'); await page.locator('#wandContiguous').uncheck();
+  await map.click({ position: sample }); await expect(page.locator('#finishDrawing')).toBeEnabled();
+  await page.locator('#finishDrawing').click();
+  await expect(page.locator('#drawingObjects button')).toHaveCount(2);
+  await page.locator('#copyDrawing').click();
+  const multi = JSON.parse(await page.evaluate(() => navigator.clipboard.readText()));
+  expect(multi.geometry.type).toBe('MultiPolygon');
+  expect(multi.geometry.coordinates).toHaveLength(2);
+  expect(multi.geometry.coordinates[0]).toHaveLength(2);
+  const islandVertex = await page.locator('.drawing-vertex[title^="Teilfläche 2:"]').first().boundingBox();
+  await page.mouse.move(islandVertex.x + 9, islandVertex.y + 9); await page.mouse.down();
+  await page.mouse.move(islandVertex.x + 20, islandVertex.y + 10, { steps: 4 }); await page.mouse.up();
+  await page.locator('#copyDrawing').click();
+  const edited = JSON.parse(await page.evaluate(() => navigator.clipboard.readText()));
+  expect(edited.geometry.coordinates[0]).toEqual(multi.geometry.coordinates[0]);
+  expect(edited.geometry.coordinates[1]).not.toEqual(multi.geometry.coordinates[1]);
+  await setRange(page, '#simplifyDrawing', 80);
+  await expect(page.locator('#simplifyStatus')).toContainText('Vorschau');
+  await setRange(page, '#simplifyDrawing', 20);
+  await expect(page.locator('#simplifyValue')).toHaveText('20 %');
+  await expect(page.locator('#applySimplification')).toBeEnabled();
+  await expect(page.locator('html')).not.toHaveClass(/app-busy/);
+  // Changing the value during a pending request must supersede, not queue it.
+  const cursor = await page.locator('#simplifyDrawing').evaluate(input => {
+    for (const value of [15, 35, 65]) { input.value = value; input.dispatchEvent(new Event('input')); }
+    return getComputedStyle(input).cursor;
+  });
+  expect(cursor).toBe('progress');
+  await expect(page.locator('#applySimplification')).toBeEnabled();
+  await expect(page.locator('#simplifyValue')).toHaveText('65 %');
+  await expect(page.locator('html')).not.toHaveClass(/app-busy/);
+  await expect(page.locator('#copyDrawing')).toBeDisabled();
+  await setRange(page, '#simplifyDrawing', 0);
+  await page.locator('#copyDrawing').click();
+  expect(JSON.parse(await page.evaluate(() => navigator.clipboard.readText()))).toEqual(edited);
+  await setRange(page, '#simplifyDrawing', 80);
+  await expect(page.locator('#applySimplification')).toBeEnabled();
+  await page.locator('#applySimplification').scrollIntoViewIfNeeded();
+  await page.screenshot({ path: 'output/playwright/simplification-preview.png', fullPage: true });
+  await page.locator('#applySimplification').click();
+  await page.locator('#copyDrawing').click();
+  const simplified = JSON.parse(await page.evaluate(() => navigator.clipboard.readText()));
+  expect(simplified.geometry.type).toBe('MultiPolygon');
+  expect(simplified.geometry.coordinates).toHaveLength(2);
+  expect(simplified.geometry.coordinates[0]).toHaveLength(2);
+  expect(simplified.geometry.coordinates).not.toEqual(edited.geometry.coordinates);
+  await page.locator('#undoDrawing').click(); await page.locator('#copyDrawing').click();
+  expect(JSON.parse(await page.evaluate(() => navigator.clipboard.readText()))).toEqual(edited);
+  await page.locator('#redoDrawing').click(); await page.locator('#copyDrawing').click();
+  expect(JSON.parse(await page.evaluate(() => navigator.clipboard.readText()))).toEqual(simplified);
+  await setRange(page, '#simplifyDrawing', 50); await page.locator('#cancelSimplification').click();
+  await expect(page.locator('html')).not.toHaveClass(/app-busy/);
+  await page.locator('#copyDrawing').click();
+  expect(JSON.parse(await page.evaluate(() => navigator.clipboard.readText()))).toEqual(simplified);
+  await page.locator('#deleteDrawing').click();
+  await expect(page.locator('#drawingObjects button')).toHaveCount(1);
+  await page.locator('[data-tool="wand"]').click();
+  await map.click({ position: sample }); await expect(page.locator('#finishDrawing')).toBeEnabled();
+  await page.keyboard.press('Escape'); await expect(page.locator('#wandSettings')).toBeHidden();
+  await expect(page.locator('#drawingObjects button')).toHaveCount(1);
+  expect(errors).toEqual([]);
+});
+
 async function paintedPixels(canvasLocator) {
   return canvasLocator.evaluate(canvas => {
     const data = canvas.getContext('2d').getImageData(0, 0, canvas.width, canvas.height).data;
@@ -451,6 +675,186 @@ async function paintedPixels(canvasLocator) {
     return painted;
   });
 }
+
+test('Vereinfachung: 40000 Punkte im Worker lassen die Oberfläche reagieren', async ({ page }) => {
+  test.setTimeout(120_000);
+  await openApp(page);
+  const result = await page.evaluate(async () => {
+    const vertices = Array.from({ length: 40000 }, (_, i) => {
+      const a = i / 40000 * Math.PI * 2, r = 100 + .01 * Math.sin(i);
+      return [r * Math.cos(a), r * Math.sin(a)];
+    });
+    let ticks = 0;
+    const heartbeat = setInterval(() => ticks++, 0);
+    const worker = new Worker('/src/drawing/simplification-worker.js', { type: 'module' });
+    try {
+      const data = await new Promise((resolve, reject) => {
+        worker.onmessage = e => resolve(e.data); worker.onerror = e => reject(new Error(e.message));
+        worker.postMessage({ object: { kind: 'polygon', vertices }, amount: 50 });
+      });
+      return { ticks, error: data.error, points: data.result?.vertices.length };
+    } finally { clearInterval(heartbeat); worker.terminate(); }
+  });
+  expect(result.error).toBeUndefined(); expect(result.ticks).toBeGreaterThan(0);
+  expect(result.points).toBeLessThan(40000);
+});
+
+test('Vereinfachung: große Zauberstab-Objekte begrenzen Griffe und bleiben erneut einstellbar', async ({ page, context }) => {
+  test.setTimeout(150_000);
+  const errors = []; page.on('pageerror', error => errors.push(error.message));
+  await openApp(page); await loadSyntheticProject(page, false, 'denseWand');
+  await page.locator('#enterDrawing').click();
+  const map = page.locator('#map');
+  await expect.poll(async () => Math.round((await map.boundingBox()).width)).toBe(1120);
+  const bounds = await darkRasterBounds(page);
+  await page.locator('[data-tool="wand"]').click();
+  await map.click({ position: { x: bounds.left + 1, y: bounds.top + 1 } });
+  await expect(page.locator('#finishDrawing')).toBeEnabled();
+  await page.locator('#finishDrawing').click();
+  await expect(page.locator('#drawingObjects button')).toHaveCount(1);
+  await expect(page.locator('#simplifyStatus')).toContainText('2800 Stützpunkte');
+  expect(await page.locator('.drawing-vertex, .drawing-midpoint').count()).toBeLessThanOrEqual(600);
+  await context.grantPermissions(['clipboard-read', 'clipboard-write']);
+  await page.locator('#copyDrawing').click();
+  const original = JSON.parse(await page.evaluate(() => navigator.clipboard.readText()));
+  for (const amount of [25, 70, 10]) {
+    await setRange(page, '#simplifyDrawing', amount);
+    await expect(page.locator('#applySimplification')).toBeEnabled();
+    await expect(page.locator('#simplifyValue')).toHaveText(`${amount} %`);
+    await expect(page.locator('html')).not.toHaveClass(/app-busy/);
+  }
+  await page.locator('#cancelSimplification').click(); await page.locator('#copyDrawing').click();
+  expect(JSON.parse(await page.evaluate(() => navigator.clipboard.readText()))).toEqual(original);
+  expect(errors).toEqual([]);
+});
+
+async function setRange(page, selector, value) {
+  await page.locator(selector).evaluate((input, value) => {
+    input.value = String(value); input.dispatchEvent(new Event('input', { bubbles: true }));
+    input.dispatchEvent(new Event('change', { bubbles: true }));
+  }, value);
+}
+
+async function copiedFeature(page, context) {
+  await context.grantPermissions(['clipboard-read', 'clipboard-write']);
+  await page.locator('#copyDrawing').click();
+  return JSON.parse(await page.evaluate(() => navigator.clipboard.readText()));
+}
+
+test('Weiterbearbeiten: bestehende Mehrfachfläche mit Pinsel korrigieren, verwerfen und ersetzen', async ({ page, context }) => {
+  test.setTimeout(150_000);
+  const errors = []; page.on('pageerror', error => errors.push(error.message));
+  await openApp(page); await loadSyntheticProject(page, false, 'wand');
+  await page.locator('#enterDrawing').click();
+  const map = page.locator('#map');
+  await expect.poll(async () => Math.round((await map.boundingBox()).width)).toBe(1120);
+  const { left, right, top, bottom } = await darkRasterBounds(page), sx = (right - left) / 140;
+  await page.locator('[data-tool="wand"]').click();
+  await map.click({ position: { x: left + 10 * sx, y: top + (bottom - top) * .16 } });
+  await expect(page.locator('#finishDrawing')).toBeEnabled(); await page.locator('#finishDrawing').click();
+  const hole = await page.locator('.drawing-vertex[title^="Teilfläche 1: Loch 1:"]').first().boundingBox();
+  await page.mouse.move(hole.x + 9, hole.y + 9); await page.mouse.down();
+  await page.mouse.move(hole.x + 13, hole.y + 9, { steps: 3 }); await page.mouse.up();
+  const original = await copiedFeature(page, context);
+  for (const apply of [false, true]) {
+    await page.locator('#reworkArea').click();
+    await expect(page.locator('#areaApply')).toBeEnabled();
+    await expect(page.locator('[data-tool="line"]')).toBeDisabled();
+    const before = await page.locator('#wandStatus').textContent();
+    await page.locator('#wandMode').selectOption('paintSubtract');
+    const box = await map.boundingBox();
+    await page.mouse.click(box.x + left + 70 * sx, box.y + top + (bottom - top) * .78);
+    await expect(page.locator('#areaApply')).toBeEnabled();
+    await expect(page.locator('#wandStatus')).not.toHaveText(before);
+    await page.locator(apply ? '#areaApply' : '#areaCancel').click();
+    await expect(page.locator('#drawingObjects button')).toHaveCount(1);
+    const result = await copiedFeature(page, context);
+    expect(result.id).toBe(original.id); expect(result.properties.name).toBe(original.properties.name);
+    if (!apply) expect(result).toEqual(original);
+    else { expect(result.geometry.type).toBe('MultiPolygon'); expect(result.geometry.coordinates[0]).toHaveLength(3); }
+  }
+  await page.locator('#undoDrawing').click(); expect(await copiedFeature(page, context)).toEqual(original);
+  await page.locator('#redoDrawing').click();
+  await page.locator('#reworkArea').click(); await expect(page.locator('#areaApply')).toBeEnabled();
+  await page.locator('#areaCancel').click();
+  expect(errors).toEqual([]);
+});
+
+test('Weiterbearbeiten: Randabschnitt zwischen Kantenpunkten manuell ersetzen', async ({ page, context }) => {
+  test.setTimeout(150_000);
+  const errors = []; page.on('pageerror', error => errors.push(error.message));
+  await openApp(page); await loadSyntheticProject(page);
+  await page.locator('#enterDrawing').click();
+  const map = page.locator('#map');
+  await expect.poll(async () => Math.round((await map.boundingBox()).width)).toBe(1120);
+  await page.locator('[data-tool="polygon"]').click();
+  for (const [x, y] of [[300, 300], [600, 300], [600, 600], [300, 600]]) await map.click({ position: { x, y } });
+  await page.keyboard.press('Enter');
+  const original = await copiedFeature(page, context);
+  await page.locator('#reworkSection').click();
+  await map.click({ position: { x: 500, y: 300 } }); await map.click({ position: { x: 400, y: 300 } });
+  await expect(page.locator('#sectionOther')).toHaveCount(0);
+  await map.click({ position: { x: 450, y: 260 } });
+  await page.locator('#sectionConnect').click();
+  await expect(page.locator('#sectionApply')).toBeEnabled();
+  await page.screenshot({ path: 'output/playwright/section-replacement.png', fullPage: true });
+  await page.locator('#sectionApply').click();
+  const result = await copiedFeature(page, context);
+  expect(result.id).toBe(original.id); expect(result.properties.controlPoints).toHaveLength(7);
+  for (const point of original.properties.controlPoints) expect(result.properties.controlPoints).toContainEqual(point);
+  await expect(page.locator('#drawingObjects button')).toHaveCount(1);
+  await page.locator('#undoDrawing').click(); expect(await copiedFeature(page, context)).toEqual(original);
+  await page.locator('#redoDrawing').click(); expect(await copiedFeature(page, context)).toEqual(result);
+  await page.locator('#reworkSection').click(); await map.click({ position: { x: 600, y: 400 } });
+  await page.locator('#sectionCancel').click(); expect(await copiedFeature(page, context)).toEqual(result);
+  await page.locator('#undoDrawing').click();
+  await page.locator('#reworkSection').click();
+  await map.click({ position: { x: 400, y: 300 } }); await map.click({ position: { x: 500, y: 300 } });
+  await map.click({ position: { x: 700, y: 450 } }); await map.click({ position: { x: 200, y: 450 } });
+  await page.locator('#sectionConnect').click();
+  await expect(page.locator('#sectionStatus')).toContainText('rot markiert');
+  await expect(page.locator('#sectionApply')).toBeDisabled();
+  await expect(page.locator('.leaflet-tooltip').filter({ hasText: 'Kreuzung oder doppelt' })).toBeVisible();
+  await page.screenshot({ path: 'output/playwright/section-problem.png', fullPage: true });
+  await page.locator('#sectionUndo').click();
+  await expect(page.locator('.leaflet-tooltip').filter({ hasText: 'Kreuzung oder doppelt' })).toHaveCount(0);
+  await page.locator('#sectionCancel').click(); expect(await copiedFeature(page, context)).toEqual(original);
+  expect(errors).toEqual([]);
+});
+
+test('Weiterbearbeiten: innerhalb eines Ersatzabschnitts magnetisch und manuell wechseln', async ({ page, context }) => {
+  test.setTimeout(150_000);
+  const errors = []; page.on('pageerror', error => errors.push(error.message));
+  await openApp(page); await loadSyntheticProject(page, false, 'line');
+  await page.locator('#enterDrawing').click();
+  const map = page.locator('#map');
+  await expect.poll(async () => Math.round((await map.boundingBox()).width)).toBe(1120);
+  const { left, right, top, bottom } = await darkRasterBounds(page), y = (top + bottom) / 2, width = right - left;
+  await page.locator('[data-tool="line"]').click();
+  await map.click({ position: { x: left, y } }); await map.click({ position: { x: right, y } }); await page.keyboard.press('Enter');
+  const original = await copiedFeature(page, context);
+  await page.locator('#reworkSection').click();
+  await map.click({ position: { x: left + width * .1, y } }); await map.click({ position: { x: left + width * .9, y } });
+  await expect(page.locator('#sectionOther')).toHaveCount(0);
+  await page.locator('#sectionMethod').selectOption('magnetic');
+  await map.click({ position: { x: left + width * .4, y } });
+  await expect(page.locator('#magneticAccept')).toBeEnabled();
+  await page.locator('#sectionMethod').selectOption('manual');
+  await expect(page.locator('#sectionMethod')).toHaveValue('magnetic');
+  await page.locator('#magneticAccept').click();
+  await page.locator('#sectionMethod').selectOption('manual');
+  await map.click({ position: { x: left + width * .6, y } });
+  await page.locator('#sectionMethod').selectOption('magnetic');
+  await page.locator('#sectionConnect').click(); await expect(page.locator('#magneticAccept')).toBeEnabled();
+  await page.locator('#magneticAccept').click(); await expect(page.locator('#sectionApply')).toBeEnabled();
+  await page.locator('#sectionApply').click();
+  const result = await copiedFeature(page, context);
+  expect(result.id).toBe(original.id); expect(result.geometry.type).toBe('LineString');
+  expect(result.geometry.coordinates[0]).toEqual(original.geometry.coordinates[0]);
+  expect(result.geometry.coordinates.at(-1)).toEqual(original.geometry.coordinates.at(-1));
+  await expect(page.locator('#drawingObjects button')).toHaveCount(1);
+  expect(errors).toEqual([]);
+});
 
 async function sourceImageOffset(page) {
   return page.locator('#sourceMap').evaluate(sourceMap => {

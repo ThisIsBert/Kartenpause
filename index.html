@@ -69,13 +69,32 @@
       <button data-tool="curvePolygon" aria-pressed="false">◯ Geschwungenes Polygon zeichnen</button>
       <button data-tool="brush" aria-pressed="false">▰ Linie mit Pinsel erkennen</button>
       <button data-tool="magnetic" aria-pressed="false">⌁ Magnetisch nachzeichnen</button>
+      <button data-tool="wand" aria-pressed="false">✧ Zauberstab / Fläche auswählen</button>
+    </div>
+    <div id="areaEditSettings" hidden>
+      <h2>Fläche weiterbearbeiten</h2>
+      <p class="hint">Die aktuelle Form ist die Ausgangsauswahl. Hinzufügen, abziehen oder mit dem Pinsel korrigieren. Übernehmen ersetzt dieses Objekt; Verwerfen erhält das Original. Die Umwandlung in Originalpixel kann den Rand geringfügig verändern.</p>
+      <div class="commands"><button id="areaApply">Übernehmen</button><button id="areaCancel">Verwerfen</button></div>
+    </div>
+    <div id="sectionSettings" hidden>
+      <h2>Randabschnitt ersetzen</h2>
+      <p class="hint">A und B auf demselben Rand wählen. Rot gestrichelt: zu ersetzender Abschnitt. Von A nach B zeichnen. Kurven werden dabei in fein aufgelöste Linien umgewandelt.</p>
+      <label for="sectionMethod">Zeichenmethode</label>
+      <select id="sectionMethod"><option value="manual">Manuell</option><option value="magnetic">Magnetisch</option></select>
+      <button id="sectionConnect">Mit Endpunkt B verbinden</button>
+      <div class="commands"><button id="sectionUndo">Letztes Teilstück zurück</button><button id="sectionReset">A und B neu wählen</button></div>
+      <div class="commands"><button id="sectionApply">Übernehmen</button><button id="sectionCancel">Verwerfen</button></div>
+      <p id="sectionStatus" role="status" aria-live="polite"></p>
     </div>
     <div id="magneticSettings" hidden>
-      <p class="hint">Startpunkt und nächsten Anker auf der Bildlinie anklicken. Orange Vorschau prüfen und übernehmen. Bei einem falschen Verlauf einen näheren Zwischenanker anklicken.</p>
+      <p class="hint">Zwei Anker setzen. Weiterklicken hinter dem Endanker übernimmt die Vorschau und setzt fort. Zurück in den Abschnitt klicken korrigiert ihn. Alt erzwingt Korrektur, Umschalt Fortsetzen.</p>
       <div class="row"><label for="magneticRadius">Suchraum neben dem Abschnitt</label><output id="magneticRadiusValue">32 Originalpixel</output></div>
       <input id="magneticRadius" type="range" min="8" max="100" value="32" step="4" />
       <div class="commands"><button id="magneticPick" aria-pressed="false">Farbpipette</button><button id="magneticClearColor" disabled>Farbe löschen</button></div>
       <div class="row"><span id="magneticColor" class="hint">Ohne Farbvorgabe</span><span id="magneticSwatch" aria-hidden="true"></span></div>
+      <div class="commands"><button id="magneticPick2" aria-pressed="false">Zweite Farbpipette</button><button id="magneticClearColor2" disabled>Zweite Farbe löschen</button></div>
+      <div class="row"><span id="magneticColor2" class="hint">Optional: zweite Flächenfarbe</span><span id="magneticSwatch2" aria-hidden="true"></span></div>
+      <p id="magneticColorMode" class="hint">Suche nach einer abgesetzten Bildlinie.</p>
       <div class="row"><label for="magneticTolerance">Farbtoleranz</label><output id="magneticToleranceValue">50</output></div>
       <input id="magneticTolerance" type="range" min="15" max="120" value="50" step="5" />
       <canvas id="magneticLoupe" width="180" height="180" aria-label="Lupe der Originalpixel"></canvas>
@@ -88,6 +107,19 @@
       <div class="row"><label for="brushWidth">Pinselbreite</label><output id="brushWidthValue">40 px</output></div>
       <input id="brushWidth" type="range" min="12" max="120" value="40" step="2" />
       <p class="hint">Mit gedrückter Maustaste eine Bildlinie abfahren. Zum Polygon zum Anfang zurückkehren. Beim Loslassen wird die Linie innerhalb der Pinselspur gesucht. Das Ergebnis lässt sich anschließend bearbeiten oder rückgängig machen.</p>
+    </div>
+    <div id="wandSettings" hidden>
+      <p class="hint">In eine Farbfläche klicken. Ähnliche Farben werden auf der Originalkarte markiert. Mit dem Pinsel korrigieren und mit „Fertig“ als ein gemeinsames Flächenobjekt übernehmen. Inseln und Löcher bleiben erhalten.</p>
+      <label for="wandMode">Werkzeug</label>
+      <select id="wandMode"><option value="replace">Zauberstab: Auswahl ersetzen</option><option value="add">Zauberstab: hinzufügen</option><option value="subtract">Zauberstab: abziehen</option><option value="paintAdd">Pinsel: hinzufügen</option><option value="paintSubtract">Pinsel: entfernen</option></select>
+      <div class="row"><label for="wandTolerance">Farbtoleranz</label><output id="wandToleranceValue">18</output></div>
+      <input id="wandTolerance" type="range" min="0" max="80" value="18" step="1" />
+      <label class="check"><input id="wandContiguous" type="checkbox" />Nur zusammenhängende Fläche</label>
+      <div class="row"><label for="wandBrushSize">Pinseldurchmesser</label><output id="wandBrushSizeValue">12 Originalpixel</output></div>
+      <input id="wandBrushSize" type="range" min="2" max="80" value="12" step="2" />
+      <p class="hint">Toleranz und „Nur zusammenhängend“ gelten erst für den nächsten Klick. Vorhandene Auswahl bleibt unverändert. Zum Nachkorrigieren „Hinzufügen“ oder „Entfernen“ wählen. Alle Teilflächen werden gemeinsam als ein Objekt übernommen.</p>
+      <button id="wandClear">Auswahl leeren</button>
+      <p id="wandStatus" role="status" aria-live="polite"></p>
     </div>
     <p id="drawingHelp" class="hint"></p>
     <div class="commands">
@@ -105,6 +137,15 @@
       <label for="drawingName">Name</label><input id="drawingName" type="text" maxlength="200" />
       <div class="commands"><button id="copyDrawing">Kopieren (Strg+C)</button><button id="deleteDrawing">Löschen</button></div>
       <button id="deleteVertex" disabled>Gewählten Stützpunkt löschen</button>
+      <button id="reworkArea">Fläche weiterbearbeiten</button>
+      <button id="reworkSection">Randabschnitt ersetzen</button>
+      <div class="row"><label for="simplifyDrawing">Vereinfachen und glätten</label><output id="simplifyValue">0 %</output></div>
+      <input id="simplifyDrawing" type="range" min="0" max="100" step="1" value="0" aria-describedby="simplifyStatus" />
+      <p id="simplifyStatus" class="hint" aria-live="polite">Objekt auswählen.</p>
+      <div class="row">
+        <button id="applySimplification" disabled>Übernehmen</button>
+        <button id="cancelSimplification" disabled>Verwerfen</button>
+      </div>
     </fieldset>
     <h2>GeoJSON</h2>
     <button id="saveDrawing" class="primary" disabled>Zeichnung speichern</button>

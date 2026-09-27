@@ -38,13 +38,21 @@ class MinHeap {
 
 // Full-resolution, eight-connected A* search between pinned anchors. A narrow
 // corridor limits detours; color and ridge evidence favor the requested stroke.
-export function findMagneticPath({ raster, start, end, radius = 32, color = null, tolerance = 50 }) {
+export function findMagneticPath({ raster, start, end, radius = 32, color = null, color2 = null, tolerance = 50 }) {
   const { width, height, data } = raster, n = width * height;
   const a = start.map(Math.round), b = end.map(Math.round);
   if ([a, b].some(p => p[0] < 0 || p[1] < 0 || p[0] >= width || p[1] >= height)) throw new Error('Anker liegt außerhalb der Pixelkarte.');
   if (Math.hypot(a[0] - b[0], a[1] - b[1]) < 2) throw new Error('Bitte den nächsten Anker etwas weiter entfernt setzen.');
   const dx = b[0] - a[0], dy = b[1] - a[1], lengthSquared = dx * dx + dy * dy;
   const evidence = new Float32Array(n).fill(-1), costs = new Float32Array(n).fill(-1);
+  const boundary = color && color2;
+  const colorGap = boundary ? Math.hypot(...color.map((v, i) => v - color2[i])) : 0;
+  if (boundary && colorGap < 12) throw new Error('Die beiden Farben sind zu ähnlich. Bitte unterschiedliche Flächenfarben aufnehmen.');
+  const matchColor = (offset, sample) => {
+    let delta = 0;
+    for (let c = 0; c < 3; c++) delta += (data[offset + c] - sample[c]) ** 2;
+    return Math.exp(-delta / (6 * tolerance * tolerance));
+  };
   const corridorDistance = (x, y) => {
     const t = Math.max(0, Math.min(1, ((x - a[0]) * dx + (y - a[1]) * dy) / lengthSquared));
     return Math.hypot(x - a[0] - t * dx, y - a[1] - t * dy);
@@ -60,11 +68,21 @@ export function findMagneticPath({ raster, start, end, radius = 32, color = null
       if (ax < 0 || bx < 0 || ay < 0 || by < 0 || ax >= width || bx >= width || ay >= height || by >= height) continue;
       const ia = (ay * width + ax) * 4, ib = (by * width + bx) * 4;
       if (data[ia + 3] < 128 || data[ib + 3] < 128) continue;
+      if (boundary) {
+        const contrast = Math.min(1, Math.hypot(data[ia] - data[ib], data[ia + 1] - data[ib + 1], data[ia + 2] - data[ib + 2]) / colorGap);
+        const pair = Math.max(matchColor(ia, color) * matchColor(ib, color2), matchColor(ia, color2) * matchColor(ib, color));
+        ridge = Math.max(ridge, Math.sqrt(pair) * contrast / (1 + (gap - 1) * .18));
+        continue;
+      }
       let dot = 0;
       for (let c = 0; c < 3; c++) dot += (data[ia + c] - data[offset + c]) * (data[ib + c] - data[offset + c]);
       ridge = Math.max(ridge, Math.sqrt(Math.max(0, dot) / 3) / 255);
     }
     let match = 1;
+    if (boundary) {
+      evidence[index] = ridge;
+      return costs[index] = .25 + 10 * (1 - ridge) + .2 * away / radius;
+    }
     if (color) {
       let delta = 0;
       for (let c = 0; c < 3; c++) delta += (data[offset + c] - color[c]) ** 2;

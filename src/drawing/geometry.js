@@ -1,8 +1,10 @@
 // Coordinates are stored in Leaflet's projected plane. Curves therefore retain
 // their shape at every zoom level; GeoJSON is always exported in WGS84 lon/lat.
-export const isClosed = kind => kind === 'polygon' || kind === 'curvePolygon';
+export const isClosed = kind => kind === 'polygon' || kind === 'curvePolygon' || kind === 'multiPolygon';
 export const isCurved = kind => kind === 'curve' || kind === 'curvePolygon';
 export const minimumPoints = kind => kind === 'point' ? 1 : isClosed(kind) ? 3 : 2;
+export const polygonParts = object => object.kind === 'multiPolygon' ? object.parts : [object];
+export const objectRings = object => polygonParts(object).flatMap(part => [part.vertices, ...(part.holes || [])]);
 
 export function segmentPoint(vertices, index, t, curved, closed) {
   const n = vertices.length;
@@ -30,6 +32,13 @@ export function sampledPoints(object) {
 }
 
 export function toFeature(object, toLonLat) {
+  if (object.kind === 'multiPolygon') {
+    const parts = object.parts.map(part => toFeature({ ...part, kind: 'polygon' }, toLonLat));
+    return { type: 'Feature', id: object.id,
+      properties: { name: object.name, drawingTool: object.kind,
+        partControlPoints: parts.map(part => ({ exterior: part.properties.controlPoints, holes: part.properties.holeControlPoints || [] })) },
+      geometry: { type: 'MultiPolygon', coordinates: parts.map(part => part.geometry.coordinates) } };
+  }
   let coordinates = sampledPoints(object).map(toLonLat);
   const type = object.kind === 'point' ? 'Point' : isClosed(object.kind) ? 'Polygon' : 'LineString';
   if (type === 'Point') coordinates = coordinates[0];
@@ -39,10 +48,16 @@ export function toFeature(object, toLonLat) {
       const q = coordinates[i + 1]; return sum + p[0] * q[1] - q[0] * p[1];
     }, 0);
     if (area < 0) coordinates.reverse();
-    coordinates = [coordinates];
+    coordinates = [coordinates, ...(object.holes || []).map(ring => {
+      const closed = [...ring, ring[0]].map(toLonLat);
+      const area = closed.slice(0, -1).reduce((sum, p, i) => sum + p[0] * closed[i + 1][1] - closed[i + 1][0] * p[1], 0);
+      if (area > 0) closed.reverse();
+      return closed;
+    })];
   }
   return { type: 'Feature', id: object.id, properties: { name: object.name,
     drawingTool: object.kind, controlPoints: object.vertices.map(toLonLat),
+    ...(object.holes?.length ? { holeControlPoints: object.holes.map(ring => ring.map(toLonLat)) } : {}),
     ...(isCurved(object.kind) ? { interpolation: 'catmull-rom', samplesPerSegment: 32 } : {})
   }, geometry: { type, coordinates } };
 }
