@@ -4,7 +4,7 @@ import { setBusy } from './busy.js';
 
 export function createWand({ map, renderer, getOriginalRaster, onState, onComplete }) {
   const el = id => document.getElementById(id), group = L.layerGroup().addTo(map);
-  const canvas = document.createElement('canvas'); canvas.className = 'tracing-brush'; canvas.hidden = true; canvas.tabIndex = 0;
+  const canvas = document.createElement('canvas'); canvas.className = 'selection-paint'; canvas.hidden = true; canvas.tabIndex = 0;
   canvas.setAttribute('aria-label', 'Auswahl mit Pinsel bearbeiten'); map.getContainer().append(canvas);
   let enabled = false, source = null, mask = null, polygons = [], count = 0, worker = null, generation = 0, busy = false;
   let undo = [], redo = [], stroke = null, cursor = null, pointer = null, dragging = false, gestures = [];

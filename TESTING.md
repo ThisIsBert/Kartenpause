@@ -14,7 +14,7 @@
 
 ## Mehrteilige Objekte und Vereinfachung
 
-`npm.cmd run test:trace` prüft zusätzlich MultiPolygon-Export samt Innenringen, reduzierter Punktzahl, geglätteten Linien mit festen Endpunkten und Erhalt kleiner Löcher/Teilflächen. `npm.cmd run test:ui -- --grep "Zauberstab:"` prüft, dass Toleranzänderungen nicht rückwirkend wirken, der nächste Klick die neue Toleranz nutzt und mehrere Teilflächen als ein bearbeitbares Objekt exportiert werden. Außerdem: Vorschau, Regler zurück auf 0, Übernehmen/Verwerfen, Rückgängig/Wiederholen und gemeinsames Löschen. Screenshot: `output/playwright/simplification-preview.png`.
+`npm.cmd run test:trace` prüft zusätzlich MultiPolygon-Export samt Innenringen, reduzierter Punktzahl und geglätteten Linien mit festen Endpunkten. Bereinigungstests prüfen gemeinsame Größenskala, Entfernen kleiner Inseln und Löcher (einschließlich Inseln in gefüllten Löchern), Schutz größerer Strukturen, lokale Rücknahme bei Konflikten und schmale Ringe mit 7.212 Stützpunkten bei 100 %. `node node_modules/@playwright/test/cli.js test --grep 'Zauberstab:|Vereinfachung:'` prüft Toleranzänderungen nur für den folgenden Klick, Vorschauzähler für Teilflächen und Löcher, Wiederherstellen bei Reglerwert 0, Übernehmen/Verwerfen und Rückgängig/Wiederholen nach dem Entfernen von Kleinteilen. Screenshot: `output/playwright/simplification-preview.png`.
 
 ## Klickfortsetzung, Farbflächengrenzen und Zauberstab
 
@@ -33,15 +33,6 @@ npm.cmd run test:ui -- --grep "Magnetisch:"
 ```
 
 Die Tests prüfen die Wahl einer gebogenen roten Grenze gegenüber einem kreuzenden blauen Fluss, die Ablehnung leerer/zu großer Suchbereiche und die Rückrechnung in Originalpixel einschließlich echter TPS-Korrektur. Im Browser werden Pipette und unverglättete Lupe, Originalpixel-Suche bei Deckkraft null nach Zoom, Vorschauersetzung, Zwischenanker, Verwerfen/Bestätigen, Linienabschluss, separat bestätigte Polygonschließkante, Export, Rückgängig und Abbruch geprüft. Ein Screenshot der Vorschau wird unter `output/playwright/magnetic-preview.png` gespeichert.
-
-## Pinsel und Stützpunkte
-
-```powershell
-npm.cmd run test:trace
-npm.cmd run test:ui -- --grep "Stützpunkte:|Pinsel erkennt"
-```
-
-Die isolierten Erkennungstests prüfen eine gegenüber der Pinselspur versetzte Bildlinie, eine farbige geschlossene Kontur sowie die Zurückweisung leerer Bereiche und außerhalb der Spur liegender Linien. Die Browser-Tests prüfen zusätzlich die kleinen quadratischen Stützpunkte, den Auswahlcursor, direktes Herausziehen eines Pluspunkts, Linien- und Polygonerkennung bei Deckkraft null, GeoJSON-Kopieren, Rückgängig/Wiederholen und Abbrechen mit Esc.
 
 ## Lokal ausprobieren
 
@@ -73,6 +64,10 @@ Playwright startet einen Vite-Entwicklungsserver. Lokal läuft der Test mit Micr
 
 Geprüft werden unter anderem:
 
+- GeoJSON-Import aller Geometrietypen, Eigenschaften und Löcher; atomare Fehlerbehandlung
+- Datei- und Zwischenablageimport ohne Pixelkarte, Umbenennen und Rückgängig
+- exakte Übernahme vorhandener Zwischenstützpunkte beim Folgen eines Polygonrands
+
 - Entfernung der alten manuellen Projektionssteuerung
 - unsichtbare Bildüberlagerung vor einer Anpassung
 - Laden und Darstellen eines Projekts
@@ -91,3 +86,5 @@ Der Prüfscreenshot wird unter `output/playwright/workflow-smoke.png` gespeicher
 ```powershell
 npm.cmd run test:ui:headed
 ```
+
+Regressionen für den erweiterten Import: MultiLineString, MultiPoint und GeometryCollection bleiben ein Objekt und werden unverändert als Geometrie exportiert. Kantentests prüfen umgekehrt orientierte Flussteilstücke, Richtungswechsel, Lücken und gerade Verbindungen ohne Vorlage.

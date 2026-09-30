@@ -67,7 +67,6 @@
       <button data-tool="polygon" aria-pressed="false">△ Polygon zeichnen</button>
       <button data-tool="curve" aria-pressed="false">∿ Geschwungene Linie zeichnen</button>
       <button data-tool="curvePolygon" aria-pressed="false">◯ Geschwungenes Polygon zeichnen</button>
-      <button data-tool="brush" aria-pressed="false">▰ Linie mit Pinsel erkennen</button>
       <button data-tool="magnetic" aria-pressed="false">⌁ Magnetisch nachzeichnen</button>
       <button data-tool="wand" aria-pressed="false">✧ Zauberstab / Fläche auswählen</button>
     </div>
@@ -87,7 +86,12 @@
       <p id="sectionStatus" role="status" aria-live="polite"></p>
     </div>
     <div id="magneticSettings" hidden>
+      <label for="magneticSource">Verlauf übernehmen aus</label>
+      <select id="magneticSource"><option value="raster">Pixelkarte</option><option value="polygon">Linien und Flächenränder</option></select>
+      <div id="magneticActiveSettings">
+      <p id="polygonFollowHelp" class="hint" hidden>Nahe an eine Linie oder einen Flächenrand klicken (16 Bildschirmpixel). Verbundene Kanten werden auf dem kürzeren Weg nachgezeichnet; für längere Bögen Zwischenpunkte setzen. Ohne passende Kante wird gerade verbunden. Weiterklicken setzt fort, Alt korrigiert die Vorschau.</p>
       <p class="hint">Zwei Anker setzen. Weiterklicken hinter dem Endanker übernimmt die Vorschau und setzt fort. Zurück in den Abschnitt klicken korrigiert ihn. Alt erzwingt Korrektur, Umschalt Fortsetzen.</p>
+      <div id="magneticRasterSettings">
       <div class="row"><label for="magneticRadius">Suchraum neben dem Abschnitt</label><output id="magneticRadiusValue">32 Originalpixel</output></div>
       <input id="magneticRadius" type="range" min="8" max="100" value="32" step="4" />
       <div class="commands"><button id="magneticPick" aria-pressed="false">Farbpipette</button><button id="magneticClearColor" disabled>Farbe löschen</button></div>
@@ -99,14 +103,11 @@
       <input id="magneticTolerance" type="range" min="15" max="120" value="50" step="5" />
       <canvas id="magneticLoupe" width="180" height="180" aria-label="Lupe der Originalpixel"></canvas>
       <p id="magneticPixel" class="hint">Maus über die Vorlage bewegen: 8-fache Pixellupe.</p>
+      </div>
       <div class="commands"><button id="magneticAccept" class="primary" disabled>Abschnitt übernehmen</button><button id="magneticReject" disabled>Vorschau verwerfen</button></div>
       <button id="magneticClose" disabled>Polygon schließen …</button>
       <p id="magneticStatus" role="status" aria-live="polite"></p>
-    </div>
-    <div id="brushSettings" hidden>
-      <div class="row"><label for="brushWidth">Pinselbreite</label><output id="brushWidthValue">40 px</output></div>
-      <input id="brushWidth" type="range" min="12" max="120" value="40" step="2" />
-      <p class="hint">Mit gedrückter Maustaste eine Bildlinie abfahren. Zum Polygon zum Anfang zurückkehren. Beim Loslassen wird die Linie innerhalb der Pinselspur gesucht. Das Ergebnis lässt sich anschließend bearbeiten oder rückgängig machen.</p>
+      </div>
     </div>
     <div id="wandSettings" hidden>
       <p class="hint">In eine Farbfläche klicken. Ähnliche Farben werden auf der Originalkarte markiert. Mit dem Pinsel korrigieren und mit „Fertig“ als ein gemeinsames Flächenobjekt übernehmen. Inseln und Löcher bleiben erhalten.</p>
@@ -148,6 +149,9 @@
       </div>
     </fieldset>
     <h2>GeoJSON</h2>
+    <input id="importDrawingFile" type="file" accept=".geojson,.json,application/geo+json,application/json" hidden />
+    <div class="commands"><button id="importDrawing">Datei laden</button><button id="pasteDrawing">Aus Zwischenablage</button></div>
+    <p class="hint">Import ergänzt die Zeichnung. Alternativ Strg+V. GeoJSON in WGS84; mehrteilige Linien, Punktgruppen und Geometriesammlungen bleiben zusammengehörige Objekte.</p>
     <button id="saveDrawing" class="primary" disabled>Zeichnung speichern</button>
     <p class="hint">Speichert alle fertigen Objekte als GeoJSON-FeatureCollection. Kurven werden als fein aufgelöste Geometrien exportiert.</p>
     <p id="drawingStatus" role="status" aria-live="polite"></p>

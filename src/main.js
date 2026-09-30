@@ -168,7 +168,7 @@ import { createRasterInverse } from './drawing/raster-source.js';
         this._animateZoom({ center: this._map.getCenter(), zoom: this._map.getZoom() });
       }
       _endZoom() { this._zooming = false; this.redraw(); }
-      redraw(alphaOverride) {
+      redraw() {
         if (!this._map || !this._canvas || this._zooming) return;
         const map = this._map, size = map.getSize();
         this._renderZoom = map.getZoom();
@@ -180,7 +180,7 @@ import { createRasterInverse } from './drawing/raster-source.js';
         const ctx = this._canvas.getContext('2d');
         ctx.clearRect(0, 0, size.x, size.y);
         if (!image || !fitted) return;
-        ctx.globalAlpha = typeof alphaOverride === 'number' ? alphaOverride : Number(els.opacity.value) / 100;
+        ctx.globalAlpha = Number(els.opacity.value) / 100;
         ctx.imageSmoothingEnabled = !document.getElementById('pixelView').checked;
 
         const crs = currentCrs();
@@ -260,7 +260,7 @@ import { createRasterInverse } from './drawing/raster-source.js';
       return button;
     }
     function updateAvailability() {
-      document.getElementById('enterDrawing').disabled = !image || !fitted || busy || !!capture;
+      document.getElementById('enterDrawing').disabled = busy || !!capture;
       const enough = points.filter(p => p.fit).length >= 3;
       ui.addPoint.disabled = !image || busy || !!capture;
       ui.clearPoints.disabled = !points.length || busy;
@@ -582,7 +582,7 @@ import { createRasterInverse } from './drawing/raster-source.js';
 
     let originalRasterImage = null, originalRasterCanvas = null, originalRasterData = null;
     document.getElementById('pixelView').onchange = () => overlay.redraw();
-    createDrawingEditor({ map, sourceMap, opacity: els.opacity, canEnter: () => fitted && !busy && !capture,
+    createDrawingEditor({ map, sourceMap, opacity: els.opacity, canEnter: () => !busy && !capture,
       getOriginalRaster() {
         if (!image || !fitted) throw new Error('Bitte zuerst eine Pixelkarte einpassen.');
         if (originalRasterImage !== image) {
@@ -600,12 +600,6 @@ import { createRasterInverse } from './drawing/raster-source.js';
         return { raster: originalRasterData, canvas: originalRasterCanvas, pixelToLatLng,
           latLngToPixel(ll, margin = 0) { const p = L.CRS.EPSG3857.project(ll); return inverse([p.x, p.y], margin); }
         };
-      },
-      getRaster() {
-        try {
-          overlay.redraw(1);
-          return overlay._canvas.getContext('2d').getImageData(0, 0, overlay._canvas.width, overlay._canvas.height);
-        } finally { overlay.redraw(); }
       },
       onModeChange(active) {
         for (const layer of [targetMarks, residualMarks]) {

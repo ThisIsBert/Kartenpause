@@ -1,7 +1,8 @@
-import { isClosed, isCurved, objectRings, sampledPoints } from './geometry.js';
+import { isClosed, isCurved, objectRings, sampledPoints, ringEntries } from './geometry.js';
 
 export function linearObject(object) {
   const result = structuredClone(object);
+  if (result.parts) result.parts = result.parts.map(linearObject);
   if (isCurved(object.kind)) {
     result.vertices = sampledPoints(object);
     if (isClosed(object.kind)) result.vertices.pop();
@@ -12,14 +13,14 @@ export function linearObject(object) {
 
 export function nearestEdge(object, point, toScreen, ringOnly = null) {
   let best = null;
-  objectRings(object).forEach((ring, ringIndex) => {
+  ringEntries(object).forEach(({ vertices: ring, kind }, ringIndex) => {
     if (ringOnly !== null && ringIndex !== ringOnly) return;
-    for (let i = 0; i < ring.length - (isClosed(object.kind) ? 0 : 1); i++) {
+    for (let i = 0; i < ring.length - (isClosed(kind) ? 0 : 1); i++) {
       const a = toScreen(ring[i]), b = toScreen(ring[(i + 1) % ring.length]);
       const dx = b[0] - a[0], dy = b[1] - a[1];
       const t = Math.max(0, Math.min(1, ((point[0] - a[0]) * dx + (point[1] - a[1]) * dy) / (dx * dx + dy * dy || 1)));
       const distance = Math.hypot(point[0] - a[0] - t * dx, point[1] - a[1] - t * dy);
-      if (!best || distance < best.distance) best = { ringIndex, at: (i + t) % (isClosed(object.kind) ? ring.length : Infinity),
+      if (!best || distance < best.distance) best = { ringIndex, at: (i + t) % (isClosed(kind) ? ring.length : Infinity),
         point: ring[i].map((v, axis) => v + t * (ring[(i + 1) % ring.length][axis] - v)), distance };
     }
   });
@@ -35,13 +36,13 @@ export function arc(ring, start, end, closed) {
 }
 
 export function selectedArc(object, start, end, other = false) {
-  const ring = objectRings(object)[start.ringIndex], closed = isClosed(object.kind);
+  const ring = objectRings(object)[start.ringIndex], closed = isClosed(ringEntries(object)[start.ringIndex].kind);
   if (!closed) return start.at < end.at ? arc(ring, start, end, false) : arc(ring, end, start, false).reverse();
   return other ? arc(ring, end, start, true).reverse() : arc(ring, start, end, true);
 }
 
 export function shorterArcIsOther(object, start, end) {
-  if (!isClosed(object.kind)) return false;
+  if (!isClosed(ringEntries(object)[start.ringIndex].kind)) return false;
   const length = points => points.reduce((sum, p, i) => i ? sum + Math.hypot(p[0] - points[i - 1][0], p[1] - points[i - 1][1]) : sum, 0);
   const forward = length(selectedArc(object, start, end));
   const backward = length(selectedArc(object, start, end, true));
@@ -50,7 +51,7 @@ export function shorterArcIsOther(object, start, end) {
 }
 
 export function replaceArc(object, start, end, path, other = false) {
-  const result = structuredClone(object), ring = objectRings(result)[start.ringIndex], closed = isClosed(object.kind);
+  const result = structuredClone(object), ring = objectRings(result)[start.ringIndex], closed = isClosed(ringEntries(object)[start.ringIndex].kind);
   let points;
   if (closed) {
     const retained = other ? arc(ring, start, end, true) : arc(ring, end, start, true);

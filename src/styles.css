@@ -84,8 +84,7 @@
     .drawing-midpoint span { position: absolute; left: 4px; top: 4px; width: 10px; height: 10px; box-sizing: border-box; background: #ffffffbb; color: #746b63; border: 1px solid #998c7e99; text-align: center; font: 10px/8px system-ui; }
     .drawing-midpoint:hover span { background: white; color: #9b3b10; }
     .drawing-vertex.draft span { background: #176c65; }
-    .tracing-brush { position: absolute; inset: 0; z-index: 650; cursor: crosshair; touch-action: none; }
-    #brushSettings { margin-top: 12px; }
+    .selection-paint { position: absolute; inset: 0; z-index: 650; cursor: crosshair; touch-action: none; }
     #magneticSettings { margin-top: 12px; padding-top: 4px; border-top: 1px solid #ccd5d3; }
     #magneticSettings output { font-size: 12px; }
     #magneticStatus { font-size: 13px; line-height: 1.45; }

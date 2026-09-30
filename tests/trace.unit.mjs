@@ -1,15 +1,75 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { traceRaster } from '../src/drawing/trace.js';
 import { findMagneticPath, cropSearch } from '../src/drawing/magnetic-path.js';
 import { createRasterInverse } from '../src/drawing/raster-source.js';
 import { ThinPlateSpline } from '../src/geo/thin-plate-spline.js';
 import { continuesSegment } from '../src/drawing/magnetic-click.js';
 import { selectColor, paintSelection, selectionPolygons } from '../src/drawing/selection.js';
 import { toFeature, objectRings, sampledPoints } from '../src/drawing/geometry.js';
-import { simplifyObject, vertexCount, hasValidTopology, topologyReport } from '../src/drawing/simplification.js';
+import { simplifyObject, vertexCount, hasValidTopology, topologyReport, geometryCounts } from '../src/drawing/simplification.js';
 import { linearObject, nearestEdge, replaceArc, selectedArc, rasterizePolygons, shorterArcIsOther } from '../src/drawing/rework-geometry.js';
 import { removeSpurs } from '../src/drawing/path-cleanup.js';
+import { drawingFilename } from '../src/drawing/export.js';
+import { importGeoJSON } from '../src/drawing/import.js';
+import { polygonHit, polygonPath, edgePath } from '../src/drawing/polygon-follow.js';
+
+test('GeoJSON imports all geometry types, keeps multipolygons and properties, rejects malformed data atomically', () => {
+  const ring = [[0, 0], [10, 0], [10, 10], [0, 0]], hole = [[1, 1], [2, 1], [2, 2], [1, 1]];
+  const input = { type: 'FeatureCollection', features: [
+    { type: 'Feature', id: 'old', properties: { name: 'Fläche', custom: 42, sourceId: 'relation/123' }, geometry: { type: 'MultiPolygon', coordinates: [[ring, hole], [ring]] } },
+    { type: 'Feature', properties: {}, geometry: { type: 'GeometryCollection', geometries: [
+      { type: 'MultiPoint', coordinates: [[0, 0], [1, 1]] },
+      { type: 'MultiLineString', coordinates: [[[0, 0], [1, 1]], [[2, 2], [3, 3]]] }
+    ] } }
+  ] };
+  let id = 0;
+  const objects = importGeoJSON(JSON.stringify(input), p => p, () => ++id);
+  assert.equal(objects.length, 2);
+  assert.equal(objects[1].kind, "collection");
+  assert.deepEqual(toFeature(objects[1], p => p).geometry, input.features[1].geometry);
+  assert.equal(objects[0].kind, 'multiPolygon');
+  assert.equal(objects[0].parts.length, 2);
+  assert.equal(objects[0].parts[0].holes.length, 1);
+  assert.equal(objects[0].parts[0].vertices.length, 3);
+  assert.equal(toFeature(objects[0], p => p).properties.custom, 42);
+  assert.equal(toFeature(objects[0], p => p).properties.sourceId, 'relation/123');
+  assert.equal(new Set(objects.map(o => o.id)).size, 2);
+  for (const bad of ['null', '{}', '{', JSON.stringify({ type: 'Point', coordinates: [2, 91] }), JSON.stringify({ type: 'Polygon', coordinates: [[[0, 0], [1, 1]]] })]) assert.throws(() => importGeoJSON(bad, p => p));
+  assert.equal(importGeoJSON('\uFEFF' + JSON.stringify({ type: 'Point', coordinates: [1, 2, 3] }), p => p.slice(0, 2))[0].kind, 'point');
+});
+
+test('polygon following snaps to a locked ring and preserves every vertex on the shorter arc', () => {
+  const object = { kind: 'polygon', vertices: [[0, 0], [3, 0], [7, 0], [10, 0], [10, 10], [0, 10]], holes: [[[3, 3], [7, 3], [7, 7], [3, 7]]] };
+  const start = polygonHit([object], [1, -.2], p => p, 1);
+  const end = nearestEdge(start.object, [9, 0], p => p, start.hit.ringIndex);
+  const path = polygonPath(start.object, start.hit, end);
+  assert.deepEqual(path, [[1, 0], [3, 0], [7, 0], [9, 0]]);
+  assert.deepEqual(polygonPath(start.object, end, start.hit), path.toReversed());
+  assert.equal(polygonHit([object], [100, 100], p => p), null);
+  assert.equal(polygonHit([object], [3, 4], p => p, 1).hit.ringIndex, 1);
+  assert.throws(() => polygonPath(object, start.hit, { ...end, ringIndex: 1 }));
+  assert.throws(() => polygonPath(object, start.hit, start.hit));
+});
+
+test('download filename uses the sole object name and safe fallbacks', () => {
+  assert.equal(drawingFilename([{ name: 'Römisches Reich' }]), 'Römisches Reich.geojson');
+  assert.equal(drawingFilename([{ name: 'Grenze.geojson' }]), 'Grenze.geojson');
+  assert.equal(drawingFilename([{ name: 'A/B: C?' }]), 'A_B_ C_.geojson');
+  for (const objects of [[], [{}], [{ name: ' ' }], [{ name: '..' }], [{ name: 'CON' }], [{ name: 'A' }, { name: 'B' }]]) {
+    assert.equal(drawingFilename(objects), 'kartenpause.geojson');
+  }
+});
+
+test('upper simplification range strongly generalizes while lower values retain detail', () => {
+  const object = { kind: 'polygon', vertices: Array.from({ length: 2000 }, (_, i) => {
+    const angle = i * Math.PI / 1000; return [100 * Math.cos(angle), 100 * Math.sin(angle)];
+  }) };
+  const fine = simplifyObject(object, 10), strong = simplifyObject(object, 100);
+  assert.ok(vertexCount(fine) > 30);
+  assert.ok(vertexCount(strong) <= 6);
+  assert.equal(hasValidTopology(strong, object), true);
+  assert.deepEqual(simplifyObject(object, 0), object);
+});
 
 test('shorter boundary is independent of anchor order and vertex density', () => {
   const object = { kind: 'polygon', vertices: [[0, 0], [2, 0], [4, 0], [6, 0], [8, 0], [10, 0], [10, 10], [0, 10]] };
@@ -52,32 +112,6 @@ function raster(draw) {
   const set = (x, y, rgb = [20, 20, 20]) => data.set([...rgb, 255], (y * width + x) * 4);
   draw(set); return { width, height, data };
 }
-
-test('finds the image line instead of reproducing the offset brush path', () => {
-  const image = raster(set => { for (let x = 20; x <= 220; x++) for (let y = 79; y <= 81; y++) set(x, y); });
-  const result = traceRaster(image, [[25, 88], [100, 88], [215, 88]], 32);
-  assert.equal(result.closed, false);
-  assert.ok(result.vertices.every(p => Math.abs(p[1] - 80) <= 2));
-  assert.ok(result.vertices.length < 10);
-});
-
-test('detects colored lines and a closed rectangular boundary', () => {
-  const image = raster(set => {
-    for (let x = 40; x <= 200; x++) for (const y of [39, 40, 41, 139, 140, 141]) set(x, y, [200, 30, 60]);
-    for (let y = 40; y <= 140; y++) for (const x of [39, 40, 41, 199, 200, 201]) set(x, y, [200, 30, 60]);
-  });
-  const result = traceRaster(image, [[48, 46], [191, 46], [191, 132], [48, 132], [48, 46]], 32);
-  assert.equal(result.closed, true);
-  assert.ok(result.vertices.length >= 4);
-  assert.ok(result.vertices.every(([x, y]) => Math.min(Math.abs(x - 40), Math.abs(x - 200), Math.abs(y - 40), Math.abs(y - 140)) < 6));
-});
-
-test('rejects empty image areas and lines outside the painted corridor', () => {
-  const blank = raster(() => {});
-  assert.throws(() => traceRaster(blank, [[20, 80], [220, 80]], 32), /Keine ausreichend/);
-  const image = raster(set => { for (let x = 20; x < 220; x++) set(x, 30); });
-  assert.throws(() => traceRaster(image, [[20, 80], [220, 80]], 32), /Keine ausreichend/);
-});
 
 test('magnetic color guidance follows a curved red border across a blue river', () => {
   const red = [185, 35, 40];
@@ -229,22 +263,64 @@ test('simplification is reversible, reduces vertices, smooths and fixes line end
   assert.deepEqual(simplifyObject({ kind: 'point', vertices: [[1, 2]] }, 100), { kind: 'point', vertices: [[1, 2]] });
 });
 
-test('simplification retains small holes and multipart islands without collapsing rings', () => {
+test('simplification removes tiny holes but protects remaining holes and large islands', () => {
   const circle = (x, y, radius) => Array.from({ length: 80 }, (_, i) => [x + radius * Math.cos(i / 40 * Math.PI), y + radius * Math.sin(i / 40 * Math.PI)]);
   const object = { kind: 'multiPolygon', parts: [
     { vertices: circle(0, 0, 100), holes: [circle(0, 0, .01), circle(90, 0, 8)] },
     { vertices: circle(220, 0, 100), holes: [] }
   ] };
   const result = simplifyObject(object, 100), rings = objectRings(result);
-  assert.equal(result.parts.length, 2); assert.equal(result.parts[0].holes.length, 2);
+  assert.equal(result.parts.length, 2); assert.equal(result.parts[0].holes.length, 1);
   assert.ok(rings.every(ring => ring.length >= 3 && Math.abs(signedArea(ring)) > 0));
   assert.ok(vertexCount(result) < vertexCount(object));
-  assert.ok(result.parts[0].holes[1].every(([x, y]) => Math.hypot(x, y) < 100));
+  assert.ok(result.parts[0].holes[0].every(([x, y]) => Math.hypot(x, y) < 100));
   // Near-touching rings may require keeping the original rather than damaging it.
   object.parts[0].holes[1] = circle(90, 0, 9.99);
   const conservative = simplifyObject(object, 100);
-  assert.equal(objectRings(conservative).length, 4);
-  assert.ok(conservative.parts[0].holes[1].every(([x, y]) => Math.hypot(x, y) < 100));
+  assert.equal(objectRings(conservative).length, 3);
+  assert.ok(conservative.parts[0].holes[0].every(([x, y]) => Math.hypot(x, y) < 100));
+  assert.equal(hasValidTopology(conservative), true);
+});
+
+test('cleanup uses one scale, drops islands in filled holes and restores the baseline at zero', () => {
+  const square = (x, y, size) => [[x, y], [x + size, y], [x + size, y + size], [x, y + size]];
+  const object = { id: 'keep', name: 'Example', kind: 'multiPolygon', parts: [
+    { vertices: square(0, 0, 100), holes: [square(10, 10, 1), square(40, 40, 10)] },
+    { vertices: square(10.2, 10.2, .2) },
+    { vertices: square(110, 0, .5) },
+    { vertices: square(150, 0, 20) }
+  ] };
+  const before = structuredClone(object);
+  assert.deepEqual(geometryCounts(simplifyObject(object, 10)), { parts: 4, holes: 2 });
+  const strong = simplifyObject(object, 100);
+  assert.deepEqual(geometryCounts(strong), { parts: 2, holes: 1 });
+  assert.equal(hasValidTopology(strong), true);
+  assert.equal(strong.id, object.id); assert.equal(strong.name, object.name);
+  assert.deepEqual(simplifyObject(object, 0), before);
+  assert.deepEqual(object, before);
+  assert.deepEqual(simplifyObject(object, 10), simplifyObject(before, 10));
+});
+
+test('7212-point narrow rings do not revert to their full outline at high strength', () => {
+  const object = { kind: 'polygon', vertices: Array.from({ length: 7212 }, (_, i) => {
+    const a = i * Math.PI * 2 / 7212; return [100 * Math.cos(a), 5 * Math.sin(a)];
+  }) };
+  for (const amount of [50, 70, 90, 100]) {
+    const result = simplifyObject(object, amount);
+    assert.ok(vertexCount(result) >= 3 && vertexCount(result) <= 8);
+    assert.equal(hasValidTopology(result), true);
+  }
+});
+
+test('pre-existing contacts do not prevent reduction of unrelated contours', () => {
+  const object = { kind: 'multiPolygon', parts: [
+    { vertices: [[0, 0], [10, 0], [10, 10], [0, 10]] },
+    { vertices: [[10, 10], [20, 10], [20, 20], [10, 20]] },
+    { vertices: Array.from({ length: 500 }, (_, i) => [50 + 10 * Math.cos(i * Math.PI / 250), 10 * Math.sin(i * Math.PI / 250)]) }
+  ] };
+  const result = simplifyObject(object, 100);
+  assert.equal(result.parts.length, 3);
+  assert.ok(result.parts[2].vertices.length < 30);
 });
 
 test('large multipart outlines can be simplified repeatedly from the same source', t => {
@@ -314,4 +390,42 @@ test('complementary replacement is valid while self-crossing and detached holes 
   const editedHole = replaceArc(holed, h1, h2, [h1.point, [3, 1], h2.point]);
   assert.deepEqual(editedHole.vertices, holed.vertices);
   assert.equal(hasValidTopology(editedHole, holed), true);
+});
+
+
+test('edge following routes reversed river members and falls back across gaps', () => {
+  const river = { id: 'river', kind: 'multiLine', parts: [
+    { kind: 'line', vertices: [[0, 0], [10, 0], [10, 10]] },
+    { kind: 'line', vertices: [[20, 20], [20, 10], [10, 10]] },
+    { kind: 'line', vertices: [[100, 100], [110, 110]] }
+  ] };
+  assert.deepEqual(edgePath([river], [2, 0], [20, 18], p => p, 1), [[2, 0], [10, 0], [10, 10], [20, 10], [20, 18]]);
+  assert.deepEqual(edgePath([river], [20, 18], [2, 0], p => p, 1), [[20, 18], [20, 10], [10, 10], [10, 0], [2, 0]]);
+  assert.deepEqual(edgePath([river], [2, 0], [105, 105], p => p, 1), [[2, 0], [105, 105]]);
+  assert.deepEqual(edgePath([river], [-50, -50], [2, 0], p => p, 1), [[-50, -50], [2, 0]]);
+  assert.deepEqual(edgePath([river], [2, -.5], [20, 18.5], p => p, 1)[0], [2, -.5]);
+  assert.deepEqual(edgePath([], [0, 0], [1, 1], p => p), [[0, 0], [1, 1]]);
+});
+
+
+test('edge routes preserve fixed off-edge endpoints and polygon holes', () => {
+  const polygon = { kind: 'polygon', vertices: [[0, 0], [20, 0], [20, 20], [0, 20]], holes: [[[5, 5], [10, 5], [10, 10], [5, 10]]] };
+  const path = edgePath([polygon], [2, -.5], [20.5, 18], p => p, 1);
+  assert.deepEqual(path, [[2, -.5], [2, 0], [20, 0], [20, 18], [20.5, 18]]);
+  assert.deepEqual(edgePath([polygon], [6, 5], [10, 9], p => p, 1), [[6, 5], [10, 5], [10, 9]]);
+  assert.deepEqual(edgePath([polygon], [2, 0], [6, 5], p => p, 1), [[2, 0], [6, 5]]);
+});
+
+test('mixed collections preserve point counts and closed ring minima during simplification', () => {
+  const object = importGeoJSON(JSON.stringify({ type: 'GeometryCollection', geometries: [
+    { type: 'MultiPoint', coordinates: [[1, 1], [2, 2]] },
+    { type: 'Polygon', coordinates: [[[0, 0], [10, 0], [10, 10], [0, 10], [0, 0]]] },
+    { type: 'MultiLineString', coordinates: [[[0, 0], [1, 0], [2, 0]], [[2, 0], [2, 2]]] }
+  ] }), p => p)[0];
+  const simplified = simplifyObject(object, 100);
+  const exported = toFeature(simplified, p => p).geometry;
+  assert.deepEqual(exported.geometries[0].coordinates, [[1, 1], [2, 2]]);
+  assert.ok(exported.geometries[1].coordinates[0].length >= 4);
+  assert.equal(exported.geometries[2].coordinates.length, 2);
+  assert.ok(topologyReport(simplified, object).valid);
 });

@@ -3,6 +3,7 @@ import { setBusy } from './busy.js';
 import { cropSearch } from './magnetic-path.js';
 import { continuesSegment } from './magnetic-click.js';
 import { removeSpurs } from './path-cleanup.js';
+import { polygonHit, edgePath } from './polygon-follow.js';
 
 export function densifyPixels(points) {
   const result = [];
@@ -14,18 +15,28 @@ export function densifyPixels(points) {
   return result;
 }
 
-export function createMagneticTool({ map, renderer, getOriginalRaster, onState, onComplete }) {
+export function createMagneticTool({ map, renderer, getOriginalRaster, getObjects, project, unproject, onState, onComplete }) {
   const el = id => document.getElementById(id), group = L.layerGroup().addTo(map);
   let enabled = false, source = null, anchors = [], segments = [], preview = null, worker = null, target = null;
   let picking = false, color = null, generation = 0, closing = false, moveFrame = 0, mouse = null;
   let color2 = null;
   let segmentHandler = null;
+  const vectorMode = () => el('magneticSource').value === 'polygon';
+  const screen = p => { const q = map.latLngToContainerPoint(unproject(p)); return [q.x, q.y]; };
+  function snap(ll, exact = false) {
+    const p = map.latLngToContainerPoint(ll), position = [p.x, p.y];
+    const found = polygonHit(getObjects(), position, screen);
+    return exact ? project(ll) : found?.hit.point || project(ll);
+  }
   const status = text => { el('magneticStatus').textContent = text; };
-  const path = () => removeSpurs(segments.flatMap((segment, i) => i ? segment.slice(1) : segment));
+  const path = () => {
+    const points = segments.flatMap((segment, i) => i ? segment.slice(1) : segment);
+    return source?.vector ? points : removeSpurs(points);
+  };
   function paint() {
     group.clearLayers();
     if (!enabled || !source) return;
-    const line = (points, color, dashArray) => L.polyline(densifyPixels(points).map(source.pixelToLatLng), {
+    const line = (points, color, dashArray) => L.polyline((source.vector ? points : densifyPixels(points)).map(source.pixelToLatLng), {
       renderer, color, weight: 3, dashArray, interactive: false
     }).addTo(group);
     if (segments.length) line(path(), '#176c65');
@@ -34,6 +45,9 @@ export function createMagneticTool({ map, renderer, getOriginalRaster, onState, 
     if (target) L.circleMarker(source.pixelToLatLng(target), { renderer, color: '#df6e12', fillOpacity: .4, weight: 1, radius: 5, interactive: false }).addTo(group);
   }
   function changed() {
+    el('magneticRasterSettings').hidden = vectorMode();
+    el('polygonFollowHelp').hidden = !vectorMode();
+    el('magneticSource').disabled = anchors.length > (segmentHandler ? 1 : 0) || !!preview || !!worker;
     el('magneticAccept').disabled = !preview || !!worker || picking;
     el('magneticReject').disabled = !target && !preview && !worker;
     el('magneticClose').disabled = anchors.length < 3 || !!preview || !!worker || picking;
@@ -54,12 +68,17 @@ export function createMagneticTool({ map, renderer, getOriginalRaster, onState, 
     status(''); changed();
   }
   function ensureSource() {
-    if (!source) source = getOriginalRaster();
+    if (!source) source = vectorMode() ? { vector: true, pixelToLatLng: unproject, latLngToPixel: project } : getOriginalRaster();
     return source;
   }
   function request(end, close = false) {
     stopSearch(); preview = null; target = end; closing = close;
     try {
+      if (source.vector) {
+        preview = edgePath(getObjects(), anchors.at(-1), end, screen);
+        status(close ? 'Schließenden Abschnitt prüfen und übernehmen.' : 'Kantenverlauf als Vorschau. Weiterklicken setzt fort; Alt korrigiert. Ohne passende Kante wird gerade verbunden.');
+        changed(); return;
+      }
       const crop = cropSearch(source.raster, anchors.at(-1), end, Number(el('magneticRadius').value));
       const requestId = generation;
       worker = new Worker(new URL('./magnetic-worker.js', import.meta.url), { type: 'module' });
@@ -85,7 +104,7 @@ export function createMagneticTool({ map, renderer, getOriginalRaster, onState, 
     changed();
   }
   function complete(closed) {
-    const pixels = closed ? removeSpurs(path(), 1e-7, true) : path();
+    const pixels = closed && !source.vector ? removeSpurs(path(), 1e-7, true) : path();
     if (pixels.length < (closed ? 4 : 2)) return;
     const result = { pixels, source, closed };
     reset(); onComplete(result);
@@ -103,6 +122,23 @@ export function createMagneticTool({ map, renderer, getOriginalRaster, onState, 
   }
   function reject() { stopSearch(); preview = null; target = null; closing = false; status('Vorschau verworfen. Einen neuen Endanker oder einen näheren Zwischenanker setzen.'); changed(); }
   function recompute() { if (target && anchors.length) request(target, closing); else changed(); }
+  el('magneticSource').onchange = () => {
+    const previousSource = source;
+    const seedPoint = segmentHandler && anchors.length ? source.pixelToLatLng(anchors.at(-1)) : null;
+    reset(); source = null;
+    try {
+      if (seedPoint) { ensureSource(); anchors = [source.vector ? snap(seedPoint, true) : source.latLngToPixel(seedPoint, .5)]; if (!anchors[0]) { anchors = []; throw new Error('Anker liegt außerhalb der Pixelkarte.'); } }
+      status(vectorMode() ? 'Startpunkt setzen. Nahe Linien und Flächenränder werden erkannt.' : 'Startanker auf die Bildlinie setzen.');
+    } catch (error) {
+      if (seedPoint) {
+        source = previousSource;
+        el('magneticSource').value = source.vector ? 'polygon' : 'raster';
+        anchors = [source.latLngToPixel(seedPoint, .5)];
+      }
+      status(error.message);
+    }
+    changed();
+  };
   el('magneticAccept').onclick = accept;
   el('magneticReject').onclick = reject;
   el('magneticClose').onclick = () => { if (anchors.length >= 3 && !worker && !preview) request(anchors[0], true); };
@@ -121,7 +157,7 @@ export function createMagneticTool({ map, renderer, getOriginalRaster, onState, 
     get pendingSegment() { return !!preview || !!target || !!worker || !!picking; },
     get isPicking() { return !!picking; },
     toAnchor(ll) {
-      ensureSource(); const point = source.latLngToPixel(ll, .5);
+      ensureSource(); const point = source.vector ? snap(ll, true) : source.latLngToPixel(ll, .5);
       if (!point) throw new Error('Der Endpunkt liegt außerhalb der Pixelkarte. Bitte manuell verbinden.');
       if (segmentHandler && preview) accept();
       request(point);
@@ -129,7 +165,7 @@ export function createMagneticTool({ map, renderer, getOriginalRaster, onState, 
     setSegmentHandler(handler) { segmentHandler = handler; },
     seed(ll) {
       ensureSource();
-      const point = source.latLngToPixel(ll, .5);
+      const point = source.vector ? snap(ll, true) : source.latLngToPixel(ll, .5);
       if (!point) throw new Error('Der Anker liegt außerhalb der Pixelkarte. Hier bitte manuell zeichnen.');
       stopSearch(); anchors = [point]; segments = []; preview = null; target = null; closing = false; picking = false; changed();
     },
@@ -140,11 +176,20 @@ export function createMagneticTool({ map, renderer, getOriginalRaster, onState, 
       if (value === enabled) return;
       enabled = value;
       if (!enabled) { reset(); source = null; cancelAnimationFrame(moveFrame); moveFrame = 0; }
-      else { status('Startanker auf die Bildlinie setzen oder zuerst mit der Farbpipette eine Linienfarbe aufnehmen.'); }
+      else { status(vectorMode() ? 'Startpunkt setzen. Nahe Linien und Flächenränder werden erkannt.' : 'Startanker auf die Bildlinie setzen oder zuerst mit der Farbpipette eine Linienfarbe aufnehmen.'); }
     },
     click(ll, modifiers = {}) {
       try {
         ensureSource();
+        if (source.vector) {
+          const point = snap(ll);
+          if (!anchors.length) { anchors = [point]; status('Startpunkt gesetzt. Weiterklicken folgt nahen Kanten oder verbindet gerade.'); changed(); return; }
+          if (preview && !closing && !modifiers.altKey) {
+            if (segmentHandler) accept();
+            else { segments.push(preview); anchors.push(target); preview = null; target = null; }
+          }
+          request(point); return;
+        }
         const pixel = source.latLngToPixel(ll);
         if (!pixel) { status('Bitte innerhalb der eingepassten Pixelkarte klicken.'); return; }
         const rounded = pixel.map(Math.round), index = (rounded[1] * source.raster.width + rounded[0]) * 4;
@@ -165,7 +210,7 @@ export function createMagneticTool({ map, renderer, getOriginalRaster, onState, 
       } catch (error) { status(error.message); }
     },
     move(ll) {
-      if (!enabled) return;
+      if (!enabled || vectorMode()) return;
       mouse = ll;
       if (moveFrame) return;
       moveFrame = requestAnimationFrame(() => {

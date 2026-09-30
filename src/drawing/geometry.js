@@ -4,7 +4,11 @@ export const isClosed = kind => kind === 'polygon' || kind === 'curvePolygon' ||
 export const isCurved = kind => kind === 'curve' || kind === 'curvePolygon';
 export const minimumPoints = kind => kind === 'point' ? 1 : isClosed(kind) ? 3 : 2;
 export const polygonParts = object => object.kind === 'multiPolygon' ? object.parts : [object];
-export const objectRings = object => polygonParts(object).flatMap(part => [part.vertices, ...(part.holes || [])]);
+export const geometryLeaves = object => object.parts
+  ? object.parts.flatMap(part => geometryLeaves({ ...part, kind: part.kind || (object.kind === 'multiPolygon' ? 'polygon' : object.kind === 'multiPoint' ? 'point' : 'line') }))
+  : [object];
+export const ringEntries = object => geometryLeaves(object).flatMap((part, partIndex) => [part.vertices, ...(part.holes || [])].map((vertices, holeIndex) => ({ vertices, kind: part.kind, partIndex, holeIndex })));
+export const objectRings = object => ringEntries(object).map(entry => entry.vertices);
 
 export function segmentPoint(vertices, index, t, curved, closed) {
   const n = vertices.length;
@@ -32,10 +36,16 @@ export function sampledPoints(object) {
 }
 
 export function toFeature(object, toLonLat) {
+  if (['multiLine', 'multiPoint', 'collection'].includes(object.kind)) {
+    const geometries = object.parts.map(part => toFeature(part, toLonLat).geometry);
+    const geometry = object.kind === 'collection' ? { type: 'GeometryCollection', geometries }
+      : { type: object.kind === 'multiLine' ? 'MultiLineString' : 'MultiPoint', coordinates: geometries.map(g => g.coordinates) };
+    return { type: 'Feature', id: object.id, properties: { ...object.properties, name: object.name }, geometry };
+  }
   if (object.kind === 'multiPolygon') {
     const parts = object.parts.map(part => toFeature({ ...part, kind: 'polygon' }, toLonLat));
     return { type: 'Feature', id: object.id,
-      properties: { name: object.name, drawingTool: object.kind,
+      properties: { ...object.properties, name: object.name, drawingTool: object.kind,
         partControlPoints: parts.map(part => ({ exterior: part.properties.controlPoints, holes: part.properties.holeControlPoints || [] })) },
       geometry: { type: 'MultiPolygon', coordinates: parts.map(part => part.geometry.coordinates) } };
   }
@@ -55,7 +65,7 @@ export function toFeature(object, toLonLat) {
       return closed;
     })];
   }
-  return { type: 'Feature', id: object.id, properties: { name: object.name,
+  return { type: 'Feature', id: object.id, properties: { ...object.properties, name: object.name,
     drawingTool: object.kind, controlPoints: object.vertices.map(toLonLat),
     ...(object.holes?.length ? { holeControlPoints: object.holes.map(ring => ring.map(toLonLat)) } : {}),
     ...(isCurved(object.kind) ? { interpolation: 'catmull-rom', samplesPerSegment: 32 } : {})

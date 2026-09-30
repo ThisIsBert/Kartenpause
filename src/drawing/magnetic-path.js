@@ -1,4 +1,4 @@
-import { simplify } from './trace.js';
+import { simplify } from './simplify-path.js';
 
 export function cropSearch(raster, start, end, radius) {
   if (![...start, ...end, radius].every(Number.isFinite)) throw new Error('Ungültiger Suchbereich.');

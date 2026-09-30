@@ -64,11 +64,11 @@ export function createSectionEditor({ map, renderer, magnetic, project, unprojec
     } catch (error) { stop(); status(error.message); }
     changed();
   }
-  function append(points) {
+  function append(points, exactEnd = false) {
     if (ready) return;
     steps.push({ path: path.map(p => [...p]), chain: structuredClone(magneticChain) });
     for (let i = 1; i < points.length; i++) path.push(points[i]);
-    if (nearEnd(path.at(-1))) { path[path.length - 1] = [...end.point]; ready = true; check(); }
+    if (nearEnd(path.at(-1)) && (!exactEnd || Math.hypot(...path.at(-1).map((v, i) => v - end.point[i])) < 1e-6)) { path[path.length - 1] = [...end.point]; ready = true; check(); }
     else { status('Weiterzeichnen oder „Mit Endpunkt B verbinden“ wählen.'); changed(); }
   }
   function seed() {
@@ -122,6 +122,7 @@ export function createSectionEditor({ map, renderer, magnetic, project, unprojec
       object = linearObject(original); resetAnchors();
       magnetic.setSegmentHandler(({ pixels, source }) => {
         if (ready) return;
+        if (source.vector) { magneticChain = null; append(pixels.map(p => [...p]), true); return; }
         const previous = { path: path.map(p => [...p]), chain: structuredClone(magneticChain) };
         if (!magneticChain) magneticChain = { base: path.map(p => [...p]), pixels: [] };
         magneticChain.pixels = removeSpurs([...magneticChain.pixels, ...pixels.slice(magneticChain.pixels.length ? 1 : 0)]);
