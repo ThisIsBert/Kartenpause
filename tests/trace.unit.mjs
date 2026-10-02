@@ -429,3 +429,71 @@ test('mixed collections preserve point counts and closed ring minima during simp
   assert.equal(exported.geometries[2].coordinates.length, 2);
   assert.ok(topologyReport(simplified, object).valid);
 });
+
+
+test('snapped vector anchors never backtrack when the display rounds to pixels', () => {
+  const source = { id: 'edge', kind: 'line', vertices: [[0, 0], [10, 3]] };
+  const screen = p => p.map(Math.round);
+  const a = polygonHit([source], [1, 0], screen).hit.point;
+  const b = polygonHit([source], [3, 0], screen).hit.point;
+  assert.deepEqual(edgePath([source], a, b, screen), [a, b]);
+  assert.deepEqual(edgePath([source], b, a, screen), [b, a]);
+});
+
+test('Rhine edge following preserves anchors even at a rounded display scale', async () => {
+  const fs = await import('node:fs');
+  const R = 6378137, circumference = 2 * Math.PI * R, scale = 256 * 2 ** 12;
+  const objects = importGeoJSON(fs.readFileSync(new URL('../examples/Rhein-Export.geojson', import.meta.url), 'utf8'), p => [R * p[0] * Math.PI / 180, R * Math.log(Math.tan(Math.PI / 4 + p[1] * Math.PI / 360))]);
+  const ring = objects[0].parts.reduce((a, b) => a.vertices.length > b.vertices.length ? a : b).vertices;
+  const a = ring[1785], b = ring[1786], at = t => a.map((v, k) => v + (b[k] - v) * t);
+  const screen = p => [Math.round((.5 + p[0] / circumference) * scale), Math.round((.5 - p[1] / circumference) * scale)];
+  const start = polygonHit(objects, screen(at(.25)), screen).hit.point, end = polygonHit(objects, screen(at(.8)), screen).hit.point;
+  assert.deepEqual(edgePath(objects, start, end, screen), [start, end]);
+});
+
+import { prepareSection, sectionIntersections } from '../src/drawing/section-geometry.js';
+
+test('section cleanup removes zero-area spurs while preserving metadata, holes and untouched parts', () => {
+  const original = { id: 'shape', name: 'A', properties: { custom: 7 }, kind: 'multiPolygon', parts: [
+    { vertices: [[0, 0], [5, 0], [5, -5], [5, 0], [10, 0], [10, 10], [0, 10]], holes: [[[2, 2], [2, 3], [3, 3], [3, 2]]] },
+    { vertices: [[20, 0], [25, 0], [25, 5], [20, 5]], holes: [] }
+  ] };
+  const before = structuredClone(original), report = prepareSection(original);
+  assert.ok(report.valid); assert.ok(report.cleaned);
+  assert.equal(report.result.id, original.id);
+  assert.deepEqual(report.result.properties, original.properties);
+  assert.deepEqual(report.result.parts[0].vertices, [[0, 0], [5, 0], [10, 0], [10, 10], [0, 10]]);
+  assert.deepEqual(report.result.parts[0].holes, original.parts[0].holes);
+  assert.deepEqual(report.result.parts[1], original.parts[1]);
+  assert.deepEqual(original, before);
+});
+
+test('genuine loops get a valid even-odd proposal and both conflicting edges, never automatic acceptance', () => {
+  const result = { id: 'bowtie', kind: 'polygon', vertices: [[0, 0], [10, 10], [0, 10], [10, 0]] };
+  const report = prepareSection(result);
+  assert.equal(report.valid, false);
+  assert.equal(report.issues[0].type, 'crossing');
+  assert.deepEqual(report.issues[0].point, [5, 5]);
+  assert.equal(report.issues[0].segments.length, 2);
+  assert.equal(report.normalized.kind, 'multiPolygon');
+  assert.equal(report.normalized.id, result.id);
+  assert.equal(report.normalized.parts.length, 2);
+  assert.ok(prepareSection(report.normalized).valid);
+  const area = vertices => Math.abs(vertices.reduce((s, a, i) => { const b = vertices[(i + 1) % vertices.length]; return s + a[0] * b[1] - a[1] * b[0]; }, 0)) / 2;
+  assert.equal(report.normalized.parts.reduce((s, p) => s + area(p.vertices), 0), 50);
+  for (const scale of [1e-5, 1e5]) {
+    const scaled = prepareSection({ ...result, vertices: result.vertices.map(p => p.map(v => v * scale)) });
+    assert.equal(scaled.valid, false); assert.equal(scaled.normalized.parts.length, 2);
+  }
+});
+
+test('robust section validation permits touching separate islands and diagnoses invalid holes', () => {
+  const touching = { kind: 'multiPolygon', parts: [
+    { vertices: [[0, 0], [1, 0], [1, 1], [0, 1]] },
+    { vertices: [[1, 1], [2, 1], [2, 2], [1, 2]] }
+  ] };
+  assert.ok(prepareSection(touching).valid);
+  const holed = { kind: 'polygon', vertices: [[0, 0], [10, 0], [10, 10], [0, 10]], holes: [[[20, 20], [21, 20], [21, 21], [20, 21]]] };
+  assert.equal(prepareSection(holed).valid, false);
+  assert.equal(sectionIntersections({ kind: 'polygon', vertices: [[0, 0], [100, .001], [100, 1], [0, 1]] }).length, 0);
+});

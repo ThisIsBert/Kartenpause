@@ -7,7 +7,8 @@ test.beforeAll(async () => {
   const { createServer } = await import('vite');
   server = await createServer({
     logLevel: 'error',
-    server: { host: '127.0.0.1', port: 4173, strictPort: true }
+    cacheDir: `node_modules/.vite-test-${process.env.TEST_PORT || 4173}`,
+    server: { host: '127.0.0.1', port: Number(process.env.TEST_PORT || 4173), strictPort: true }
   });
   await server.listen();
 });

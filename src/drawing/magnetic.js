@@ -22,9 +22,9 @@ export function createMagneticTool({ map, renderer, getOriginalRaster, getObject
   let color2 = null;
   let segmentHandler = null;
   const vectorMode = () => el('magneticSource').value === 'polygon';
-  const screen = p => { const q = map.latLngToContainerPoint(unproject(p)); return [q.x, q.y]; };
+  const screen = p => { const q = map.project(unproject(p)); return [q.x, q.y]; };
   function snap(ll, exact = false) {
-    const p = map.latLngToContainerPoint(ll), position = [p.x, p.y];
+    const p = map.project(ll), position = [p.x, p.y];
     const found = polygonHit(getObjects(), position, screen);
     return exact ? project(ll) : found?.hit.point || project(ll);
   }

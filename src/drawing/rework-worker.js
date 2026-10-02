@@ -1,5 +1,5 @@
-import { topologyReport } from './simplification.js';
+import { prepareSection } from './section-geometry.js';
 self.onmessage = ({ data }) => {
-  try { self.postMessage(topologyReport(data.result, data.original)); }
+  try { self.postMessage(prepareSection(data.result)); }
   catch (error) { self.postMessage({ error: error.message }); }
 };

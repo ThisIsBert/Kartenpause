@@ -20,8 +20,18 @@ export function polygonPath(object, start, end) {
 // Follow connected edges, including reversed members of a MultiLineString.
 // Shared coordinates are junctions; gaps are never silently bridged.
 export function edgePath(objects, start, end, screen, limit = 16) {
-  const a = polygonHit(objects, screen(start), screen, limit);
-  const b = polygonHit(objects, screen(end), screen, limit);
+  const locate = point => {
+    const found = polygonHit(objects, screen(point), screen, limit);
+    if (!found) return null;
+    // Screen coordinates select a nearby source only. Compute the position in
+    // the stored plane, preserving an already-snapped anchor exactly. Rounding
+    // an anchor to display pixels here used to create artificial backtracking.
+    const hit = nearestEdge(found.object, point, p => p, found.hit.ringIndex);
+    const epsilon = 64 * Number.EPSILON * Math.max(1, ...point.map(Math.abs));
+    if (hit.distance <= epsilon) hit.point = point;
+    return { ...found, hit };
+  };
+  const a = locate(start), b = locate(end);
   if (!a || !b) return [start, end];
   const graph = new Map(), key = p => JSON.stringify(p);
   const node = p => {
@@ -38,7 +48,7 @@ export function edgePath(objects, start, end, screen, limit = 16) {
     ringEntries(object).forEach(({ vertices, kind }, ringIndex) => {
       const hits = [a, b].filter(hit => hit.index === objectIndex && hit.hit.ringIndex === ringIndex);
       for (let i = 0; i < vertices.length - (isClosed(kind) ? 0 : 1); i++) {
-        const cuts = hits.filter(h => Math.floor(h.hit.at) === i).sort((x, y) => x.hit.at - y.hit.at);
+        const cuts = hits.filter(h => h.hit.segmentIndex === i).sort((x, y) => x.hit.at - y.hit.at);
         const points = [vertices[i], ...cuts.map(h => h.hit.point), vertices[(i + 1) % vertices.length]];
         for (let j = 1; j < points.length; j++) connect(points[j - 1], points[j]);
       }

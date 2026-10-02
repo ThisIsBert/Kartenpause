@@ -465,6 +465,7 @@ export function createDrawingEditor({ map, sourceMap, opacity, canEnter, onModeC
   });
   document.addEventListener('keydown', e => {
     if (!active || editingText(e.target)) return;
+    if (section.active && (e.key === 'Delete' || e.key === 'Backspace')) { e.preventDefault(); section.deleteVertex(); return; }
     if (section.active && e.key === 'Enter') { e.preventDefault(); section.enter(); return; }
     if (e.key === 'Escape' && reworking()) { e.preventDefault(); if (section.active) section.cancel(); else cancelArea(); return; }
     if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z') { e.preventDefault(); history(e.shiftKey ? redo : undo, e.shiftKey ? undo : redo); }

@@ -12,7 +12,7 @@ module.exports = defineConfig({
   ],
   outputDir: 'output/playwright/test-results',
   use: {
-    baseURL: 'http://127.0.0.1:4173',
+    baseURL: `http://127.0.0.1:${process.env.TEST_PORT || 4173}`,
     browserName: 'chromium',
     channel: process.env.CI ? undefined : 'msedge',
     headless: true,

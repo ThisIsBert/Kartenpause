@@ -5,7 +5,8 @@ test.beforeAll(async () => {
   const { createServer } = await import('vite');
   server = await createServer({
     logLevel: 'error',
-    server: { host: '127.0.0.1', port: 4173, strictPort: true }
+    cacheDir: `node_modules/.vite-test-${process.env.TEST_PORT || 4173}`,
+    server: { host: '127.0.0.1', port: Number(process.env.TEST_PORT || 4173), strictPort: true }
   });
   await server.listen();
 });
@@ -877,10 +878,10 @@ test('Weiterbearbeiten: Randabschnitt zwischen Kantenpunkten manuell ersetzen', 
   await page.locator('#sectionConnect').click();
   await expect(page.locator('#sectionStatus')).toContainText('rot markiert');
   await expect(page.locator('#sectionApply')).toBeDisabled();
-  await expect(page.locator('.leaflet-tooltip').filter({ hasText: 'Kreuzung oder doppelt' })).toBeVisible();
+  await expect(page.locator('.leaflet-tooltip').filter({ hasText: 'Kreuzung zweier' }).first()).toBeVisible();
   await page.screenshot({ path: 'output/playwright/section-problem.png', fullPage: true });
   await page.locator('#sectionUndo').click();
-  await expect(page.locator('.leaflet-tooltip').filter({ hasText: 'Kreuzung oder doppelt' })).toHaveCount(0);
+  await expect(page.locator('.leaflet-tooltip').filter({ hasText: 'Kreuzung zweier' })).toHaveCount(0);
   await page.locator('#sectionCancel').click(); expect(await copiedFeature(page, context)).toEqual(original);
   expect(errors).toEqual([]);
 });
@@ -973,4 +974,64 @@ test('GeoJSON: Magnet zeichnet ohne nahe Kanten gerade und setzt mit jedem Klick
   const line = await copiedFeature(page, context);
   expect(line.geometry.type).toBe('LineString');
   expect(line.geometry.coordinates).toHaveLength(3);
+});
+
+
+for (const correction of ['points', 'faces']) test(`Randkorrektur: magnetischen Verlauf erhalten und ${correction} bearbeiten`, async ({ page, context }) => {
+  test.setTimeout(120_000);
+  const errors = []; page.on('pageerror', error => errors.push(error.message));
+  await openApp(page); await page.locator('#enterDrawing').click();
+  const target = { type: 'Feature', properties: { name: 'Ziel' }, geometry: { type: 'Polygon', coordinates: [[[0, 0], [4, 0], [4, 4], [0, 4], [0, 0]]] } };
+  const source = { type: 'Feature', properties: { name: 'Schleife' }, geometry: { type: 'LineString', coordinates: [[1, 4], [3, 6], [1, 6], [3, 4]] } };
+  await page.locator('#importDrawingFile').setInputFiles({ name: 'loop.geojson', mimeType: 'application/json', buffer: Buffer.from(JSON.stringify({ type: 'FeatureCollection', features: [target, source] })) });
+  await page.waitForTimeout(400);
+  const original = await copiedFeature(page, context);
+  const box = await page.locator('#map .leaflet-drawingShapes-pane path').first().boundingBox();
+  await page.locator('#reworkSection').click();
+  await page.locator('#magneticSource').selectOption('polygon');
+  await page.mouse.click(box.x + box.width * .25, box.y);
+  await page.mouse.click(box.x + box.width * .75, box.y);
+  await page.locator('#sectionMethod').selectOption('magnetic');
+  await page.locator('#sectionConnect').click();
+  await page.locator('#magneticAccept').click();
+  await expect(page.locator('#sectionStatus')).toContainText('rot markiert');
+  await expect(page.locator('#sectionApply')).toBeDisabled();
+  const initialCount = await page.locator('.section-vertex').count();
+  expect(initialCount).toBeGreaterThanOrEqual(2);
+  await expect(page.locator('#sectionUseRepair')).toBeVisible();
+  await page.screenshot({ path: `output/playwright/section-editable-${correction}.png`, fullPage: true });
+  if (correction === 'points') {
+    const moveCorner = async () => {
+      const handles = await page.locator('.section-vertex').all();
+      const boxes = await Promise.all(handles.map(handle => handle.boundingBox()));
+      const distance = handle => Math.hypot(handle.x + handle.width / 2 - (box.x + box.width * .75), handle.y + handle.height / 2 - (box.y - box.height * .5));
+      const handle = boxes.sort((a, b) => distance(a) - distance(b))[0];
+      await page.mouse.move(handle.x + handle.width / 2, handle.y + handle.height / 2); await page.mouse.down();
+      await page.mouse.move(box.x + box.width * .125, box.y - box.height * .25, { steps: 5 }); await page.mouse.up();
+      await expect(page.locator('#sectionApply')).toBeEnabled();
+    };
+    await moveCorner();
+    await page.locator('#sectionUndo').click();
+    await expect(page.locator('#sectionApply')).toBeDisabled();
+    await expect(page.locator('#sectionStatus')).toContainText('rot markiert');
+    await expect(page.locator('.section-vertex')).toHaveCount(initialCount);
+    await moveCorner();
+    await page.locator('.section-midpoint').first().click();
+    await expect(page.locator('.section-vertex')).toHaveCount(initialCount + 1);
+    await page.locator('#sectionDeleteVertex').click();
+    await expect(page.locator('.section-vertex')).toHaveCount(initialCount);
+    await expect(page.locator('#sectionApply')).toBeEnabled();
+  } else {
+    await page.locator('#sectionUseRepair').click();
+    await expect(page.locator('#sectionApply')).toBeEnabled();
+  }
+  await page.locator('#sectionApply').click();
+  const result = await copiedFeature(page, context);
+  expect(result.id).toBe(original.id);
+  expect(result.geometry.type).toBe(correction === 'points' ? 'Polygon' : 'MultiPolygon');
+  expect(result.geometry.coordinates).not.toEqual(original.geometry.coordinates);
+  await expect(page.locator('.section-vertex')).toHaveCount(0);
+  await page.locator('#undoDrawing').click(); expect(await copiedFeature(page, context)).toEqual(original);
+  await page.locator('#redoDrawing').click(); expect(await copiedFeature(page, context)).toEqual(result);
+  expect(errors).toEqual([]);
 });

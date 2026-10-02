@@ -88,3 +88,12 @@ npm.cmd run test:ui:headed
 ```
 
 Regressionen für den erweiterten Import: MultiLineString, MultiPoint und GeometryCollection bleiben ein Objekt und werden unverändert als Geometrie exportiert. Kantentests prüfen umgekehrt orientierte Flussteilstücke, Richtungswechsel, Lücken und gerade Verbindungen ohne Vorlage.
+
+
+## Robuste Randkorrektur und bearbeitbare Vorschau
+
+`npm.cmd run test:trace` prüft zusätzlich den reproduzierten Pixelrundungsfehler mit einer Geraden und der Rhein-Datei, flächenlose Dorne, Erhalt von Löchern und Metadaten, robuste Schnittdiagnosen und die bestätigungspflichtige Even-odd-Flächenrekonstruktion bei echten Schleifen.
+
+`node node_modules/@playwright/test/cli.js test --grep 'Randkorrektur:|Weiterbearbeiten:|GeoJSON:' --timeout 120000` prüft magnetische Übernahme, Verschieben/Einfügen/Löschen der Ersatzstützpunkte, erneute Prüfung, Rückgängig, Bestätigung einer Flächenaufteilung und Erhalt der Objekt-ID. Screenshots: `output/playwright/section-editable-points.png` und `section-editable-faces.png`.
+
+Wenn bereits ein lokaler Server läuft, kann der Testport separat gewählt werden: `$env:TEST_PORT = '4175'`. Die Tests verwenden einen eigenen Vite-Cache, damit sie den laufenden Entwicklungsserver nicht beeinflussen. JSTS-Workerimporte werden vorab optimiert, um Neuladen beim ersten Randersatz zu vermeiden.

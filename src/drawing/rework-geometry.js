@@ -20,7 +20,7 @@ export function nearestEdge(object, point, toScreen, ringOnly = null) {
       const dx = b[0] - a[0], dy = b[1] - a[1];
       const t = Math.max(0, Math.min(1, ((point[0] - a[0]) * dx + (point[1] - a[1]) * dy) / (dx * dx + dy * dy || 1)));
       const distance = Math.hypot(point[0] - a[0] - t * dx, point[1] - a[1] - t * dy);
-      if (!best || distance < best.distance) best = { ringIndex, at: (i + t) % (isClosed(kind) ? ring.length : Infinity),
+      if (!best || distance < best.distance) best = { ringIndex, segmentIndex: i, at: (i + t) % (isClosed(kind) ? ring.length : Infinity),
         point: ring[i].map((v, axis) => v + t * (ring[(i + 1) % ring.length][axis] - v)), distance };
     }
   });

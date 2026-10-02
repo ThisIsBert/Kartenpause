@@ -105,3 +105,8 @@
       .drawing-mode #sourcePanel { display: none; }
       #drawingSidebar { padding: 10px; }
     }
+
+    .section-vertex span { background: #087fa6; box-shadow: 0 0 0 1px #065973; }
+    .section-issue { pointer-events: none; }
+
+    .section-vertex.chosen span { background: #163e73; box-shadow: 0 0 0 2px #163e73; }
