@@ -65,7 +65,8 @@ export function createWand({ map, renderer, getOriginalRaster, onState, onComple
   function snapshot() { return { mask: mask.slice(), polygons, count }; }
   function compute(operation, base = mask, saveHistory = true) {
     const id = ++generation, before = snapshot();
-    busy = true; startWorker(); status('Auswahl wird aus den Originalpixeln berechnet …'); changed();
+    busy = true; startWorker();
+    status(`${count.toLocaleString('de-DE')} Originalpixel ausgewählt · Auswahl wird aus den Originalpixeln berechnet …`); changed();
     worker.onmessage = ({ data }) => {
       if (data.id !== generation) return;
       busy = false;
