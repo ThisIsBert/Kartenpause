@@ -176,7 +176,14 @@ export function createMagneticTool({ map, renderer, getOriginalRaster, getObject
       if (value === enabled) return;
       enabled = value;
       if (!enabled) { reset(); source = null; cancelAnimationFrame(moveFrame); moveFrame = 0; }
-      else { status(vectorMode() ? 'Startpunkt setzen. Nahe Linien und Flächenränder werden erkannt.' : 'Startanker auf die Bildlinie setzen oder zuerst mit der Farbpipette eine Linienfarbe aufnehmen.'); }
+      else {
+        if (!vectorMode()) {
+          const ctx = el('magneticLoupe').getContext('2d');
+          ctx.imageSmoothingEnabled = false;
+          el('magneticPixel').textContent = 'Originalpixel-Lupe: Maus über die Vorlage bewegen · 8-fach, ohne Glättung.';
+        }
+        status(vectorMode() ? 'Startpunkt setzen. Nahe Linien und Flächenränder werden erkannt.' : 'Startanker auf die Bildlinie setzen oder zuerst mit der Farbpipette eine Linienfarbe aufnehmen.');
+      }
     },
     click(ll, modifiers = {}) {
       try {
