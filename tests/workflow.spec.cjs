@@ -378,12 +378,12 @@ test('Magnetisch: Originalpixel, Pipette, Vorschau, Zwischenanker und Export', a
   const map = page.locator('#map');
   await expect.poll(async () => Math.round((await map.boundingBox()).width)).toBe(1120);
   await page.locator('#map .leaflet-control-zoom-in').click();
+  await page.waitForTimeout(400);
   await page.locator('#pixelView').check();
   const { left, right, top, bottom } = await darkRasterBounds(page);
   const y = (top + bottom) / 2, middle = (left + right) / 2;
   await page.locator('[data-tool="magnetic"]').click();
-  const bounds = await map.boundingBox();
-  await page.mouse.move(bounds.x + middle, bounds.y + y);
+  await map.hover({ position: { x: middle, y } });
   await expect(page.locator('#magneticPixel')).toContainText('Originalpixel');
   expect(await page.locator('#magneticLoupe').evaluate(c => c.getContext('2d').imageSmoothingEnabled)).toBe(false);
   await page.locator('#magneticPick').click();
@@ -521,7 +521,10 @@ test('Zauberstab: Auswahl, Inseln, Löcher, Korrekturpinsel und bearbeitbarer Ex
   await map.click({ position: sample });
   await expect(page.locator('#wandStatus')).toContainText('2 Fläche(n)');
   await expect(page.locator('#finishDrawing')).toBeEnabled();
-  const selectedCount = async () => Number((await page.locator('#wandStatus').textContent()).match(/^[\d.]+/)[0].replaceAll('.', ''));
+  const selectedCount = async () => {
+    const match = (await page.locator('#wandStatus').textContent()).match(/^[\d.]+/);
+    return match ? Number(match[0].replaceAll('.', '')) : NaN;
+  };
   const broadCount = await selectedCount();
   await setRange(page, '#wandTolerance', 0);
   await page.locator('#wandTolerance').dispatchEvent('change');
@@ -953,10 +956,14 @@ test('GeoJSON: Fluss als ein Objekt, Punktgruppen und Sammlungen bleiben bearbei
     { type: 'Polygon', coordinates: [[[2, 0], [3, 0], [3, 1], [2, 0]]] }] };
   await page.locator('#importDrawingFile').setInputFiles({ name: 'group.geojson', mimeType: 'application/json', buffer: Buffer.from(JSON.stringify(group)) });
   await expect(page.locator('#drawingObjects button')).toHaveCount(3);
+  await page.waitForTimeout(400);
   expect(rounded((await copiedFeature(page, context)).geometry)).toEqual(group);
-  const handle = await page.locator('.drawing-vertex').first().boundingBox();
+  const handleLocator = page.locator('.drawing-vertex').first();
+  await handleLocator.hover();
+  const handle = await handleLocator.boundingBox();
   await page.mouse.move(handle.x + 9, handle.y + 9); await page.mouse.down();
   await page.mouse.move(handle.x + 25, handle.y + 25, { steps: 3 }); await page.mouse.up();
+  await expect(page.locator('#copyDrawing')).toBeEnabled();
   expect((await copiedFeature(page, context)).geometry.geometries[0].coordinates[0]).not.toEqual([-.2, 0]);
   await page.locator('#undoDrawing').click();
   expect(rounded((await copiedFeature(page, context)).geometry)).toEqual(group);
