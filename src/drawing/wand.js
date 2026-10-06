@@ -10,6 +10,7 @@ export function createWand({ map, renderer, getOriginalRaster, onState, onComple
   let undo = [], redo = [], stroke = null, cursor = null, pointer = null, dragging = false, gestures = [];
   let renderedPolygons = null;
   let preserveExisting = false;
+  let referenceModel = null;
   const status = text => { el('wandStatus').textContent = text; };
   const painting = () => el('wandMode').value.startsWith('paint');
   function ensureSource() {
@@ -62,7 +63,7 @@ export function createWand({ map, renderer, getOriginalRaster, onState, onComple
     worker = new Worker(new URL('./selection-worker.js', import.meta.url), { type: 'module' });
     worker.postMessage({ type: 'init', raster: source.raster });
   }
-  function snapshot() { return { mask: mask.slice(), polygons, count }; }
+  function snapshot() { return { mask: mask.slice(), polygons, count, referenceModel }; }
   function compute(operation, base = mask, saveHistory = true) {
     const id = ++generation, before = snapshot();
     busy = true; startWorker();
@@ -77,13 +78,17 @@ export function createWand({ map, renderer, getOriginalRaster, onState, onComple
           const limit = Math.max(1, Math.min(12, Math.floor(32000000 / mask.length)));
           while (undo.length > limit) undo.shift();
         }
-        mask = data.mask; polygons = data.polygons; count = data.count;
+        mask = data.mask; polygons = data.polygons; count = data.count; referenceModel = data.referenceModel;
+        if (data.debug) {
+          window.kartenpauseWandDebug = data.debug;
+          window.kartenpauseShowWandDebug = async () => (await import('./wand-debug.js')).showWandDebug(window.kartenpauseWandDebug);
+        }
         status(`${count.toLocaleString('de-DE')} Originalpixel ausgewählt · ${polygons.length} Fläche(n). Mit „Fertig“ als ein Objekt übernehmen.`);
       }
       changed();
     };
     worker.onerror = () => { worker?.terminate(); worker = null; busy = false; status('Die Auswahl konnte nicht berechnet werden. Bitte erneut versuchen.'); changed(); };
-    const copy = base.slice(); worker.postMessage({ ...operation, id, mask: copy, preserveExisting }, [copy.buffer]);
+    const copy = base.slice(); worker.postMessage({ ...operation, id, mask: copy, preserveExisting, referenceModel }, [copy.buffer]);
   }
   function cancelStroke() {
     stroke = null;
@@ -92,8 +97,10 @@ export function createWand({ map, renderer, getOriginalRaster, onState, onComple
   }
   function reset() {
     generation++; worker?.terminate(); worker = null; busy = false; cancelStroke();
+    delete window.kartenpauseWandDebug;
+    delete window.kartenpauseShowWandDebug;
     mask = source ? new Uint8Array(source.raster.width * source.raster.height) : null;
-    polygons = []; count = 0; undo = []; redo = []; cursor = null; preserveExisting = false; status(''); changed();
+    polygons = []; count = 0; undo = []; redo = []; cursor = null; preserveExisting = false; referenceModel = null; status(''); changed();
   }
   const eventPixel = e => {
     const bounds = canvas.getBoundingClientRect();
@@ -127,6 +134,13 @@ export function createWand({ map, renderer, getOriginalRaster, onState, onComple
   canvas.addEventListener('pointerleave', () => { if (!stroke) { cursor = null; paint(); } });
   for (const name of ['click', 'dblclick', 'mousedown', 'touchstart']) canvas.addEventListener(name, e => e.stopPropagation());
   el('wandMode').onchange = () => { cancelStroke(); changed(); };
+  el('wandAlgorithm').onchange = () => {
+    const intelligent = el('wandAlgorithm').value === 'intelligent';
+    el('wandToleranceLabel').textContent = intelligent ? 'Empfindlichkeit' : 'Farbtoleranz';
+    el('wandContiguous').disabled = intelligent;
+    el('wandContiguous').closest('label').hidden = intelligent;
+    el('wandAlgorithmHint').hidden = !intelligent;
+  };
   el('wandBrushSize').oninput = () => { el('wandBrushSizeValue').textContent = `${el('wandBrushSize').value} Originalpixel`; paint(); };
   el('wandTolerance').oninput = () => { el('wandToleranceValue').textContent = el('wandTolerance').value; };
   el('wandClear').onclick = () => { if (mask && !busy) compute({ type: 'restore' }, new Uint8Array(mask.length)); };
@@ -189,7 +203,8 @@ export function createWand({ map, renderer, getOriginalRaster, onState, onComple
       try {
         ensureSource(); const seed = source.latLngToPixel(ll);
         if (!seed) { status('Bitte innerhalb der Pixelkarte klicken.'); return; }
-        const operation = { type: 'select', seed, mode: el('wandMode').value, tolerance: Number(el('wandTolerance').value), contiguous: el('wandContiguous').checked };
+        const operation = { type: 'select', seed, mode: el('wandMode').value, tolerance: Number(el('wandTolerance').value), contiguous: el('wandContiguous').checked,
+          algorithm: el('wandAlgorithm').value, debug: window.kartenpauseWandDebugEnabled === true };
         compute(operation);
       } catch (error) { status(error.message); }
     },
@@ -197,7 +212,7 @@ export function createWand({ map, renderer, getOriginalRaster, onState, onComple
       if (busy || stroke) return;
       const from = forward ? redo : undo, to = forward ? undo : redo;
       if (!from.length) return;
-      to.push(snapshot()); ({ mask, polygons, count } = from.pop());
+      to.push(snapshot()); ({ mask, polygons, count, referenceModel } = from.pop());
       status(`${count.toLocaleString('de-DE')} Originalpixel ausgewählt.`); changed();
     },
     finish() { if (count && !busy && !stroke) { const result = { polygons, source }; reset(); onComplete(result); } },

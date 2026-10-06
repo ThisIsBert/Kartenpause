@@ -196,6 +196,12 @@ async function loadSyntheticProject(page, distorted = false, traceKind = null) {
         context.fillStyle = '#323232'; context.fillRect(70, 20, 50, 80);
         context.fillStyle = '#fff'; context.fillRect(40, 40, 25, 25);
       }
+      else if (traceKind === 'wandMemory') {
+        context.fillStyle = 'rgb(155,154,153)'; context.fillRect(0, 0, 180, 120);
+        context.fillStyle = 'rgb(76,100,152)'; context.fillRect(20, 20, 45, 80);
+        context.fillStyle = 'rgb(104,132,174)'; context.fillRect(65, 59, 90, 3);
+        context.fillStyle = 'rgb(212,105,112)'; context.fillRect(120, 85, 35, 20);
+      }
       else if (traceKind === 'boundary') {
         context.fillStyle = '#dda96e'; context.fillRect(0, 0, 90, 120);
         context.fillStyle = '#6eb4dc'; context.fillRect(90, 0, 90, 120);
@@ -505,6 +511,104 @@ test('Magnetisch: zwei Pipettenfarben erkennen eine reine Flächengrenze', async
   await context.grantPermissions(['clipboard-read', 'clipboard-write']); await page.locator('#copyDrawing').click();
   const feature = JSON.parse(await page.evaluate(() => navigator.clipboard.readText()));
   expect(feature.geometry.coordinates.every(p => Math.abs(p[0] - 10) < .15)).toBe(true);
+  expect(errors).toEqual([]);
+});
+
+test('Intelligenter Zauberstab: Farbgedächtnis, schmaler Seitenarm und atomarer Verlauf', async ({ page }) => {
+  const errors = []; page.on('pageerror', e => errors.push(e.message));
+  await openApp(page); await loadSyntheticProject(page, false, 'wandMemory');
+  await page.locator('#enterDrawing').click();
+  const map = page.locator('#map');
+  await expect.poll(async () => Math.round((await map.boundingBox()).width)).toBe(1120);
+  const colorPixel = async color => page.locator('.leaflet-warped-image-layer').evaluate((canvas, color) => {
+    const { data, width, height } = canvas.getContext('2d').getImageData(0, 0, canvas.width, canvas.height), points = [];
+    for (let y = 0; y < height; y++) for (let x = 0; x < width; x++) {
+      const i = (y * width + x) * 4;
+      if (data[i + 3] > 20 && color.every((v, c) => Math.abs(v - data[i + c]) < 4)) points.push({ x, y });
+    }
+    if (!points.length) throw new Error('Testfarbe nicht gerendert.');
+    const cx = points.reduce((s, p) => s + p.x, 0) / points.length, cy = points.reduce((s, p) => s + p.y, 0) / points.length;
+    return points.reduce((best, p) => Math.hypot(p.x - cx, p.y - cy) < Math.hypot(best.x - cx, best.y - cy) ? p : best);
+  }, color);
+  const main = await colorPixel([76, 100, 152]), arm = await colorPixel([104, 132, 174]), red = await colorPixel([212, 105, 112]);
+  await page.locator('[data-tool="wand"]').click();
+  await page.locator('#wandAlgorithm').selectOption('intelligent'); await setRange(page, '#wandTolerance', 5);
+  await page.evaluate(() => { window.kartenpauseWandDebugEnabled = true; });
+  const count = async () => Number((await page.locator('#wandStatus').textContent()).match(/^[\d.]+/)?.[0]?.replaceAll('.', '') ?? NaN);
+  const reference = () => page.evaluate(() => window.kartenpauseWandDebug.reference);
+  const select = async (mode, position) => {
+    await page.locator('#wandMode').selectOption(mode); await map.click({ position });
+    await expect(page.locator('#wandStatus')).toContainText('Originalpixel ausgewählt');
+  };
+  await select('replace', main); const firstCount = await count(), original = await reference();
+  await select('add', arm); const both = await count(); expect(both).toBeGreaterThan(firstCount);
+  expect((await reference()).color).toEqual(original.color); expect((await reference()).variants).toHaveLength(1);
+  await page.locator('#undoDrawing').click(); await expect.poll(count).toBe(firstCount);
+  await page.locator('#redoDrawing').click(); await expect.poll(count).toBe(both);
+  await page.locator('#undoDrawing').click(); await expect.poll(count).toBe(firstCount);
+  await select('add', main); expect((await reference()).variants).toHaveLength(0);
+  await select('add', arm); expect((await reference()).variants).toHaveLength(1);
+  await map.click({ position: red }); await expect(page.locator('#wandStatus')).toContainText('bisherigen Flächenfarbe');
+  await expect(page.locator('#finishDrawing')).toBeEnabled();
+  await select('add', main); expect((await reference()).color).toEqual(original.color);
+  await page.locator('#wandClear').click(); await expect.poll(count).toBe(0);
+  await select('add', red); expect((await reference()).color).not.toEqual(original.color);
+  expect((await reference()).variants || []).toHaveLength(0);
+  expect(errors).toEqual([]);
+});
+
+test('Intelligenter Zauberstab: Worker, Moduswechsel, Verlauf, Pinsel und MultiPolygon-Export', async ({ page, context }) => {
+  const errors = []; page.on('pageerror', e => errors.push(e.message));
+  await openApp(page); await loadSyntheticProject(page, false, 'wand');
+  await page.locator('#enterDrawing').click();
+  const map = page.locator('#map');
+  await expect.poll(async () => Math.round((await map.boundingBox()).width)).toBe(1120);
+  const { left, right, top, bottom } = await darkRasterBounds(page), sx = (right - left) / 140;
+  const sample = { x: left + 10 * sx, y: top + (bottom - top) * .16 };
+  const island = { x: left + 130 * sx, y: top + (bottom - top) * .25 };
+  await page.locator('[data-tool="wand"]').click();
+  await expect(page.locator('#wandAlgorithm')).toHaveValue('classic');
+  await page.locator('#wandAlgorithm').selectOption('intelligent');
+  await expect(page.locator('#wandToleranceLabel')).toHaveText('Empfindlichkeit');
+  await expect(page.locator('#wandContiguous')).toBeDisabled();
+  await page.evaluate(() => { window.kartenpauseWandDebugEnabled = true; });
+  await map.click({ position: sample });
+  await expect(page.locator('#wandStatus')).toContainText('1 Fläche(n)');
+  const count = async () => Number((await page.locator('#wandStatus').textContent()).match(/^[\d.]+/)?.[0]?.replaceAll('.', '') ?? NaN);
+  const first = await count();
+  expect(await page.evaluate(() => {
+    const d = window.kartenpauseWandDebug;
+    return d.coarse.length === d.final.length && d.corridor.length === d.final.length && d.simplified.data.length > 0;
+  })).toBe(true);
+  await page.evaluate(async () => { await window.kartenpauseShowWandDebug(); });
+  await expect(page.locator('#wandDebugDialog canvas')).toHaveCount(4);
+  await page.screenshot({ path: 'output/playwright/intelligent-wand-debug.png', fullPage: true });
+  await page.locator('#wandDebugDialog button').click();
+  await page.locator('#wandMode').selectOption('add'); await map.click({ position: island });
+  await expect(page.locator('#wandStatus')).toContainText('2 Fläche(n)');
+  const both = await count(); expect(both).toBeGreaterThan(first);
+  await page.locator('#wandMode').selectOption('subtract'); await map.click({ position: sample });
+  await expect.poll(count).toBe(both - first);
+  await page.locator('#undoDrawing').click(); await expect.poll(count).toBe(both);
+  await page.locator('#redoDrawing').click(); await expect.poll(count).toBe(both - first);
+  await page.locator('#undoDrawing').click(); await expect.poll(count).toBe(both);
+  await page.locator('#wandAlgorithm').selectOption('classic');
+  await expect(page.locator('#wandContiguous')).toBeEnabled();
+  await expect.poll(count).toBe(both);
+  await page.locator('#wandAlgorithm').selectOption('intelligent');
+  await page.locator('#wandMode').selectOption('paintSubtract');
+  const box = await map.boundingBox(), p = { x: box.x + left + 65 * sx, y: box.y + top + (bottom - top) * .78 };
+  await page.mouse.click(p.x, p.y); await expect(page.locator('#finishDrawing')).toBeEnabled();
+  await expect.poll(count).toBeLessThan(both);
+  await page.locator('#wandMode').selectOption('paintAdd'); await page.mouse.click(p.x, p.y);
+  await expect.poll(count).toBe(both);
+  await page.screenshot({ path: 'output/playwright/intelligent-wand.png', fullPage: true });
+  await page.locator('#finishDrawing').click();
+  await context.grantPermissions(['clipboard-read', 'clipboard-write']); await page.locator('#copyDrawing').click();
+  const feature = JSON.parse(await page.evaluate(() => navigator.clipboard.readText()));
+  expect(feature.geometry.type).toBe('MultiPolygon');
+  expect(feature.geometry.coordinates).toHaveLength(2);
+  expect(feature.geometry.coordinates.some(polygon => polygon.length === 2)).toBe(true);
   expect(errors).toEqual([]);
 });
 

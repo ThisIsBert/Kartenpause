@@ -114,9 +114,12 @@
     </div>
     <div id="wandSettings" hidden>
       <p class="hint">In eine Farbfläche klicken. Ähnliche Farben werden auf der Originalkarte markiert. Mit dem Pinsel korrigieren und mit „Fertig“ als ein gemeinsames Flächenobjekt übernehmen. Inseln und Löcher bleiben erhalten.</p>
+      <label for="wandAlgorithm">Erkennung</label>
+      <select id="wandAlgorithm"><option value="classic">Klassisch: Farbähnlichkeit</option><option value="intelligent">Intelligent: Fläche erkennen</option></select>
+      <p id="wandAlgorithmHint" class="hint" hidden>Erkennt die Farbfläche und überbrückt dünne Überlagerungen. „Hinzufügen“ ergänzt dieselbe Flächenfarbe und lernt passende Nuancen, auch in schmalen Seitenarmen. „Auswahl ersetzen“ beginnt mit einer neuen Farbe.</p>
       <label for="wandMode">Werkzeug</label>
       <select id="wandMode"><option value="replace">Zauberstab: Auswahl ersetzen</option><option value="add">Zauberstab: hinzufügen</option><option value="subtract">Zauberstab: abziehen</option><option value="paintAdd">Pinsel: hinzufügen</option><option value="paintSubtract">Pinsel: entfernen</option></select>
-      <div class="row"><label for="wandTolerance">Farbtoleranz</label><output id="wandToleranceValue">18</output></div>
+      <div class="row"><label id="wandToleranceLabel" for="wandTolerance">Farbtoleranz</label><output id="wandToleranceValue">18</output></div>
       <input id="wandTolerance" type="range" min="0" max="80" value="18" step="1" />
       <label class="check"><input id="wandContiguous" type="checkbox" />Nur zusammenhängende Fläche</label>
       <div class="row"><label for="wandBrushSize">Pinseldurchmesser</label><output id="wandBrushSizeValue">12 Originalpixel</output></div>

@@ -58,6 +58,14 @@ Unter der Deckkraft steht zusätzlich **Vorlage ohne Glättung anzeigen** zur Ve
 
 ## Zauberstab und Flächenauswahl
 
+Unter **Erkennung** stehen **Klassisch: Farbähnlichkeit** (weiterhin Standard) und **Intelligent: Fläche erkennen** zur Wahl. Der intelligente Prototyp erkennt zuerst eine zusammenhängende Farbregion auf vereinfachten Bilddaten und verfeinert anschließend ihren Rand auf Originalpixeln. Dünne Schrift, Flüsse und Straßen werden nach Möglichkeit überbrückt; dauerhaft andere Flächenfarben begrenzen die Auswahl. **Empfindlichkeit** steuert die erlaubte Farbabweichung. Getrennte Inseln lassen sich mit **hinzufügen** ergänzen. Pinsel, Rückgängig/Wiederholen, Löcher und MultiPolygon-Export funktionieren in beiden Modi.
+
+Die Erkennung arbeitet lokal im Worker, ohne KI, Netzwerkdienst oder zusätzliche Runtime-Abhängigkeit. Sehr kleine andersfarbige Gebiete können weiterhin wie grafische Überlagerungen wirken; breite Beschriftungen und besonders schmale Gebiete benötigen gegebenenfalls Pinselkorrekturen. [Technischer Aufbau, Grenzen und Debugansichten](docs/intelligent-wand.md).
+
+Im intelligenten Modus behält **hinzufügen** die ursprüngliche Flächenfarbe und lernt passende Nuancen hinzu. Dafür genau in den fehlenden Seitenarm oder die gleichfarbige Insel klicken; diese Ergänzung verfolgt die Originalpixel auch unterhalb der groben Rasterauflösung. Deutlich andere Farben werden mit einer Meldung abgelehnt. **Auswahl ersetzen** oder **Auswahl leeren** startet eine neue Farbreferenz. Rückgängig/Wiederholen nimmt auch die gelernten Nuancen zurück bzw. stellt sie wieder her. Für eine gemeinsame Auswahl unterschiedlicher Farben bleibt der klassische Modus verfügbar.
+
+Für den klassischen Modus gilt:
+
 **Zauberstab / Fläche auswählen** aktivieren und in eine Farbfläche klicken. Standardmäßig werden alle ähnlich gefärbten Originalpixel im Bild ausgewählt, auch auf getrennten Inseln. **Nur zusammenhängende Fläche** beschränkt die Auswahl auf die mit dem angeklickten Pixel über Kanten verbundene Fläche. Transparente Bildbereiche bleiben ausgeschlossen. Die Farbtoleranz verwendet den wahrnehmungsbezogenen CIELAB-Farbraum: niedrige Werte wählen sehr ähnliche Farben, höhere erlauben stärkere Farb- und Helligkeitsnuancen. Der Vergleich bleibt an die angeklickte Farbe gebunden und wandert nicht schrittweise in andere Farben weiter.
 
 - **Auswahl ersetzen / hinzufügen / abziehen:** per Zauberstab weitere Bereiche auswählen oder entfernen.

@@ -1,14 +1,6 @@
-const linear = Float64Array.from({ length: 256 }, (_, c) => { const v = c / 255; return v <= .04045 ? v / 12.92 : ((v + .055) / 1.055) ** 2.4; });
+import { lab } from './image-features.js';
 // CIELAB distance handles both color nuances and brightness variations. Always
 // compare against the clicked color, never a moving flood-fill average.
-function lab(data, i) {
-  const r = linear[data[i]], g = linear[data[i + 1]], b = linear[data[i + 2]];
-  const f = v => v > .008856 ? Math.cbrt(v) : 7.787 * v + 16 / 116;
-  const x = f((.4124564 * r + .3575761 * g + .1804375 * b) / .95047);
-  const y = f(.2126729 * r + .7151522 * g + .072175 * b);
-  const z = f((.0193339 * r + .119192 * g + .9503041 * b) / 1.08883);
-  return [116 * y - 16, 500 * (x - y), 200 * (y - z)];
-}
 
 export function selectColor(raster, seed, tolerance, contiguous) {
   const { width, height, data } = raster, size = width * height;

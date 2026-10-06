@@ -1,4 +1,5 @@
 import { simplify } from './simplify-path.js';
+import { pixelContrast } from './image-features.js';
 
 export function cropSearch(raster, start, end, radius) {
   if (![...start, ...end, radius].every(Number.isFinite)) throw new Error('Ungültiger Suchbereich.');
@@ -69,7 +70,7 @@ export function findMagneticPath({ raster, start, end, radius = 32, color = null
       const ia = (ay * width + ax) * 4, ib = (by * width + bx) * 4;
       if (data[ia + 3] < 128 || data[ib + 3] < 128) continue;
       if (boundary) {
-        const contrast = Math.min(1, Math.hypot(data[ia] - data[ib], data[ia + 1] - data[ib + 1], data[ia + 2] - data[ib + 2]) / colorGap);
+        const contrast = Math.min(1, pixelContrast(data, ia, ib) / colorGap);
         const pair = Math.max(matchColor(ia, color) * matchColor(ib, color2), matchColor(ia, color2) * matchColor(ib, color));
         ridge = Math.max(ridge, Math.sqrt(pair) * contrast / (1 + (gap - 1) * .18));
         continue;
