@@ -539,6 +539,7 @@ test('Intelligenter Zauberstab: Farbgedächtnis, schmaler Seitenarm und atomarer
   const select = async (mode, position) => {
     await page.locator('#wandMode').selectOption(mode); await map.click({ position });
     await expect(page.locator('#wandStatus')).toContainText('Originalpixel ausgewählt');
+    await expect(page.locator('#finishDrawing')).toBeEnabled();
   };
   await select('replace', main); const firstCount = await count(), original = await reference();
   await select('add', arm); const both = await count(); expect(both).toBeGreaterThan(firstCount);
