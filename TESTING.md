@@ -97,3 +97,12 @@ Regressionen für den erweiterten Import: MultiLineString, MultiPoint und Geomet
 `node node_modules/@playwright/test/cli.js test --grep 'Randkorrektur:|Weiterbearbeiten:|GeoJSON:' --timeout 120000` prüft magnetische Übernahme, Verschieben/Einfügen/Löschen der Ersatzstützpunkte, erneute Prüfung, Rückgängig, Bestätigung einer Flächenaufteilung und Erhalt der Objekt-ID. Screenshots: `output/playwright/section-editable-points.png` und `section-editable-faces.png`.
 
 Wenn bereits ein lokaler Server läuft, kann der Testport separat gewählt werden: `$env:TEST_PORT = '4175'`. Die Tests verwenden einen eigenen Vite-Cache, damit sie den laufenden Entwicklungsserver nicht beeinflussen. JSTS-Workerimporte werden vorab optimiert, um Neuladen beim ersten Randersatz zu vermeiden.
+
+
+## Basiskarte als magnetische Quelle
+
+`npm.cmd run test:trace` enthält zusätzlich `tests/basemap-source.unit.mjs`: sichtbare Kacheln der aktuellen Zoomstufe, feste Zeichnungskoordinaten bei wechselnden Aufnahmen nach Zoom/Pan, neu sichtbare Bereiche, Ausschnittgrenzen sowie Lade-, Kachel- und Pixelzugriffsfehler.
+
+Die Browserprüfung mit kontrollierten Kartenkacheln wurde ohne Pixelvorlage durchgeführt: schwarze Kartenlinie mit blauem kreuzendem Element, Pipette, Übernahme eines Abschnitts bei Zoom 6, Verschieben um 650 Bildschirmpixel, Fortsetzung außerhalb der ersten Aufnahme, anschließend Herauszoomen auf 5 beziehungsweise Hineinzoomen auf 7, Vorschau, Übernahme, GeoJSON-Koordinaten und Rückgängig/Wiederholen. Screenshot: `output/playwright/basemap-pan-zoom.png` und `output/playwright/basemap-pan-zoom-in.png`. Die vier bestehenden Browsertests „Magnetisch:“ prüfen weiterhin den Originalpixelmodus.
+
+Live-Kacheln von Esri Street, Esri Topo und OSM waren in der Prüfungsumgebung nicht erreichbar (Lade-Timeout; auch direkte Abrufe scheiterten). Der tatsächliche Pixelzugriff dieser Anbieter bleibt deshalb vor Ort zu prüfen; die erfolgreiche Browserprüfung verwendete kontrollierte Kachelantworten.

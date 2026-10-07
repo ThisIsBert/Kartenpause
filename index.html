@@ -90,10 +90,11 @@
     </div>
     <div id="magneticSettings" hidden>
       <label for="magneticSource">Verlauf übernehmen aus</label>
-      <select id="magneticSource"><option value="raster">Pixelkarte</option><option value="polygon">Linien und Flächenränder</option></select>
+      <select id="magneticSource"><option value="raster">Pixelkarte</option><option value="polygon">Linien und Flächenränder</option><option value="basemap">Basiskarte (aktuelle Zoomstufe)</option></select>
       <div id="magneticActiveSettings">
       <p id="polygonFollowHelp" class="hint" hidden>Nahe an eine Linie oder einen Flächenrand klicken (16 Bildschirmpixel). Verbundene Kanten werden auf dem kürzeren Weg nachgezeichnet; für längere Bögen Zwischenpunkte setzen. Ohne passende Kante wird gerade verbunden. Weiterklicken setzt fort, Alt korrigiert die Vorschau.</p>
       <p class="hint">Zwei Anker setzen. Weiterklicken hinter dem Endanker übernimmt die Vorschau und setzt fort. Zurück in den Abschnitt klicken korrigiert ihn. Alt erzwingt Korrektur, Umschalt Fortsetzen.</p>
+      <p id="basemapFollowHelp" class="hint" hidden>Sichtbare Straßen, Grenzen oder Flüsse abschnittsweise nachfahren. Du kannst während des Zeichnens verschieben und zoomen. Für den nächsten Abschnitt letzten Anker und Ziel im Ausschnitt halten und die Kartenkacheln laden lassen. Bereits gezeichnete Abschnitte bleiben erhalten. Bei Beschriftungen und Kreuzungen helfen nahe Zwischenanker und die Farbpipette.</p>
       <div id="magneticRasterSettings">
       <div class="row"><label for="magneticRadius">Suchraum neben dem Abschnitt</label><output id="magneticRadiusValue">32 Originalpixel</output></div>
       <input id="magneticRadius" type="range" min="8" max="100" value="32" step="4" />

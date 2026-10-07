@@ -188,7 +188,11 @@ export function createSectionEditor({ map, renderer, magnetic, project, unprojec
       object = linearObject(original); resetAnchors();
       magnetic.setSegmentHandler(({ pixels, source }) => {
         if (ready) return;
-        if (source.vector) { magneticChain = null; append(pixels.map(p => [...p]), true); return; }
+        if (source.vector || source.basemap) {
+          magneticChain = null;
+          const points = source.basemap ? removeSpurs(pixels).map(p => project(source.pixelToLatLng(p))) : pixels.map(p => [...p]);
+          append(points, true); return;
+        }
         const previous = { path: path.map(p => [...p]), chain: structuredClone(magneticChain) };
         if (!magneticChain) magneticChain = { base: path.map(p => [...p]), pixels: [] };
         magneticChain.pixels = removeSpurs([...magneticChain.pixels, ...pixels.slice(magneticChain.pixels.length ? 1 : 0)]);

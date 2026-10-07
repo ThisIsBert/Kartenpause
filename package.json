@@ -5,7 +5,7 @@
   "private": true,
   "description": "Lokale Tests für den Kartenprojektions-Prototyp",
   "scripts": {
-    "test:trace": "node --test tests/trace.unit.mjs",
+    "test:trace": "node --test tests/trace.unit.mjs tests/basemap-source.unit.mjs",
     "test:wand": "node --test tests/intelligent-selection.unit.mjs",
     "dev": "vite",
     "build": "vite build",

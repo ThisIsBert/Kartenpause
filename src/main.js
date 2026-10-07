@@ -18,21 +18,22 @@ import { ThinPlateSpline } from './geo/thin-plate-spline.js';
 import './styles.css';
 import { createDrawingEditor } from './drawing/editor.js';
 import { createRasterInverse } from './drawing/raster-source.js';
+import { createBasemapRaster } from './drawing/basemap-source.js';
 
 
     const map = L.map('map', { preferCanvas: true }).setView([51.1, 10.3], 6);
 
     const basemaps = {
       esriStreet: L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}', {
-        maxZoom: 19,
+        maxZoom: 19, crossOrigin: true,
         attribution: 'Tiles &copy; Esri'
       }),
       esriTopo: L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Topo_Map/MapServer/tile/{z}/{y}/{x}', {
-        maxZoom: 19,
+        maxZoom: 19, crossOrigin: true,
         attribution: 'Tiles &copy; Esri'
       }),
       osm: L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
-        maxZoom: 19,
+        maxZoom: 19, crossOrigin: true,
         attribution: '&copy; OpenStreetMap-Mitwirkende'
       })
     };
@@ -583,6 +584,7 @@ import { createRasterInverse } from './drawing/raster-source.js';
     let originalRasterImage = null, originalRasterCanvas = null, originalRasterData = null;
     document.getElementById('pixelView').onchange = () => overlay.redraw();
     createDrawingEditor({ map, sourceMap, opacity: els.opacity, canEnter: () => !busy && !capture,
+      getBasemapRaster: () => createBasemapRaster(map, activeBasemap),
       getOriginalRaster() {
         if (!image || !fitted) throw new Error('Bitte zuerst eine Pixelkarte einpassen.');
         if (originalRasterImage !== image) {

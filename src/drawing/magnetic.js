@@ -4,6 +4,7 @@ import { cropSearch } from './magnetic-path.js';
 import { continuesSegment } from './magnetic-click.js';
 import { removeSpurs } from './path-cleanup.js';
 import { polygonHit, edgePath } from './polygon-follow.js';
+import { createBasemapCoordinates } from './basemap-source.js';
 
 export function densifyPixels(points) {
   const result = [];
@@ -15,12 +16,24 @@ export function densifyPixels(points) {
   return result;
 }
 
-export function createMagneticTool({ map, renderer, getOriginalRaster, getObjects, project, unproject, onState, onComplete }) {
+export function createMagneticTool({ map, renderer, getOriginalRaster, getBasemapRaster, getObjects, project, unproject, onState, onComplete }) {
   const el = id => document.getElementById(id), group = L.layerGroup().addTo(map);
   let enabled = false, source = null, anchors = [], segments = [], preview = null, worker = null, target = null;
   let picking = false, color = null, generation = 0, closing = false, moveFrame = 0, mouse = null;
   let color2 = null;
   let segmentHandler = null;
+  let mapMoving = false, basemapRaster = null, basemapDirty = true;
+  const basemapMode = () => el('magneticSource').value === 'basemap';
+  const pixelUnit = () => basemapMode() ? 'Kartenpixel' : 'Originalpixel';
+  const outsideMessage = () => basemapMode() ? 'Außerhalb des aktuellen Kartenausschnitts. Bitte die Karte verschieben oder herauszoomen.' : 'Außerhalb der Pixelkarte';
+  map.on('movestart zoomstart', () => { mapMoving = true; });
+  map.on('moveend zoomend resize', () => {
+    mapMoving = false;
+    basemapDirty = true;
+  });
+  map.on('layeradd layerremove', e => {
+    if (e.layer instanceof L.TileLayer) basemapDirty = true;
+  });
   const vectorMode = () => el('magneticSource').value === 'polygon';
   const screen = p => { const q = map.project(unproject(p)); return [q.x, q.y]; };
   function snap(ll, exact = false) {
@@ -36,7 +49,7 @@ export function createMagneticTool({ map, renderer, getOriginalRaster, getObject
   function paint() {
     group.clearLayers();
     if (!enabled || !source) return;
-    const line = (points, color, dashArray) => L.polyline((source.vector ? points : densifyPixels(points)).map(source.pixelToLatLng), {
+    const line = (points, color, dashArray) => L.polyline((source.vector || source.basemap ? points : densifyPixels(points)).map(source.pixelToLatLng), {
       renderer, color, weight: 3, dashArray, interactive: false
     }).addTo(group);
     if (segments.length) line(path(), '#176c65');
@@ -46,6 +59,9 @@ export function createMagneticTool({ map, renderer, getOriginalRaster, getObject
   }
   function changed() {
     el('magneticRasterSettings').hidden = vectorMode();
+    el('basemapFollowHelp').hidden = !basemapMode();
+    el('magneticRadiusValue').textContent = el('magneticRadius').value + ' ' + pixelUnit();
+    el('magneticLoupe').setAttribute('aria-label', 'Lupe der ' + pixelUnit());
     el('polygonFollowHelp').hidden = !vectorMode();
     el('magneticSource').disabled = anchors.length > (segmentHandler ? 1 : 0) || !!preview || !!worker;
     el('magneticAccept').disabled = !preview || !!worker || picking;
@@ -65,21 +81,39 @@ export function createMagneticTool({ map, renderer, getOriginalRaster, getObject
   function stopSearch() { generation++; worker?.terminate(); worker = null; setBusy('magnetic', false); }
   function reset() {
     stopSearch(); anchors = []; segments = []; preview = null; target = null; closing = false; picking = false;
+    if (source?.basemap) source = null;
+    basemapRaster = null; basemapDirty = true;
     status(''); changed();
   }
   function ensureSource() {
-    if (!source) source = vectorMode() ? { vector: true, pixelToLatLng: unproject, latLngToPixel: project } : getOriginalRaster();
+    if (basemapMode()) {
+      if (mapMoving) throw new Error('Bitte warten, bis die Kartenbewegung beendet ist.');
+      if (basemapDirty || !basemapRaster) {
+        const next = getBasemapRaster();
+        basemapRaster = next; basemapDirty = false;
+      }
+      if (!source) source = createBasemapCoordinates(basemapRaster);
+      source.pixelScale = Math.min(source.pixelScale, 2 ** (source.zoom - basemapRaster.zoom));
+    } else if (!source) {
+      source = vectorMode() ? { vector: true, pixelToLatLng: unproject, latLngToPixel: project } : getOriginalRaster();
+    }
     return source;
   }
+  const currentRaster = () => source.basemap ? basemapRaster : source;
   function request(end, close = false) {
     stopSearch(); preview = null; target = end; closing = close;
     try {
+      ensureSource();
       if (source.vector) {
         preview = edgePath(getObjects(), anchors.at(-1), end, screen);
         status(close ? 'Schließenden Abschnitt prüfen und übernehmen.' : 'Kantenverlauf als Vorschau. Weiterklicken setzt fort; Alt korrigiert. Ohne passende Kante wird gerade verbunden.');
         changed(); return;
       }
-      const crop = cropSearch(source.raster, anchors.at(-1), end, Number(el('magneticRadius').value));
+      const rasterSource = currentRaster();
+      const searchPoint = p => source.basemap ? rasterSource.latLngToPixel(source.pixelToLatLng(p), .5) : p;
+      const start = searchPoint(anchors.at(-1)), finish = searchPoint(end);
+      if (!start || !finish) throw new Error('Für den nächsten Abschnitt müssen letzter Anker und Ziel im Kartenausschnitt liegen. Bitte die Karte verschieben oder herauszoomen; die Zeichnung bleibt erhalten.');
+      const crop = cropSearch(rasterSource.raster, start, finish, Number(el('magneticRadius').value));
       const requestId = generation;
       worker = new Worker(new URL('./magnetic-worker.js', import.meta.url), { type: 'module' });
       setBusy('magnetic', true);
@@ -89,7 +123,10 @@ export function createMagneticTool({ map, renderer, getOriginalRaster, getObject
         setBusy('magnetic', false);
         if (data.error) status(data.error);
         else {
-          preview = data.result.pixels.map(p => [p[0] + crop.offset[0], p[1] + crop.offset[1]]);
+          preview = data.result.pixels.map(p => {
+            const pixel = [p[0] + crop.offset[0], p[1] + crop.offset[1]];
+            return source.basemap ? source.latLngToPixel(rasterSource.pixelToLatLng(pixel)) : pixel;
+          });
           // Keep shared anchor coordinates exact across independently searched segments.
           preview[0] = [...anchors.at(-1)]; preview[preview.length - 1] = [...end];
           status(close ? 'Schließenden Abschnitt prüfen. „Abschnitt übernehmen“ erstellt das Polygon.' : 'Weiterklicken übernimmt diesen Abschnitt. Ein Klick zurück in den Abschnitt korrigiert ihn. Alt: immer korrigieren; Umschalt: immer fortsetzen.');
@@ -99,7 +136,7 @@ export function createMagneticTool({ map, renderer, getOriginalRaster, getObject
       worker.onerror = () => { if (requestId !== generation) return; stopSearch(); status('Die Suche konnte nicht ausgeführt werden. Bitte erneut versuchen.'); changed(); };
       worker.postMessage({ raster: crop.raster, start: crop.start, end: crop.end,
         radius: Number(el('magneticRadius').value), color, color2, tolerance: Number(el('magneticTolerance').value) }, [crop.raster.data.buffer]);
-      status('Suche in den Originalpixeln …');
+      status(source.basemap ? `Suche in der Basiskarte (Zoom ${rasterSource.zoom}) …` : 'Suche in den Originalpixeln …');
     } catch (error) { stopSearch(); status(error.message); }
     changed();
   }
@@ -125,14 +162,14 @@ export function createMagneticTool({ map, renderer, getOriginalRaster, getObject
   el('magneticSource').onchange = () => {
     const previousSource = source;
     const seedPoint = segmentHandler && anchors.length ? source.pixelToLatLng(anchors.at(-1)) : null;
-    reset(); source = null;
+    reset(); source = null; color = null; color2 = null;
     try {
-      if (seedPoint) { ensureSource(); anchors = [source.vector ? snap(seedPoint, true) : source.latLngToPixel(seedPoint, .5)]; if (!anchors[0]) { anchors = []; throw new Error('Anker liegt außerhalb der Pixelkarte.'); } }
-      status(vectorMode() ? 'Startpunkt setzen. Nahe Linien und Flächenränder werden erkannt.' : 'Startanker auf die Bildlinie setzen.');
+      if (seedPoint) { ensureSource(); anchors = [source.vector ? snap(seedPoint, true) : source.latLngToPixel(seedPoint, .5)]; if (!anchors[0]) { anchors = []; throw new Error(outsideMessage()); } }
+      status(vectorMode() ? 'Startpunkt setzen. Nahe Linien und Flächenränder werden erkannt.' : basemapMode() ? 'Passend zoomen, dann Startanker auf eine Linie der Basiskarte setzen.' : 'Startanker auf die Bildlinie setzen.');
     } catch (error) {
       if (seedPoint) {
         source = previousSource;
-        el('magneticSource').value = source.vector ? 'polygon' : 'raster';
+        el('magneticSource').value = source.vector ? 'polygon' : source.basemap ? 'basemap' : 'raster';
         anchors = [source.latLngToPixel(seedPoint, .5)];
       }
       status(error.message);
@@ -150,7 +187,7 @@ export function createMagneticTool({ map, renderer, getOriginalRaster, getObject
   el('magneticPick2').onclick = () => { picking = picking === 2 ? false : 2; status('Auf die andere Farbfläche neben der Grenze klicken. Dies setzt keinen Anker.'); changed(); };
   el('magneticClearColor2').onclick = () => { color2 = null; picking = false; recompute(); };
   for (const id of ['magneticRadius', 'magneticTolerance']) {
-    el(id).oninput = () => { el(`${id}Value`).textContent = el(id).value + (id === 'magneticRadius' ? ' Originalpixel' : ''); };
+    el(id).oninput = () => { el(`${id}Value`).textContent = el(id).value + (id === 'magneticRadius' ? ' ' + pixelUnit() : ''); };
     el(id).onchange = recompute;
   }
   return {
@@ -158,7 +195,7 @@ export function createMagneticTool({ map, renderer, getOriginalRaster, getObject
     get isPicking() { return !!picking; },
     toAnchor(ll) {
       ensureSource(); const point = source.vector ? snap(ll, true) : source.latLngToPixel(ll, .5);
-      if (!point) throw new Error('Der Endpunkt liegt außerhalb der Pixelkarte. Bitte manuell verbinden.');
+      if (!point) throw new Error(outsideMessage() + ' Bitte manuell verbinden.');
       if (segmentHandler && preview) accept();
       request(point);
     },
@@ -166,7 +203,7 @@ export function createMagneticTool({ map, renderer, getOriginalRaster, getObject
     seed(ll) {
       ensureSource();
       const point = source.vector ? snap(ll, true) : source.latLngToPixel(ll, .5);
-      if (!point) throw new Error('Der Anker liegt außerhalb der Pixelkarte. Hier bitte manuell zeichnen.');
+      if (!point) throw new Error(outsideMessage() + ' Hier bitte manuell zeichnen.');
       stopSearch(); anchors = [point]; segments = []; preview = null; target = null; closing = false; picking = false; changed();
     },
     get hasDraft() { return anchors.length > 0 || !!worker; },
@@ -180,7 +217,7 @@ export function createMagneticTool({ map, renderer, getOriginalRaster, getObject
         if (!vectorMode()) {
           const ctx = el('magneticLoupe').getContext('2d');
           ctx.imageSmoothingEnabled = false;
-          el('magneticPixel').textContent = 'Originalpixel-Lupe: Maus über die Vorlage bewegen · 8-fach, ohne Glättung.';
+          el('magneticPixel').textContent = pixelUnit() + '-Lupe: Maus über die Karte bewegen · 8-fach, ohne Glättung.';
         }
         status(vectorMode() ? 'Startpunkt setzen. Nahe Linien und Flächenränder werden erkannt.' : 'Startanker auf die Bildlinie setzen oder zuerst mit der Farbpipette eine Linienfarbe aufnehmen.');
       }
@@ -197,22 +234,24 @@ export function createMagneticTool({ map, renderer, getOriginalRaster, getObject
           }
           request(point); return;
         }
-        const pixel = source.latLngToPixel(ll);
-        if (!pixel) { status('Bitte innerhalb der eingepassten Pixelkarte klicken.'); return; }
-        const rounded = pixel.map(Math.round), index = (rounded[1] * source.raster.width + rounded[0]) * 4;
-        if (source.raster.data[index + 3] < 128) { status('Dieses Bildpixel ist transparent. Bitte auf die sichtbare Bildlinie klicken.'); return; }
+        const rasterSource = currentRaster();
+        const pixel = rasterSource.latLngToPixel(ll);
+        if (!pixel) { status(outsideMessage()); return; }
+        const rounded = pixel.map(Math.round), index = (rounded[1] * rasterSource.raster.width + rounded[0]) * 4;
+        if (rasterSource.raster.data[index + 3] < 128) { status(source.basemap ? 'Hier fehlen Kartenpixel. Bitte auf eine geladene Kartenlinie klicken.' : 'Dieses Bildpixel ist transparent. Bitte auf die sichtbare Bildlinie klicken.'); return; }
         if (picking) {
-          const sample = [...source.raster.data.slice(index, index + 3)];
+          const sample = [...rasterSource.raster.data.slice(index, index + 3)];
           if (picking === 2) color2 = sample; else color = sample;
           picking = false; status('Farbe aufgenommen.'); recompute(); return;
         }
-        if (!anchors.length) { anchors = [rounded]; status('Startanker gesetzt. Nun den nächsten Anker auf derselben Bildlinie anklicken.'); changed(); }
+        const point = source.basemap ? source.latLngToPixel(rasterSource.pixelToLatLng(rounded)) : rounded;
+        if (!anchors.length) { anchors = [point]; status('Startanker gesetzt. Nun den nächsten Anker auf derselben Bildlinie anklicken.'); changed(); }
         else {
-          if (preview && !closing && !modifiers.altKey && (modifiers.shiftKey || continuesSegment(anchors.at(-1), target, rounded))) {
+          if (preview && !closing && !modifiers.altKey && (modifiers.shiftKey || continuesSegment(...[anchors.at(-1), target, point].map(p => source.basemap ? rasterSource.projectLatLng(source.pixelToLatLng(p)) : p)))) {
             if (segmentHandler) accept();
             else { segments.push(preview); anchors.push(target); preview = null; target = null; }
           }
-          request(rounded);
+          request(point);
         }
       } catch (error) { status(error.message); }
     },
@@ -223,19 +262,19 @@ export function createMagneticTool({ map, renderer, getOriginalRaster, getObject
       moveFrame = requestAnimationFrame(() => {
         moveFrame = 0;
         try {
-          ensureSource(); const pixel = source.latLngToPixel(mouse), canvas = el('magneticLoupe'), ctx = canvas.getContext('2d');
+          ensureSource(); const rasterSource = currentRaster(), pixel = rasterSource.latLngToPixel(mouse), canvas = el('magneticLoupe'), ctx = canvas.getContext('2d');
           ctx.fillStyle = '#e9eceb'; ctx.fillRect(0, 0, 180, 180);
-          if (!pixel) { el('magneticPixel').textContent = 'Außerhalb der Pixelkarte'; return; }
+          if (!pixel) { el('magneticPixel').textContent = outsideMessage(); return; }
           const [x, y] = pixel.map(Math.round);
-          ctx.imageSmoothingEnabled = false; ctx.drawImage(source.canvas, x - 11, y - 11, 23, 23, -2, -2, 184, 184);
+          ctx.imageSmoothingEnabled = false; ctx.drawImage(rasterSource.canvas, x - 11, y - 11, 23, 23, -2, -2, 184, 184);
           ctx.strokeStyle = '#e96e18'; ctx.lineWidth = 1; ctx.strokeRect(86.5, 86.5, 7, 7);
-          el('magneticPixel').textContent = `Originalpixel ${x}, ${y} · 8-fach, ohne Glättung`;
+          el('magneticPixel').textContent = `${pixelUnit()} ${x}, ${y}${source.basemap ? ` · Zoom ${rasterSource.zoom}` : ''} · 8-fach, ohne Glättung`;
         } catch (error) { status(error.message); }
       });
     },
     undo() {
       if (target || preview || worker) reject();
-      else { segments.pop(); anchors.pop(); status('Letzten Anker zurückgenommen.'); changed(); }
+      else { segments.pop(); anchors.pop(); if (!anchors.length && source?.basemap) source = null; status('Letzten Anker zurückgenommen.'); changed(); }
     },
     enter() { if (picking) return; if (preview) accept(); else if (segments.length && !worker && !target) complete(false); },
     finish() { if (segments.length && !preview && !worker && !target && !picking) complete(false); },

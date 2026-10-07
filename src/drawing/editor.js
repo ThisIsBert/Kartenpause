@@ -12,7 +12,7 @@ import { createSectionEditor } from './section-editor.js';
 
 const labels = { multiLine: 'Mehrteilige Linie', multiPoint: 'Punktgruppe', collection: 'Geometriesammlung', point: 'Punkt', line: 'Linie', polygon: 'Polygon', multiPolygon: 'Mehrteilige Fläche', curve: 'Geschwungene Linie', curvePolygon: 'Geschwungenes Polygon' };
 
-export function createDrawingEditor({ map, sourceMap, opacity, canEnter, onModeChange, getOriginalRaster }) {
+export function createDrawingEditor({ map, sourceMap, opacity, canEnter, onModeChange, getOriginalRaster, getBasemapRaster }) {
   const el = id => document.getElementById(id);
   const shapes = L.layerGroup().addTo(map), handles = L.layerGroup().addTo(map);
   map.createPane('drawingShapes');
@@ -33,14 +33,14 @@ export function createDrawingEditor({ map, sourceMap, opacity, canEnter, onModeC
   const message = text => { el('drawingStatus').textContent = text; };
   const snapshot = () => JSON.stringify({ objects, selectedId });
   const record = () => { undo.push(snapshot()); if (undo.length > 100) undo.shift(); redo = []; };
-  const magnetic = createMagneticTool({ map, renderer, getOriginalRaster,
+  const magnetic = createMagneticTool({ map, renderer, getOriginalRaster, getBasemapRaster,
     getObjects: () => objects.filter(object => !section.active || object.id !== selectedId),
     project, unproject, onState: updateUI, onComplete({ pixels, source, closed }) {
     record();
-    const projected = source.vector ? pixels : densifyPixels(pixels).map(p => project(source.pixelToLatLng(p)));
+    const projected = source.vector ? pixels : (source.basemap ? pixels : densifyPixels(pixels)).map(p => project(source.pixelToLatLng(p)));
     const origin = project(source.pixelToLatLng(pixels[0]));
     const neighbor = project(source.pixelToLatLng([pixels[0][0] + 1, pixels[0][1]]));
-    const tolerance = Math.max(.001, Math.hypot(neighbor[0] - origin[0], neighbor[1] - origin[1]) * .3);
+    const tolerance = Math.max(.001, Math.hypot(neighbor[0] - origin[0], neighbor[1] - origin[1]) * .3 * (source.pixelScale ?? 1));
     let vertices = source.vector ? projected.map(p => [...p]) : simplify(projected, tolerance);
     if (closed) vertices = vertices.slice(0, -1);
     if (vertices.length < (closed ? 3 : 2)) { message('Die Form ist zu klein. Bitte weiter auseinanderliegende Anker setzen.'); render(); return; }
