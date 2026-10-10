@@ -117,6 +117,9 @@ test('Originalbild zoomt ohne seitlichen Versatz', async ({ page }) => {
 
 async function openApp(page) {
   await page.goto('/');
+  await expect(page.locator('#drawingSidebar')).toBeVisible();
+  await expect(page.locator('#sourcePanel')).toBeHidden();
+  await page.locator('#leaveDrawing').click();
   await expect(page.locator('#sourceMap.leaflet-container')).toBeVisible();
   await expect(page.locator('#map.leaflet-container')).toBeVisible();
 }
@@ -127,7 +130,7 @@ test('Pixelkarte zoomt während der Animation synchron mit Polygonen', async ({ 
   await openApp(page); await loadSyntheticProject(page);
   await page.locator('#enterDrawing').click();
   const map = page.locator('#map');
-  await expect.poll(async () => Math.round((await map.boundingBox()).width)).toBe(1120);
+  await expect.poll(async () => Math.round((await map.boundingBox()).width)).toBe(1014);
   await page.locator('[data-tool="polygon"]').click();
   for (const position of [{ x: 400, y: 350 }, { x: 650, y: 350 }, { x: 525, y: 550 }]) await map.click({ position });
   await page.keyboard.press('Enter');
@@ -251,7 +254,7 @@ test('Zeichenmodus: alle Geometrien bearbeiten, kopieren und exportieren', async
   await expect.poll(() => paintedPixels(page.locator('.leaflet-warped-image-layer'))).toBeGreaterThan(1000);
   const map = page.locator('#map');
   // Await the grid transition so the same clicks refer to stable map coordinates.
-  await expect.poll(async () => Math.round((await map.boundingBox()).width)).toBe(1120);
+  await expect.poll(async () => Math.round((await map.boundingBox()).width)).toBe(1014);
   for (const kind of ['point', 'line', 'polygon', 'curve', 'curvePolygon']) {
     await page.locator(`[data-tool="${kind}"]`).click();
     await map.click({ position: { x: 320, y: 300 } });
@@ -307,7 +310,9 @@ test('Zeichenmodus: alle Geometrien bearbeiten, kopieren und exportieren', async
   await expect(page.locator('#deleteVertex')).toBeDisabled();
   await page.locator('#undoDrawing').click();
   const downloadEvent = page.waitForEvent('download');
+  await page.locator('[data-tool="files"]').click();
   await page.locator('#saveDrawing').click();
+  await page.locator('[data-tool="select"]').click();
   const download = await downloadEvent;
   const collection = JSON.parse(require('node:fs').readFileSync(await download.path(), 'utf8'));
   expect(download.suggestedFilename()).toBe('kartenpause.geojson');
@@ -338,7 +343,7 @@ test('Stützpunkte: kleine Quadrate, Cursor und Plus direkt herausziehen', async
   await openApp(page); await loadSyntheticProject(page);
   await page.locator('#enterDrawing').click();
   const map = page.locator('#map');
-  await expect.poll(async () => Math.round((await map.boundingBox()).width)).toBe(1120);
+  await expect.poll(async () => Math.round((await map.boundingBox()).width)).toBe(1014);
   await page.locator('[data-tool="line"]').click();
   await map.click({ position: { x: 300, y: 250 } });
   await map.click({ position: { x: 600, y: 250 } });
@@ -359,7 +364,9 @@ test('Stützpunkte: kleine Quadrate, Cursor und Plus direkt herausziehen', async
   await page.locator('#drawingName').fill('Römische Grenze');
   await page.locator('#drawingName').press('Tab');
   const saved = page.waitForEvent('download');
+  await page.locator('[data-tool="files"]').click();
   await page.locator('#saveDrawing').click();
+  await page.locator('[data-tool="select"]').click();
   expect((await saved).suggestedFilename()).toBe('Römische Grenze.geojson');
 });
 
@@ -382,7 +389,7 @@ test('Magnetisch: Originalpixel, Pipette, Vorschau, Zwischenanker und Export', a
   await openApp(page); await loadSyntheticProject(page, false, 'line');
   await page.locator('#enterDrawing').click();
   const map = page.locator('#map');
-  await expect.poll(async () => Math.round((await map.boundingBox()).width)).toBe(1120);
+  await expect.poll(async () => Math.round((await map.boundingBox()).width)).toBe(1014);
   await page.locator('#map .leaflet-control-zoom-in').click();
   await page.waitForTimeout(400);
   await page.locator('#pixelView').check();
@@ -397,7 +404,7 @@ test('Magnetisch: Originalpixel, Pipette, Vorschau, Zwischenanker und Export', a
   await expect(page.locator('#magneticColor')).toContainText('#111111');
   await expect(page.locator('#cancelDrawing')).toBeDisabled();
   // Color and path must still come from original pixels at opacity zero.
-  await page.locator('#drawingOpacity').fill('0');
+  await page.locator('#opacity').fill('0');
   await map.click({ position: { x: left + 12, y } });
   await map.click({ position: { x: right - 12, y } });
   await expect(page.locator('#magneticAccept')).toBeEnabled();
@@ -441,7 +448,7 @@ test('Magnetisch: Polygon erst nach bestätigter Schließkante', async ({ page, 
   await openApp(page); await loadSyntheticProject(page, false, 'polygon');
   await page.locator('#enterDrawing').click();
   const map = page.locator('#map');
-  await expect.poll(async () => Math.round((await map.boundingBox()).width)).toBe(1120);
+  await expect.poll(async () => Math.round((await map.boundingBox()).width)).toBe(1014);
   const { left, right, top, bottom } = await darkRasterBounds(page);
   await page.locator('[data-tool="magnetic"]').click();
   await map.click({ position: { x: left + 1, y: top + 1 } });
@@ -468,7 +475,7 @@ test('Magnetisch: Weiterklicken übernimmt, Zurückklicken korrigiert', async ({
   await openApp(page); await loadSyntheticProject(page, false, 'line');
   await page.locator('#enterDrawing').click();
   const map = page.locator('#map');
-  await expect.poll(async () => Math.round((await map.boundingBox()).width)).toBe(1120);
+  await expect.poll(async () => Math.round((await map.boundingBox()).width)).toBe(1014);
   const { left, right, top, bottom } = await darkRasterBounds(page), y = (top + bottom) / 2, span = right - left;
   await page.locator('[data-tool="magnetic"]').click();
   await map.click({ position: { x: left + 8, y } });
@@ -498,7 +505,7 @@ test('Magnetisch: zwei Pipettenfarben erkennen eine reine Flächengrenze', async
   await openApp(page); await loadSyntheticProject(page, false, 'boundary');
   await page.locator('#enterDrawing').click();
   const map = page.locator('#map');
-  await expect.poll(async () => Math.round((await map.boundingBox()).width)).toBe(1120);
+  await expect.poll(async () => Math.round((await map.boundingBox()).width)).toBe(1014);
   const size = await map.boundingBox(), center = { x: size.width / 2, y: size.height / 2 };
   await page.locator('[data-tool="magnetic"]').click();
   await page.locator('#magneticPick').click(); await map.click({ position: { x: center.x - 50, y: center.y } });
@@ -519,7 +526,7 @@ test('Intelligenter Zauberstab: Farbgedächtnis, schmaler Seitenarm und atomarer
   await openApp(page); await loadSyntheticProject(page, false, 'wandMemory');
   await page.locator('#enterDrawing').click();
   const map = page.locator('#map');
-  await expect.poll(async () => Math.round((await map.boundingBox()).width)).toBe(1120);
+  await expect.poll(async () => Math.round((await map.boundingBox()).width)).toBe(1014);
   const colorPixel = async color => page.locator('.leaflet-warped-image-layer').evaluate((canvas, color) => {
     const { data, width, height } = canvas.getContext('2d').getImageData(0, 0, canvas.width, canvas.height), points = [];
     for (let y = 0; y < height; y++) for (let x = 0; x < width; x++) {
@@ -563,7 +570,7 @@ test('Intelligenter Zauberstab: Worker, Moduswechsel, Verlauf, Pinsel und MultiP
   await openApp(page); await loadSyntheticProject(page, false, 'wand');
   await page.locator('#enterDrawing').click();
   const map = page.locator('#map');
-  await expect.poll(async () => Math.round((await map.boundingBox()).width)).toBe(1120);
+  await expect.poll(async () => Math.round((await map.boundingBox()).width)).toBe(1014);
   const { left, right, top, bottom } = await darkRasterBounds(page), sx = (right - left) / 140;
   const sample = { x: left + 10 * sx, y: top + (bottom - top) * .16 };
   const island = { x: left + 130 * sx, y: top + (bottom - top) * .25 };
@@ -619,7 +626,7 @@ test('Zauberstab: Auswahl, Inseln, Löcher, Korrekturpinsel und bearbeitbarer Ex
   await openApp(page); await loadSyntheticProject(page, false, 'wand');
   await page.locator('#enterDrawing').click();
   const map = page.locator('#map');
-  await expect.poll(async () => Math.round((await map.boundingBox()).width)).toBe(1120);
+  await expect.poll(async () => Math.round((await map.boundingBox()).width)).toBe(1014);
   const { left, right, top, bottom } = await darkRasterBounds(page), sx = (right - left) / 140;
   const sample = { x: left + 10 * sx, y: top + (bottom - top) * .16 };
   await page.locator('[data-tool="wand"]').click();
@@ -750,7 +757,7 @@ test('Vereinfachung: Kleinteile und Löcher verschwinden nur in der Vorschau und
   await openApp(page); await loadSyntheticProject(page, false, 'cleanupWand');
   await page.locator('#enterDrawing').click();
   const map = page.locator('#map');
-  await expect.poll(async () => Math.round((await map.boundingBox()).width)).toBe(1120);
+  await expect.poll(async () => Math.round((await map.boundingBox()).width)).toBe(1014);
   const bounds = await darkRasterBounds(page);
   await page.locator('[data-tool="wand"]').click();
   await map.click({ position: { x: bounds.left + 10, y: bounds.top + 10 } });
@@ -805,7 +812,7 @@ test('Vereinfachung: große Zauberstab-Objekte begrenzen Griffe und bleiben erne
   await openApp(page); await loadSyntheticProject(page, false, 'denseWand');
   await page.locator('#enterDrawing').click();
   const map = page.locator('#map');
-  await expect.poll(async () => Math.round((await map.boundingBox()).width)).toBe(1120);
+  await expect.poll(async () => Math.round((await map.boundingBox()).width)).toBe(1014);
   const bounds = await darkRasterBounds(page);
   await page.locator('[data-tool="wand"]').click();
   await map.click({ position: { x: bounds.left + 1, y: bounds.top + 1 } });
@@ -847,7 +854,7 @@ test('GeoJSON: Datei und Zwischenablage, Bearbeiten und exaktes Folgen eines Pol
   const errors = []; page.on('pageerror', error => errors.push(error.message));
   await openApp(page);
   await page.locator('#enterDrawing').click();
-  await expect.poll(async () => Math.round((await page.locator('#map').boundingBox()).width)).toBe(1120);
+  await expect.poll(async () => Math.round((await page.locator('#map').boundingBox()).width)).toBe(1014);
   const polygon = { type: 'Feature', properties: { name: 'Quellfläche', category: 'test' }, geometry: { type: 'Polygon', coordinates: [[[0, 0], [1, 0], [1, 1], [.7, 1], [.3, 1], [0, 1], [0, 0]]] } };
   await page.locator('#importDrawingFile').setInputFiles({ name: 'test.geojson', mimeType: 'application/json', buffer: Buffer.from(JSON.stringify(polygon)) });
   await expect(page.locator('#drawingObjects button')).toHaveCount(1);
@@ -873,6 +880,7 @@ test('GeoJSON: Datei und Zwischenablage, Bearbeiten und exaktes Folgen eines Pol
   for (const p of coords) expect(p[1]).toBeCloseTo(1, 10);
   for (const x of [.3, .7]) expect(coords.some(p => Math.abs(p[0] - x) < 1e-12)).toBe(true);
   await expect(page.locator('#drawingObjects button')).toHaveCount(2);
+  await page.locator('[data-tool="files"]').click();
   await page.locator('#pasteDrawing').click();
   await expect(page.locator('#drawingObjects button')).toHaveCount(3);
   expect((await copiedFeature(page, context)).id).not.toBe(line.id);
@@ -902,8 +910,6 @@ for (const gap of [0, .01]) test(`GeoJSON: Randabschnitt folgt dem Nachbarpolygo
   await page.mouse.click(box.x, box.y + box.height * .9);
   await page.locator('#sectionMethod').selectOption('magnetic');
   await page.locator('#sectionConnect').click();
-  await expect(page.locator('#magneticAccept')).toBeEnabled();
-  await page.locator('#magneticAccept').click();
   await expect(page.locator('#sectionApply')).toBeEnabled();
   await page.locator('#sectionApply').click();
   const result = await copiedFeature(page, context);
@@ -919,7 +925,7 @@ test('Weiterbearbeiten: bestehende Mehrfachfläche mit Pinsel korrigieren, verwe
   await openApp(page); await loadSyntheticProject(page, false, 'wand');
   await page.locator('#enterDrawing').click();
   const map = page.locator('#map');
-  await expect.poll(async () => Math.round((await map.boundingBox()).width)).toBe(1120);
+  await expect.poll(async () => Math.round((await map.boundingBox()).width)).toBe(1014);
   const { left, right, top, bottom } = await darkRasterBounds(page), sx = (right - left) / 140;
   await page.locator('[data-tool="wand"]').click();
   await map.click({ position: { x: left + 10 * sx, y: top + (bottom - top) * .16 } });
@@ -958,7 +964,7 @@ test('Weiterbearbeiten: Randabschnitt zwischen Kantenpunkten manuell ersetzen', 
   await openApp(page); await loadSyntheticProject(page);
   await page.locator('#enterDrawing').click();
   const map = page.locator('#map');
-  await expect.poll(async () => Math.round((await map.boundingBox()).width)).toBe(1120);
+  await expect.poll(async () => Math.round((await map.boundingBox()).width)).toBe(1014);
   await page.locator('[data-tool="polygon"]').click();
   for (const [x, y] of [[300, 300], [600, 300], [600, 600], [300, 600]]) await map.click({ position: { x, y } });
   await page.keyboard.press('Enter');
@@ -1000,7 +1006,7 @@ test('Weiterbearbeiten: innerhalb eines Ersatzabschnitts magnetisch und manuell 
   await openApp(page); await loadSyntheticProject(page, false, 'line');
   await page.locator('#enterDrawing').click();
   const map = page.locator('#map');
-  await expect.poll(async () => Math.round((await map.boundingBox()).width)).toBe(1120);
+  await expect.poll(async () => Math.round((await map.boundingBox()).width)).toBe(1014);
   const { left, right, top, bottom } = await darkRasterBounds(page), y = (top + bottom) / 2, width = right - left;
   await page.locator('[data-tool="line"]').click();
   await map.click({ position: { x: left, y } }); await map.click({ position: { x: right, y } }); await page.keyboard.press('Enter');
@@ -1017,8 +1023,11 @@ test('Weiterbearbeiten: innerhalb eines Ersatzabschnitts magnetisch und manuell 
   await page.locator('#sectionMethod').selectOption('manual');
   await map.click({ position: { x: left + width * .6, y } });
   await page.locator('#sectionMethod').selectOption('magnetic');
-  await page.locator('#sectionConnect').click(); await expect(page.locator('#magneticAccept')).toBeEnabled();
-  await page.locator('#magneticAccept').click(); await expect(page.locator('#sectionApply')).toBeEnabled();
+  await map.click({ position: { x: left + width * .75, y } });
+  await expect(page.locator('#magneticAccept')).toBeEnabled();
+  await expect(page.locator('#sectionConnect')).toBeEnabled();
+  await page.locator('#sectionConnect').click();
+  await expect(page.locator('#sectionApply')).toBeEnabled();
   await page.locator('#sectionApply').click();
   const result = await copiedFeature(page, context);
   expect(result.id).toBe(original.id); expect(result.geometry.type).toBe('LineString');
@@ -1078,7 +1087,7 @@ test('GeoJSON: Fluss als ein Objekt, Punktgruppen und Sammlungen bleiben bearbei
 
 test('GeoJSON: Magnet zeichnet ohne nahe Kanten gerade und setzt mit jedem Klick fort', async ({ page, context }) => {
   await openApp(page); await page.locator('#enterDrawing').click();
-  await expect.poll(async () => Math.round((await page.locator('#map').boundingBox()).width)).toBe(1120);
+  await expect.poll(async () => Math.round((await page.locator('#map').boundingBox()).width)).toBe(1014);
   await page.locator('[data-tool="magnetic"]').click();
   await page.locator('#magneticSource').selectOption('polygon');
   for (const [x, y] of [[300, 300], [500, 300], [400, 450]]) await page.locator('#map').click({ position: { x, y } });
@@ -1105,7 +1114,6 @@ for (const correction of ['points', 'faces']) test(`Randkorrektur: magnetischen 
   await page.mouse.click(box.x + box.width * .75, box.y);
   await page.locator('#sectionMethod').selectOption('magnetic');
   await page.locator('#sectionConnect').click();
-  await page.locator('#magneticAccept').click();
   await expect(page.locator('#sectionStatus')).toContainText('rot markiert');
   await expect(page.locator('#sectionApply')).toBeDisabled();
   const initialCount = await page.locator('.section-vertex').count();

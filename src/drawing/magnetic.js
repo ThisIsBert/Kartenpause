@@ -100,13 +100,14 @@ export function createMagneticTool({ map, renderer, getOriginalRaster, getBasema
     return source;
   }
   const currentRaster = () => source.basemap ? basemapRaster : source;
-  function request(end, close = false) {
+  function request(end, close = false, autoAccept = false) {
     stopSearch(); preview = null; target = end; closing = close;
     try {
       ensureSource();
       if (source.vector) {
         preview = edgePath(getObjects(), anchors.at(-1), end, screen);
         status(close ? 'Schließenden Abschnitt prüfen und übernehmen.' : 'Kantenverlauf als Vorschau. Weiterklicken setzt fort; Alt korrigiert. Ohne passende Kante wird gerade verbunden.');
+        if (autoAccept) accept();
         changed(); return;
       }
       const rasterSource = currentRaster();
@@ -131,6 +132,7 @@ export function createMagneticTool({ map, renderer, getOriginalRaster, getBasema
           preview[0] = [...anchors.at(-1)]; preview[preview.length - 1] = [...end];
           status(close ? 'Schließenden Abschnitt prüfen. „Abschnitt übernehmen“ erstellt das Polygon.' : 'Weiterklicken übernimmt diesen Abschnitt. Ein Klick zurück in den Abschnitt korrigiert ihn. Alt: immer korrigieren; Umschalt: immer fortsetzen.');
         }
+        if (autoAccept && preview) accept();
         changed();
       };
       worker.onerror = () => { if (requestId !== generation) return; stopSearch(); status('Die Suche konnte nicht ausgeführt werden. Bitte erneut versuchen.'); changed(); };
@@ -193,11 +195,13 @@ export function createMagneticTool({ map, renderer, getOriginalRaster, getBasema
   return {
     get pendingSegment() { return !!preview || !!target || !!worker || !!picking; },
     get isPicking() { return !!picking; },
-    toAnchor(ll) {
+    get canConnect() { return !worker && !picking; },
+    toAnchor(ll, { autoAccept = false } = {}) {
       ensureSource(); const point = source.vector ? snap(ll, true) : source.latLngToPixel(ll, .5);
       if (!point) throw new Error(outsideMessage() + ' Bitte manuell verbinden.');
       if (segmentHandler && preview) accept();
-      request(point);
+      if (!anchors.length) return; // Accepting the preview may already have reached B.
+      request(point, false, autoAccept);
     },
     setSegmentHandler(handler) { segmentHandler = handler; },
     seed(ll) {

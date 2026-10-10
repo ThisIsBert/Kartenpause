@@ -35,7 +35,7 @@ export function createSectionEditor({ map, renderer, magnetic, project, unprojec
     }
     el('sectionMethod').value = method;
     el('sectionMethod').disabled = !end || ready || !!worker;
-    el('sectionConnect').disabled = !end || ready || !!worker || (method === 'magnetic' && magnetic.pendingSegment);
+    el('sectionConnect').disabled = !end || ready || !!worker || (method === 'magnetic' && !magnetic.canConnect);
     el('sectionApply').disabled = !candidate || !!worker || (method === 'magnetic' && magnetic.pendingSegment);
     el('sectionUseRepair').hidden = !normalized;
     el('sectionUseRepair').disabled = !!worker;
@@ -107,7 +107,7 @@ export function createSectionEditor({ map, renderer, magnetic, project, unprojec
         normalized = data.valid ? null : data.normalized;
         if (data.valid) {
           candidate = data.result;
-          status(`${data.cleaned ? 'Flächenlose Rückläufe bereinigt. ' : ''}Vorschau fertig. Stützpunkte können verschoben werden. Übernehmen ersetzt den Randabschnitt.`);
+          status(`${data.cleaned ? 'Flächenlose Rückläufe bereinigt. ' : ''}Vorschau fertig. Stützpunkte können verschoben werden. Fertig ersetzt den Randabschnitt.`);
         } else {
           const parts = normalized ? geometryLeaves(normalized).filter(p => isClosed(p.kind)) : [];
           const counts = normalized ? ` Bereinigter Flächenvorschlag: ${parts.length} Teilfläche(n), ${parts.reduce((n, p) => n + (p.holes?.length || 0), 0)} Loch/Löcher. Prüfen und bestätigen oder den Verlauf korrigieren.` : '';
@@ -162,16 +162,16 @@ export function createSectionEditor({ map, renderer, magnetic, project, unprojec
     if (method === 'magnetic') seed();
   };
   el('sectionConnect').onclick = () => {
-    if (!end || ready || worker || (method === 'magnetic' && magnetic.pendingSegment)) return;
+    if (!end || ready || worker || (method === 'magnetic' && !magnetic.canConnect)) return;
     if (method === 'magnetic') {
-      try { magnetic.toAnchor(unproject(end.point)); } catch (error) { status(error.message); }
+      try { magnetic.toAnchor(unproject(end.point), { autoAccept: true }); } catch (error) { status(error.message); }
     } else append([path.at(-1), end.point]);
   };
   el('sectionDeleteVertex').onclick = deleteVertex;
   el('sectionUseRepair').onclick = () => {
     if (!normalized || worker) return;
     candidate = normalized; normalized = null; issues = [];
-    status('Bereinigte Flächenaufteilung bestätigt. Mit Übernehmen speichern oder Stützpunkte weiter korrigieren.'); changed();
+    status('Bereinigte Flächenaufteilung bestätigt. Mit Fertig speichern oder Stützpunkte weiter korrigieren.'); changed();
   };
   el('sectionUndo').onclick = undo;
   el('sectionReset').onclick = resetAnchors;
@@ -182,6 +182,7 @@ export function createSectionEditor({ map, renderer, magnetic, project, unprojec
     stop(); object = null; magnetic.setSegmentHandler(null); magnetic.cancel(); group.clearLayers(); handles.clearLayers(); onComplete(result);
   };
   return {
+    get canConnect() { return !!end && !ready && !worker && (method !== 'magnetic' || magnetic.canConnect); },
     get active() { return !!object; },
     get magneticMode() { return !!object && !!end && !ready && method === 'magnetic'; },
     begin(original) {

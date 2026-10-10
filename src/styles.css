@@ -110,3 +110,72 @@
     .section-issue { pointer-events: none; }
 
     .section-vertex.chosen span { background: #163e73; box-shadow: 0 0 0 2px #163e73; }
+
+/* Drawing workspace: permanent tools, shared map controls, contextual inspector. */
+body, body.drawing-mode {
+  --sidebar-width: 360px;
+  grid-template-columns: 60px minmax(0, 1fr) 6px var(--sidebar-width);
+  grid-template-rows: auto minmax(0, 1fr);
+  transition: none;
+  color: #243633;
+  background: #f3f6f5;
+}
+#toolRail { grid-column: 1; grid-row: 1 / -1; background: #fff; border-right: 1px solid #d8e1de; padding: 10px 7px; display: flex; flex-direction: column; align-items: center; gap: 6px; z-index: 1100; }
+.brand { display: grid; place-items: center; width: 36px; height: 36px; margin-bottom: 12px; background: #176c65; color: white; border-radius: 10px; font-weight: 750; font-size: 22px; }
+#drawingTools { display: flex; flex-direction: column; gap: 6px; }
+.tool-button { position: relative; display: grid; place-items: center; width: 44px; height: 42px; padding: 10px; border: 1px solid transparent; border-radius: 8px; }
+.tool-button svg { width: 21px; height: 21px; }
+.tool-button[aria-pressed="true"] { color: #105a53; background: #e1f1ed; border-color: #89b7af; box-shadow: inset 3px 0 #176c65; }
+.tool-divider { width: 30px; border-top: 1px solid #d8e1de; margin: 6px 0; }
+.tool-tooltip { position: absolute; left: calc(100% + 12px); top: 50%; transform: translateY(-50%); background: #243633; color: white; border-radius: 5px; padding: 7px 10px; white-space: nowrap; font-size: 13px; pointer-events: none; visibility: hidden; }
+.tool-button:hover .tool-tooltip, .tool-button:focus-visible .tool-tooltip { visibility: visible; }
+#mapToolbar { grid-column: 2 / -1; grid-row: 1; display: flex; flex-wrap: wrap; align-items: center; gap: 10px; padding: 10px 16px; border-bottom: 1px solid #d8e1de; background: white; font-size: 12px; min-height: 38px; }
+#basemap { width: 158px; font-size: 12px; border: 1px solid #b8c9c4; border-radius: 5px; }
+#rasterControls, #historyControls { display: flex; align-items: center; gap: 8px; }
+#rasterControls { padding: 0 12px; border-left: 1px solid #d8e1de; border-right: 1px solid #d8e1de; }
+#rasterControls .check { margin: 0; white-space: nowrap; font-size: 12px; }
+#opacity { width: 100px; accent-color: #176c65; }
+#opacityValue { width: 36px; white-space: nowrap; font-variant-numeric: tabular-nums; }
+#historyControls { margin-left: auto; }
+#workspace, .drawing-mode #workspace { grid-column: 2; grid-row: 2; transition: none; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); grid-template-rows: minmax(0, 1fr); }
+.drawing-mode #workspace, #workspace.single, .drawing-mode #workspace.single { grid-template-columns: minmax(0, 1fr); }
+.drawing-mode #sourcePanel { display: none; }
+.drawing-mode .map-panel { grid-template-rows: minmax(0, 1fr); }
+.drawing-mode .map-panel > .panelbar { display: none; }
+#sidebar, .drawing-mode #sidebar, #drawingSidebar {
+  grid-column: 4; grid-row: 2; display: block; height: auto; min-height: 0; padding: 22px 20px;
+  border: 0; background: white; transform: none; visibility: visible; transition: none;
+}
+#sidebarResize { grid-column: 3; grid-row: 2; cursor: col-resize; background: #e5ece9; touch-action: none; }
+#sidebarResize:hover, #sidebarResize:focus-visible { background: #89b7af; outline: none; }
+#drawingSidebar h1, #sidebar h1 { font-size: 22px; margin: 0 0 12px; }
+#drawingHelp { padding-bottom: 16px; border-bottom: 1px solid #e1e8e5; }
+#drawingStatus:not(:empty) { padding: 10px; border-left: 3px solid #176c65; background: #edf5f2; }
+#drawingStatus:empty { display: none; }
+#drawingActions { margin: 18px 0; }
+#sidebar, #drawingSidebar, #drawingObjects, #toolRail { overscroll-behavior: contain; }
+.tool-actions, #drawingActions { padding-top: 16px; margin-top: 24px; border-top: 1px solid #d8e1de; }
+#imageFilename { overflow-wrap: anywhere; }
+#drawingObjects { max-height: 32vh; }
+#drawingObjects:empty::after { content: "Noch keine Objekte. Wähle links ein Zeichenwerkzeug oder lade eine Zeichnung über Import / Export."; font-size: 13px; line-height: 1.5; color: #657670; }
+#drawingSidebar fieldset { margin-top: 18px; }
+#filePanel h2:first-child { margin-top: 0; }
+select:focus-visible, #sidebarResize:focus-visible { outline: 3px solid #287ac7; outline-offset: -3px; }
+@media (max-width: 1000px) {
+  body, body.drawing-mode { grid-template-columns: 54px minmax(0, 1fr) 6px min(var(--sidebar-width), 300px); }
+  #toolRail { padding-inline: 4px; }
+  #sidebar, #drawingSidebar { padding: 16px 12px; }
+  #mapToolbar { padding: 8px; gap: 8px; }
+  #workspace:not(.single) { grid-template-columns: minmax(0, 1fr); grid-template-rows: minmax(0, 1fr) minmax(0, 1fr); }
+  .drawing-mode #workspace:not(.single) { grid-template-rows: minmax(0, 1fr); }
+}
+@media (max-width: 620px) {
+  body, body.drawing-mode { grid-template-columns: 50px minmax(0, 1fr); grid-template-rows: auto minmax(180px, 1fr) minmax(160px, 38vh); }
+  #mapToolbar { grid-column: 2; }
+  #workspace, .drawing-mode #workspace { grid-column: 2; grid-row: 2; }
+  #sidebar, .drawing-mode #sidebar, #drawingSidebar { grid-column: 2; grid-row: 3; border-top: 1px solid #d8e1de; }
+  #sidebarResize { display: none; }
+  #rasterControls { flex-wrap: wrap; border: 0; padding: 0; }
+  #toolRail { overflow-y: auto; overflow-x: hidden; }
+  #toolRail > *, #drawingTools { flex-shrink: 0; }
+}

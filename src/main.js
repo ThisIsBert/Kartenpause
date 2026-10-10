@@ -10,12 +10,13 @@ import {
   Save,
   Scan,
   Trash2,
-  X
+  X, Check, MousePointer2, MapPin, Slash, Pentagon, Spline, Circle, Magnet, WandSparkles, MapPinned, Undo2, Redo2
 } from 'lucide';
 import { GeoFit } from './geo/geo-fit.js';
 import { ProjectionSearch } from './geo/projection-search.js';
 import { ThinPlateSpline } from './geo/thin-plate-spline.js';
 import './styles.css';
+import { setupWorkspace } from './workspace.js';
 import { createDrawingEditor } from './drawing/editor.js';
 import { createRasterInverse } from './drawing/raster-source.js';
 import { createBasemapRaster } from './drawing/basemap-source.js';
@@ -180,7 +181,7 @@ import { createBasemapRaster } from './drawing/basemap-source.js';
         L.DomUtil.setPosition(this._canvas, topLeft);
         const ctx = this._canvas.getContext('2d');
         ctx.clearRect(0, 0, size.x, size.y);
-        if (!image || !fitted) return;
+        if (!image || !fitted || !document.getElementById('showRaster').checked) return;
         ctx.globalAlpha = Number(els.opacity.value) / 100;
         ctx.imageSmoothingEnabled = !document.getElementById('pixelView').checked;
 
@@ -246,7 +247,7 @@ import { createBasemapRaster } from './drawing/basemap-source.js';
     }
     function showError(err) { ui.notice.textContent = 'Fehler: ' + (err?.message || err); }
 
-    const appIcons = { Crosshair, FolderOpen, MapPinPlus, Pencil, Save, Scan, Trash2, X };
+    const appIcons = { Crosshair, FolderOpen, MapPinPlus, Pencil, Save, Scan, Trash2, X, Check, MousePointer2, MapPin, Slash, Pentagon, Spline, Circle, Magnet, WandSparkles, MapPinned, Undo2, Redo2 };
     function icons() { createIcons({ icons: appIcons }); }
     function formatDistance(value) {
       if (!Number.isFinite(value)) return 'nicht berechenbar';
@@ -262,6 +263,10 @@ import { createBasemapRaster } from './drawing/basemap-source.js';
     }
     function updateAvailability() {
       document.getElementById('enterDrawing').disabled = busy || !!capture;
+      document.getElementById('cancelGeoreference').disabled = busy;
+      document.getElementById('imageFilename').textContent = imageName || 'Noch keine Pixelkarte geladen.';
+      for (const id of ['opacity', 'showRaster', 'pixelView']) document.getElementById(id).disabled = !image || !fitted;
+      document.getElementById('rasterControls').title = fitted ? 'Darstellung der Pixelkarte' : 'Pixelkarte zuerst mit dem Werkzeug Georeferenzieren zuweisen';
       const enough = points.filter(p => p.fit).length >= 3;
       ui.addPoint.disabled = !image || busy || !!capture;
       ui.clearPoints.disabled = !points.length || busy;
@@ -582,8 +587,39 @@ import { createBasemapRaster } from './drawing/basemap-source.js';
     });
 
     let originalRasterImage = null, originalRasterCanvas = null, originalRasterData = null;
+    let georeferenceSnapshot = null;
+    document.getElementById('chooseImage').onclick = () => els.file.click();
+    setupWorkspace();
+    document.getElementById('showRaster').onchange = () => overlay.redraw();
     document.getElementById('pixelView').onchange = () => overlay.redraw();
-    createDrawingEditor({ map, sourceMap, opacity: els.opacity, canEnter: () => !busy && !capture,
+    createDrawingEditor({ map, sourceMap, canEnter: () => !busy && !capture,
+      onCancelGeoreference() {
+        if (busy || !georeferenceSnapshot) return false;
+        const previous = georeferenceSnapshot;
+        imageLoadVersion++;
+        ({ image, imageName, imageData, points, nextPointId, fitted, transformMode, tpsCorrection,
+          currentCrsIndex, rotation, renderMesh, imageCenter, halfWidthSource } = previous);
+        capture = null;
+        candidates.splice(0, candidates.length, ...previous.candidates);
+        for (const entry of candidates) if (entry.def) proj4.defs(entry.code, entry.def);
+        if (sourceLayer) sourceMap.removeLayer(sourceLayer);
+        sourceLayer = null;
+        if (image) installImage(image, imageData, imageName);
+        els.opacity.value = previous.opacity;
+        els.opacityValue.textContent = previous.opacity + ' %';
+        map.removeLayer(activeBasemap);
+        els.basemap.value = previous.basemap;
+        activeBasemap = basemaps[previous.basemap].addTo(map);
+        document.getElementById('showRaster').checked = previous.showRaster;
+        document.getElementById('pixelView').checked = previous.pixelView;
+        ui.showResiduals.checked = previous.showResiduals;
+        setSourceVisible(previous.showSource);
+        map.setView(previous.center, previous.zoom, { animate: false });
+        ui.automationInfo.textContent = previous.automationInfo;
+        ui.notice.textContent = '';
+        updateCapture(); refresh();
+        return true;
+      },
       getBasemapRaster: () => createBasemapRaster(map, activeBasemap),
       getOriginalRaster() {
         if (!image || !fitted) throw new Error('Bitte zuerst eine Pixelkarte einpassen.');
@@ -604,6 +640,15 @@ import { createBasemapRaster } from './drawing/basemap-source.js';
         };
       },
       onModeChange(active) {
+        if (!active) georeferenceSnapshot = {
+          image, imageName, imageData, points: structuredClone(points), nextPointId, fitted,
+          transformMode, tpsCorrection, currentCrsIndex, rotation, renderMesh, imageCenter, halfWidthSource,
+          candidates: structuredClone(candidates), opacity: els.opacity.value, basemap: els.basemap.value,
+          showRaster: document.getElementById('showRaster').checked, pixelView: document.getElementById('pixelView').checked,
+          showSource: ui.showSource.checked, showResiduals: ui.showResiduals.checked,
+          center: map.getCenter(), zoom: map.getZoom(), automationInfo: ui.automationInfo.textContent
+        };
+        else georeferenceSnapshot = null;
         for (const layer of [targetMarks, residualMarks]) {
           if (active) map.removeLayer(layer);
           else if (!map.hasLayer(layer)) layer.addTo(map);

@@ -4,31 +4,54 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <meta name="description" content="Rasterkarten georeferenzieren, manuell nachzeichnen und als GeoJSON speichern." />
-  <title>Kartenpause – Karten georeferenzieren und nachzeichnen</title>
+  <title>Kartenpause – Zeichnen auf Karten</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%23176c65'/%3E%3Ctext x='16' y='24' text-anchor='middle' font-family='sans-serif' font-size='24' fill='white'%3EK%3C/text%3E%3C/svg%3E" />
 </head>
-<body>
-<aside id="sidebar">
-    <h1>Pixelkarte → Basiskarte</h1>
-    <button id="enterDrawing" class="primary" disabled>Nachzeichnen →</button>
+<body class="drawing-mode">
+<nav id="toolRail" aria-label="Werkzeuge">
+  <span class="brand" title="Kartenpause" aria-label="Kartenpause">K</span>
+  <div id="drawingTools" role="group" aria-label="Zeichenwerkzeuge">
+    <button data-tool="select" class="tool-button" title="Auswahl" aria-label="Auswahl" aria-pressed="false"><i data-lucide="mouse-pointer-2"></i><span class="tool-tooltip">Auswahl</span></button>
+    <button data-tool="point" class="tool-button" title="Punkt" aria-label="Punkt" aria-pressed="false"><i data-lucide="map-pin"></i><span class="tool-tooltip">Punkt</span></button>
+    <button data-tool="line" class="tool-button" title="Linie" aria-label="Linie" aria-pressed="false"><i data-lucide="slash"></i><span class="tool-tooltip">Linie</span></button>
+    <button data-tool="polygon" class="tool-button" title="Polygon" aria-label="Polygon" aria-pressed="false"><i data-lucide="pentagon"></i><span class="tool-tooltip">Polygon</span></button>
+    <button data-tool="curve" class="tool-button" title="Kurve" aria-label="Kurve" aria-pressed="false"><i data-lucide="spline"></i><span class="tool-tooltip">Kurve</span></button>
+    <button data-tool="curvePolygon" class="tool-button" title="Kurvenfläche" aria-label="Kurvenfläche" aria-pressed="false"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 3C3 2 2 7 5 10C8 13 1 15 4 19C7 23 10 18 14 20C19 23 23 18 20 14C17 11 23 8 19 5C15 2 13 8 10 6C9 5 10 3 8 3Z"/></svg><span class="tool-tooltip">Kurvenfläche</span></button>
+    <button data-tool="magnetic" class="tool-button" title="Magnetisch zeichnen" aria-label="Magnetisch zeichnen" aria-pressed="false"><i data-lucide="magnet"></i><span class="tool-tooltip">Magnetisch zeichnen</span></button>
+    <button data-tool="wand" class="tool-button" title="Zauberstab" aria-label="Zauberstab" aria-pressed="false"><i data-lucide="wand-sparkles"></i><span class="tool-tooltip">Zauberstab</span></button>
+  </div>
+  <div class="tool-divider"></div>
+  <button id="leaveDrawing" class="tool-button" title="Georeferenzieren" aria-label="Georeferenzieren" aria-pressed="false"><i data-lucide="map-pinned"></i><span class="tool-tooltip">Georeferenzieren</span></button>
+  <button data-tool="files" class="tool-button" title="Import / Export" aria-label="Import / Export" aria-pressed="false"><i data-lucide="folder-open"></i><span class="tool-tooltip">Import / Export</span></button>
+</nav>
+<header id="mapToolbar" aria-label="Kartenansicht">
+  <label for="basemap">Basiskarte</label>
+  <select id="basemap"><option value="esriStreet" selected>Esri Straße</option><option value="esriTopo">Esri Topografie</option><option value="osm">OpenStreetMap</option></select>
+  <div id="rasterControls" role="group" aria-label="Pixelkarte">
+    <label class="check"><input id="showRaster" type="checkbox" checked />Pixelkarte</label>
+    <label for="opacity">Deckkraft</label><input id="opacity" type="range" min="0" max="100" value="55" /><output id="opacityValue" for="opacity">55 %</output>
+    <label class="check" title="Pixel ohne Glättung anzeigen"><input id="pixelView" type="checkbox" />Pixelscharf</label>
+  </div>
+  <button id="zoomContent" class="icon" title="Auf Inhalt zoomen" aria-label="Auf Inhalt zoomen"><i data-lucide="scan"></i></button>
+  <div id="historyControls" role="group" aria-label="Änderungen der Zeichnung">
+    <button id="undoDrawing" class="icon" title="Rückgängig (Strg+Z)" aria-label="Rückgängig" disabled><i data-lucide="undo-2"></i></button>
+    <button id="redoDrawing" class="icon" title="Wiederholen (Strg+Umschalt+Z)" aria-label="Wiederholen" disabled><i data-lucide="redo-2"></i></button>
+  </div>
+</header>
+<div id="sidebarResize" role="separator" tabindex="0" aria-label="Breite der Werkzeugspalte" aria-orientation="vertical" aria-valuemin="280" aria-valuemax="600" aria-valuenow="360" title="Ziehen oder mit Pfeiltasten Breite ändern"></div>
 
-    <h2>Basiskarte</h2>
-    <select id="basemap">
-      <option value="esriStreet" selected>Esri World Street Map</option>
-      <option value="esriTopo">Esri World Topographic Map</option>
-      <option value="osm">OpenStreetMap (kann bei Direktstart 403 liefern)</option>
-    </select>
+<aside id="sidebar" aria-label="Georeferenzieren" hidden>
+    <h1>Georeferenzieren</h1>
+    <p class="hint">Lade eine Pixelkarte. Markiere dieselben Orte im Originalbild und auf der Basiskarte. Mit mindestens drei Punktpaaren kannst du die Karte anpassen.</p>
 
-    <h2>1. Vorlage</h2>
-    <input id="file" type="file" accept="image/png,image/jpeg,image/webp,image/gif" />
-    <div class="row">
-      <label for="opacity">Deckkraft</label><span id="opacityValue" class="value">55 %</span>
-    </div>
-    <input id="opacity" type="range" min="0" max="100" value="55" />
-
-    <h2>2. Referenzpunkte</h2>
+    <h2>1. Pixelkarte</h2>
+    <input id="file" type="file" accept="image/png,image/jpeg,image/webp,image/gif" hidden />
+    <button id="chooseImage"><i data-lucide="folder-open"></i> Pixelkarte wählen</button>
+    <p id="imageFilename" class="hint" aria-live="polite">Noch keine Pixelkarte geladen.</p>
+<h2>2. Referenzpunkte</h2>
     <label class="check"><input id="showSource" type="checkbox" checked />Originalbild anzeigen</label>
     <div class="commands">
-      <button id="addPoint" class="primary"><i data-lucide="map-pin-plus"></i> Referenzpunkt hinzufügen</button>
+      <button id="addPoint" class="primary"><i data-lucide="map-pin-plus"></i> Punktpaar</button>
       <button id="cancelPoint" class="icon" title="Punktaufnahme abbrechen" aria-label="Punktaufnahme abbrechen" hidden><i data-lucide="x"></i></button>
       <button id="clearPoints" class="icon" title="Alle Referenzpunkte löschen" aria-label="Alle Referenzpunkte löschen"><i data-lucide="trash-2"></i></button>
     </div>
@@ -37,11 +60,11 @@
     <label class="check"><input id="showResiduals" type="checkbox" checked />Abweichungen anzeigen</label>
     <div id="metrics" aria-live="polite"></div>
     <div class="stack">
-      <button id="fitCrs"><i data-lucide="crosshair"></i> Projektion automatisch anpassen</button>
+      <button id="fitCrs"><i data-lucide="crosshair"></i> Anpassen</button>
       <button id="cancelSearch" hidden><i data-lucide="x"></i> Suche abbrechen</button>
     </div>
     <div id="automationInfo" role="status" aria-live="polite"></div>
-    <h2>Projekt</h2>
+    <h2>Georeferenzierung</h2>
     <div class="commands">
       <button id="saveProject"><i data-lucide="save"></i> Speichern</button>
       <button id="loadProject"><i data-lucide="folder-open"></i> Laden</button>
@@ -50,6 +73,7 @@
     <div id="notice" role="alert"></div>
     <div id="renderNote"></div>
     <div id="status">Noch kein Bild geladen.</div>
+    <div class="commands tool-actions"><button id="enterDrawing" class="primary"><i data-lucide="check"></i> Fertig</button><button id="cancelGeoreference"><i data-lucide="x"></i> Abbrechen</button></div>
   </aside>
 
   <main id="workspace">
@@ -57,23 +81,12 @@
     <section class="map-panel"><div class="panelbar"><strong>Basiskarte</strong><span id="alignmentLabel">Noch nicht angepasst</span><button id="zoomImage" class="icon" title="Auf die angepasste Vorlage zoomen" aria-label="Auf die angepasste Vorlage zoomen"><i data-lucide="scan"></i></button></div><div id="map" aria-label="Georeferenzierte Karte"></div></section>
   </main>
   <aside id="drawingSidebar" aria-label="Zeichenwerkzeuge" hidden>
-    <button id="leaveDrawing">← Karte einpassen</button>
-    <h1>Nachzeichnen</h1>
-    <p class="hint">Die angepasste Pixelkarte bleibt als Vorlage auf der Basiskarte sichtbar.</p>
-    <div id="drawingTools" class="stack" role="group" aria-label="Zeichenwerkzeug">
-      <button data-tool="select" aria-pressed="true">↖ Auswählen / Bearbeiten</button>
-      <button data-tool="point" aria-pressed="false">• Punkt setzen</button>
-      <button data-tool="line" aria-pressed="false">╱ Linie zeichnen</button>
-      <button data-tool="polygon" aria-pressed="false">△ Polygon zeichnen</button>
-      <button data-tool="curve" aria-pressed="false">∿ Geschwungene Linie zeichnen</button>
-      <button data-tool="curvePolygon" aria-pressed="false">◯ Geschwungenes Polygon zeichnen</button>
-      <button data-tool="magnetic" aria-pressed="false">⌁ Magnetisch nachzeichnen</button>
-      <button data-tool="wand" aria-pressed="false">✧ Zauberstab / Fläche auswählen</button>
-    </div>
+    <h1 id="toolTitle">Auswahl</h1>
+    <p id="drawingHelp" class="hint"></p>
+    <p id="drawingStatus" role="status" aria-live="polite"></p>
     <div id="areaEditSettings" hidden>
       <h2>Fläche weiterbearbeiten</h2>
-      <p class="hint">Die aktuelle Form ist die Ausgangsauswahl. Hinzufügen, abziehen oder mit dem Pinsel korrigieren. Übernehmen ersetzt dieses Objekt; Verwerfen erhält das Original. Die Umwandlung in Originalpixel kann den Rand geringfügig verändern.</p>
-      <div class="commands"><button id="areaApply">Übernehmen</button><button id="areaCancel">Verwerfen</button></div>
+      <p class="hint">Ergänze oder entferne Teile der Fläche mit Zauberstab und Pinsel. „Fertig“ speichert deine Änderungen am Objekt. „Abbrechen“ stellt das Original wieder her. Der Rand kann sich durch die Bearbeitung auf der Pixelkarte leicht verschieben.</p>
     </div>
     <div id="sectionSettings" hidden>
       <h2>Randabschnitt ersetzen</h2>
@@ -81,18 +94,17 @@
       <label for="sectionMethod">Zeichenmethode</label>
       <select id="sectionMethod"><option value="manual">Manuell</option><option value="magnetic">Magnetisch</option></select>
       <button id="sectionConnect">Mit Endpunkt B verbinden</button>
-      <div class="commands"><button id="sectionUndo">Letztes Teilstück zurück</button><button id="sectionReset">A und B neu wählen</button></div>
+      <div class="commands"><button id="sectionUndo">Teilstück zurück</button><button id="sectionReset">A und B neu wählen</button></div>
       <p id="sectionEditHelp" class="hint" hidden>Blauen Stützpunkt zum Korrigieren ziehen. + fügt einen Punkt hinzu. Gewählten Punkt mit Entf löschen. A und B bleiben fest. Bei vielen Punkten zum Bearbeiten hineinzoomen.</p>
-      <button id="sectionDeleteVertex" hidden disabled>Gewählten Ersatzstützpunkt löschen</button>
-      <button id="sectionUseRepair" hidden>Bereinigte Flächenaufteilung bestätigen</button>
-      <div class="commands"><button id="sectionApply">Übernehmen</button><button id="sectionCancel">Verwerfen</button></div>
+      <button id="sectionDeleteVertex" hidden disabled>Stützpunkt löschen</button>
+      <button id="sectionUseRepair" hidden>Bereinigung übernehmen</button>
       <p id="sectionStatus" role="status" aria-live="polite"></p>
     </div>
     <div id="magneticSettings" hidden>
       <label for="magneticSource">Verlauf übernehmen aus</label>
       <select id="magneticSource"><option value="raster">Pixelkarte</option><option value="polygon">Linien und Flächenränder</option><option value="basemap">Basiskarte (aktuelle Zoomstufe)</option></select>
       <div id="magneticActiveSettings">
-      <p id="polygonFollowHelp" class="hint" hidden>Nahe an eine Linie oder einen Flächenrand klicken (16 Bildschirmpixel). Verbundene Kanten werden auf dem kürzeren Weg nachgezeichnet; für längere Bögen Zwischenpunkte setzen. Ohne passende Kante wird gerade verbunden. Weiterklicken setzt fort, Alt korrigiert die Vorschau.</p>
+      <p id="polygonFollowHelp" class="hint" hidden>Klicke nahe an eine vorhandene Linie oder einen Flächenrand. Das Werkzeug folgt dem kürzeren Weg. Setze für längere Bögen Zwischenpunkte. Ohne passende Kante entsteht eine gerade Verbindung.</p>
       <p class="hint">Zwei Anker setzen. Weiterklicken hinter dem Endanker übernimmt die Vorschau und setzt fort. Zurück in den Abschnitt klicken korrigiert ihn. Alt erzwingt Korrektur, Umschalt Fortsetzen.</p>
       <p id="basemapFollowHelp" class="hint" hidden>Sichtbare Straßen, Grenzen oder Flüsse abschnittsweise nachfahren. Du kannst während des Zeichnens verschieben und zoomen. Für den nächsten Abschnitt letzten Anker und Ziel im Ausschnitt halten und die Kartenkacheln laden lassen. Bereits gezeichnete Abschnitte bleiben erhalten. Bei Beschriftungen und Kreuzungen helfen nahe Zwischenanker und die Farbpipette.</p>
       <div id="magneticRasterSettings">
@@ -129,39 +141,40 @@
       <button id="wandClear">Auswahl leeren</button>
       <p id="wandStatus" role="status" aria-live="polite"></p>
     </div>
-    <p id="drawingHelp" class="hint"></p>
-    <div class="commands">
-      <button id="finishDrawing" class="primary" disabled>Fertig (Enter)</button>
-      <button id="cancelDrawing" disabled>Abbrechen (Esc)</button>
-    </div>
-    <div class="commands"><button id="undoDrawing" disabled>Rückgängig</button><button id="redoDrawing" disabled>Wiederholen</button></div>
-    <label for="drawingOpacity">Deckkraft der Vorlage</label>
-    <input id="drawingOpacity" type="range" min="0" max="100" value="55" />
-    <label class="check"><input id="pixelView" type="checkbox" />Vorlage ohne Glättung anzeigen</label>
+    <section id="objectPanel">
     <h2 id="drawingCount">Objekte (0)</h2>
     <div id="drawingObjects" class="stack" aria-label="Gezeichnete Objekte"></div>
     <fieldset id="drawingSelection" disabled>
       <legend>Ausgewähltes Objekt</legend>
       <label for="drawingName">Name</label><input id="drawingName" type="text" maxlength="200" />
-      <div class="commands"><button id="copyDrawing">Kopieren (Strg+C)</button><button id="deleteDrawing">Löschen</button></div>
-      <button id="deleteVertex" disabled>Gewählten Stützpunkt löschen</button>
+      <div class="commands"><button id="copyDrawing">Kopieren</button><button id="deleteDrawing">Löschen</button></div>
+      <button id="deleteVertex" disabled>Stützpunkt löschen</button>
       <button id="reworkArea">Fläche weiterbearbeiten</button>
       <button id="reworkSection">Randabschnitt ersetzen</button>
       <div class="row"><label for="simplifyDrawing">Vereinfachen und glätten</label><output id="simplifyValue">0 %</output></div>
       <input id="simplifyDrawing" type="range" min="0" max="100" step="1" value="0" aria-describedby="simplifyStatus" />
       <p id="simplifyStatus" class="hint" aria-live="polite">Objekt auswählen.</p>
       <div class="row">
-        <button id="applySimplification" disabled>Übernehmen</button>
-        <button id="cancelSimplification" disabled>Verwerfen</button>
+        <button id="applySimplification" class="primary" disabled><i data-lucide="check"></i> Fertig</button>
+        <button id="cancelSimplification" disabled><i data-lucide="x"></i> Abbrechen</button>
       </div>
     </fieldset>
-    <h2>GeoJSON</h2>
+    </section>
+    <section id="filePanel" hidden>
+    <h2>Zeichnung laden</h2>
     <input id="importDrawingFile" type="file" accept=".geojson,.json,application/geo+json,application/json" hidden />
     <div class="commands"><button id="importDrawing">Datei laden</button><button id="pasteDrawing">Aus Zwischenablage</button></div>
-    <p class="hint">Import ergänzt die Zeichnung. Alternativ Strg+V. GeoJSON in WGS84; mehrteilige Linien, Punktgruppen und Geometriesammlungen bleiben zusammengehörige Objekte.</p>
+    <p class="hint">Lade eine GeoJSON-Datei oder füge sie mit Strg+V ein. Die Objekte werden deiner Zeichnung hinzugefügt.</p>
+    <h2>Zeichnung speichern</h2>
     <button id="saveDrawing" class="primary" disabled>Zeichnung speichern</button>
-    <p class="hint">Speichert alle fertigen Objekte als GeoJSON-FeatureCollection. Kurven werden als fein aufgelöste Geometrien exportiert.</p>
-    <p id="drawingStatus" role="status" aria-live="polite"></p>
+    <p class="hint">Speichert alle fertigen Objekte als GeoJSON. Du kannst die Datei später wieder laden oder in anderen Kartenprogrammen öffnen. Die Pixelkarte wird separat beim Georeferenzieren gespeichert.</p>
+    </section>
+    <div id="drawingActions" class="commands">
+      <button id="finishDrawing" title="Zeichnung fertigstellen (Enter)" class="primary" disabled><i data-lucide="check"></i> Fertig</button>
+      <button id="cancelDrawing" title="Zeichnung abbrechen (Esc)" disabled><i data-lucide="x"></i> Abbrechen</button>
+    </div>
+    <div id="areaActions" class="commands tool-actions" hidden><button id="areaApply" class="primary"><i data-lucide="check"></i> Fertig</button><button id="areaCancel"><i data-lucide="x"></i> Abbrechen</button></div>
+    <div id="sectionActions" class="commands tool-actions" hidden><button id="sectionApply" class="primary"><i data-lucide="check"></i> Fertig</button><button id="sectionCancel"><i data-lucide="x"></i> Abbrechen</button></div>
   </aside>
   <script type="module" src="/src/main.js"></script>
 </body>

@@ -24,6 +24,7 @@ test('alle veröffentlichten Testkarten lassen sich laden', async ({ page }) => 
   for (const file of files) {
     const project = JSON.parse(readFileSync(path.join(directory, file), 'utf8'));
     await page.goto('/');
+    await page.locator('#leaveDrawing').click();
     await page.locator('#projectFile').setInputFiles(path.join(directory, file));
     await expect(page.locator('#pointList tr')).toHaveCount(project.points.length);
     await expect(page.locator('#notice')).toContainText('Projekt geladen.');

@@ -12,12 +12,14 @@ import { createSectionEditor } from './section-editor.js';
 
 const labels = { multiLine: 'Mehrteilige Linie', multiPoint: 'Punktgruppe', collection: 'Geometriesammlung', point: 'Punkt', line: 'Linie', polygon: 'Polygon', multiPolygon: 'Mehrteilige Fläche', curve: 'Geschwungene Linie', curvePolygon: 'Geschwungenes Polygon' };
 
-export function createDrawingEditor({ map, sourceMap, opacity, canEnter, onModeChange, getOriginalRaster, getBasemapRaster }) {
+export function createDrawingEditor({ map, sourceMap, canEnter, onModeChange, onCancelGeoreference, getOriginalRaster, getBasemapRaster }) {
   const el = id => document.getElementById(id);
   const shapes = L.layerGroup().addTo(map), handles = L.layerGroup().addTo(map);
   map.createPane('drawingShapes');
   map.getPane('drawingShapes').style.zIndex = 450;
   const renderer = L.svg({ pane: 'drawingShapes' });
+  let drawingView = null, displayedTool = null;
+  const toolLabels = { select: 'Auswahl', point: 'Punkt', line: 'Linie', polygon: 'Polygon', curve: 'Kurve', curvePolygon: 'Kurvenfläche', magnetic: 'Magnetisch zeichnen', wand: 'Zauberstab', section: 'Randabschnitt ersetzen', files: 'Import / Export' };
   let active = false, tool = 'select', objects = [], selectedId = null, vertexIndex = null, draft = null;
   let undo = [], redo = [], layers = new Map();
   let savedObjects = JSON.stringify(objects);
@@ -111,6 +113,17 @@ export function createDrawingEditor({ map, sourceMap, opacity, canEnter, onModeC
 
   function updateUI() {
     const object = selected();
+    const currentTool = areaEdit ? 'area' : tool;
+    if (currentTool !== displayedTool) { el('drawingSidebar').scrollTop = 0; displayedTool = currentTool; }
+    el('toolTitle').textContent = areaEdit ? 'Fläche weiterbearbeiten' : toolLabels[tool];
+    el('areaActions').hidden = !areaEdit;
+    el('sectionActions').hidden = !section.active;
+    el('objectPanel').hidden = tool !== 'select';
+    el('drawingSelection').hidden = !object;
+    el('filePanel').hidden = tool !== 'files';
+    el('drawingActions').hidden = tool === 'files' || tool === 'select' || reworking();
+    el('historyControls').hidden = !active;
+    el('leaveDrawing').setAttribute('aria-pressed', String(!active));
     const pending = !!draft || magnetic.hasDraft || wand.hasDraft || !!simplification || reworking();
     el('drawingSelection').disabled = !object || !!draft || magnetic.hasDraft || wand.hasDraft || reworking();
     el('reworkArea').disabled = !object || !isClosed(object.kind) || !!simplification;
@@ -118,15 +131,15 @@ export function createDrawingEditor({ map, sourceMap, opacity, canEnter, onModeC
     el('areaEditSettings').hidden = !areaEdit;
     el('areaApply').disabled = !wand.canFinish;
     el('sectionSettings').hidden = !section.active;
-    if (section.active && magnetic.pendingSegment) el('sectionConnect').disabled = true;
+    if (section.active) el('sectionConnect').disabled = !section.canConnect;
     el('drawingName').value = object?.name || '';
     for (const id of ['drawingName', 'copyDrawing', 'deleteDrawing']) el(id).disabled = !!simplification;
     el('simplifyDrawing').disabled = !object || geometryLeaves(object).every(part => part.kind === 'point');
     el('simplifyDrawing').value = simplifyAmount;
     el('simplifyValue').textContent = `${simplifyAmount} %`;
     el('simplifyStatus').textContent = !object ? 'Objekt auswählen.' : geometryLeaves(object).every(part => part.kind === 'point') ? 'Punkte lassen sich nicht vereinfachen.'
-      : simplifyBusy ? `Berechne ${simplifyAmount} % … Der Regler bleibt bedienbar; Verwerfen bricht die Berechnung ab.`
-      : simplification ? `Vorschau: ${vertexCount(object)} → ${vertexCount(simplification)} Stützpunkte.${isClosed(object.kind) ? ` ${geometryCounts(object).parts} → ${geometryCounts(simplification).parts} Teilflächen, ${geometryCounts(object).holes} → ${geometryCounts(simplification).holes} Löcher. Kleine Inseln und Löcher können entfallen.` : ''} Übernehmen oder verwerfen.`
+      : simplifyBusy ? `Berechne ${simplifyAmount} % … Der Regler bleibt bedienbar; Abbrechen beendet die Berechnung.`
+      : simplification ? `Vorschau: ${vertexCount(object)} → ${vertexCount(simplification)} Stützpunkte.${isClosed(object.kind) ? ` ${geometryCounts(object).parts} → ${geometryCounts(simplification).parts} Teilflächen, ${geometryCounts(object).holes} → ${geometryCounts(simplification).holes} Löcher. Kleine Inseln und Löcher können entfallen.` : ''} Mit Fertig bestätigen oder abbrechen.`
         : `${vertexCount(object)} Stützpunkte. Regler zeigt eine Vorschau; 0 stellt die Ausgangsform wieder her.${vertexCount(object) > 1000 ? ' Bei großen Formen werden Griffe ausgedünnt. Zum Bearbeiten einzelner Punkte hineinzoomen.' : ''}`;
     el('applySimplification').disabled = !simplification || simplifyBusy;
     el('cancelSimplification').disabled = !simplification;
@@ -143,15 +156,16 @@ export function createDrawingEditor({ map, sourceMap, opacity, canEnter, onModeC
     el('importDrawing').disabled = pending;
     el('pasteDrawing').disabled = pending;
     el('drawingCount').textContent = `Objekte (${objects.length})`;
-    el('drawingHelp').textContent = tool === 'select'
+    el('undoDrawing').title = (draft ? 'Letzten Punkt zurück' : magnetic.hasDraft ? 'Letzten Abschnitt zurück' : wand.hasDraft ? 'Letzte Auswahländerung zurück' : 'Rückgängig') + ' (Strg+Z)';
+    el('drawingHelp').textContent = tool === 'files' ? 'Lade vorhandene Objekte oder speichere deine Zeichnung für die Weiterarbeit.' : tool === 'select'
       ? 'Objekt anklicken. Stützpunkte ziehen; + auf einer Kante fügt einen Punkt hinzu. Stützpunkt anklicken und mit Entf löschen.'
       : tool === 'magnetic' ? 'Enter übernimmt die Vorschau. Ohne Vorschau schließt „Fertig“ die Linie ab. Für Flächen „Polygon schließen“ wählen und die Schließkante bestätigen. Esc bricht die Zeichnung ab.'
       : tool === 'wand' ? 'Farbfläche auswählen und bei Bedarf mit dem Pinsel korrigieren. Fertig übernimmt die Umrisse, Esc verwirft die Auswahl.'
       : tool === 'point' ? 'Auf die Karte klicken, um einen Punkt zu setzen.'
         : `Stützpunkte durch Klicken setzen. ${isClosed(tool) ? 'Mindestens drei' : 'Mindestens zwei'} Punkte. Mit Enter oder „Fertig“ abschließen, Esc bricht ab.`;
-    if (section.active) el('drawingHelp').textContent = 'Sie bearbeiten das ausgewählte Objekt. Methodenwechsel erfolgt oben im Abschnittswerkzeug. Esc verwirft alle Änderungen.';
-    document.querySelectorAll('[data-tool]').forEach(button => { button.setAttribute('aria-pressed', String(button.dataset.tool === tool)); button.disabled = reworking(); });
-    map.getContainer().classList.toggle('drawing-crosshair', active && tool !== 'select');
+    if (section.active) el('drawingHelp').textContent = 'Wähle Anfang und Ende des Randabschnitts und zeichne den neuen Verlauf. Mit „Fertig“ speicherst du ihn; Esc verwirft die Änderungen.';
+    document.querySelectorAll('[data-tool]').forEach(button => { button.setAttribute('aria-pressed', String(active && button.dataset.tool === tool)); button.disabled = reworking(); });
+    map.getContainer().classList.toggle('drawing-crosshair', active && !['select', 'files'].includes(tool));
     el('magneticSettings').hidden = tool !== 'magnetic' && !section.active;
     el('magneticActiveSettings').hidden = tool !== 'magnetic' && !section.magneticMode;
     magnetic.setEnabled(active && (tool === 'magnetic' || section.magneticMode));
@@ -290,17 +304,27 @@ export function createDrawingEditor({ map, sourceMap, opacity, canEnter, onModeC
   function setMode(value) {
     if (value && !canEnter()) return;
     if (draft || magnetic.hasDraft || wand.hasDraft || simplification || reworking()) { message('Bitte zuerst die begonnene Form oder Vorschau übernehmen oder verwerfen.'); return; }
+    if (active === value) return true;
+    const previousView = { center: map.getCenter(), zoom: map.getZoom() };
+    if (!value) drawingView = objects.length ? previousView : null;
     active = value;
     document.body.classList.toggle('drawing-mode', active);
     el('sidebar').inert = active;
+    el('sidebar').hidden = active;
     el('sourcePanel').inert = active;
     el('drawingSidebar').hidden = !active;
-    el('drawingOpacity').value = opacity.value;
+    el(active ? 'drawingSidebar' : 'sidebar').scrollTop = 0;
     if (active) map.doubleClickZoom.disable(); else map.doubleClickZoom.enable();
     onModeChange(active); render();
-    // ResizeObserver follows the sliding grid throughout its transition.
-    requestAnimationFrame(() => { map.invalidateSize({ pan: false }); sourceMap.invalidateSize({ pan: false }); });
-    (active ? el('leaveDrawing') : el('enterDrawing')).focus();
+    // Apply the new map dimensions before restoring an existing drawing's view.
+    const nextView = active && drawingView ? drawingView : previousView;
+    requestAnimationFrame(() => {
+      map.invalidateSize({ pan: false }); sourceMap.invalidateSize({ pan: false });
+      map.setView(nextView.center, nextView.zoom, { animate: false });
+      if (!active) el('sourceFit').click();
+    });
+    (active ? document.querySelector(`[data-tool="${tool}"]`) : el('leaveDrawing'))?.focus();
+    return true;
   }
 
   function finish() {
@@ -326,7 +350,7 @@ export function createDrawingEditor({ map, sourceMap, opacity, canEnter, onModeC
   }
 
   function mapClick(e) {
-    if (!active) return;
+    if (!active || tool === 'files') return;
     if (simplification) { message('Bitte die Vereinfachung zuerst übernehmen oder verwerfen.'); return; }
     if (section.active) { section.click(e.latlng, e.originalEvent); return; }
     if (tool === 'magnetic') { magnetic.click(e.latlng, e.originalEvent); return; }
@@ -355,11 +379,13 @@ export function createDrawingEditor({ map, sourceMap, opacity, canEnter, onModeC
   document.querySelectorAll('[data-tool]').forEach(button => {
     button.onclick = () => {
       if (draft || magnetic.hasDraft || wand.hasDraft || simplification || reworking()) { message('Bitte zuerst die begonnene Form oder Vorschau übernehmen oder verwerfen.'); return; }
+      if (!active && !setMode(true)) return;
       tool = button.dataset.tool; selectedId = null; vertexIndex = null; message(''); render();
     };
   });
   el('enterDrawing').onclick = () => setMode(true);
   el('leaveDrawing').onclick = () => setMode(false);
+  el('cancelGeoreference').onclick = () => { if (onCancelGeoreference()) setMode(true); };
   el('finishDrawing').onclick = finish;
   el('cancelDrawing').onclick = () => { if (section.active) { section.cancel(); return; } if (areaEdit) { cancelArea(); return; } stopSimplification(); simplification = null; simplifyAmount = 0; magnetic.cancel(); wand.cancel(); draft = null; message('Zeichnen abgebrochen.'); render(); };
   function stopSimplification() {
@@ -414,7 +440,12 @@ export function createDrawingEditor({ map, sourceMap, opacity, canEnter, onModeC
     if (!selected()) return;
     record(); selected().name = el('drawingName').value.trim() || labels[selected().kind]; render();
   };
-  el('drawingOpacity').oninput = () => { opacity.value = el('drawingOpacity').value; opacity.dispatchEvent(new Event('input')); };
+  el('zoomContent').onclick = () => {
+    const bounds = L.latLngBounds([]);
+    for (const object of objects) for (const ring of objectRings(object)) for (const p of ring) bounds.extend(unproject(p));
+    if (bounds.isValid()) map.fitBounds(bounds, { padding: [30, 30], maxZoom: 16 });
+    else el('zoomImage').click();
+  };
   function loadGeoJSON(text) {
     if (draft || magnetic.hasDraft || wand.hasDraft || simplification || reworking()) { message('Bitte zuerst die begonnene Bearbeitung abschließen oder verwerfen.'); return; }
     try {
@@ -479,5 +510,5 @@ export function createDrawingEditor({ map, sourceMap, opacity, canEnter, onModeC
   window.addEventListener('beforeunload', e => {
     if (draft || magnetic.hasDraft || wand.hasDraft || reworking() || JSON.stringify(objects) !== savedObjects) { e.preventDefault(); e.returnValue = ''; }
   });
-  render();
+  setMode(true);
 }
