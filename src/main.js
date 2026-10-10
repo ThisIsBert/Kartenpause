@@ -10,7 +10,7 @@ import {
   Save,
   Scan,
   Trash2,
-  X, Check, MousePointer2, MapPin, Slash, Pentagon, Spline, Circle, Magnet, WandSparkles, MapPinned, Undo2, Redo2
+  X, Check, Search, MousePointer2, MapPin, Slash, Pentagon, Spline, Circle, Magnet, WandSparkles, MapPinned, Undo2, Redo2
 } from 'lucide';
 import { GeoFit } from './geo/geo-fit.js';
 import { ProjectionSearch } from './geo/projection-search.js';
@@ -247,7 +247,7 @@ import { createBasemapRaster } from './drawing/basemap-source.js';
     }
     function showError(err) { ui.notice.textContent = 'Fehler: ' + (err?.message || err); }
 
-    const appIcons = { Crosshair, FolderOpen, MapPinPlus, Pencil, Save, Scan, Trash2, X, Check, MousePointer2, MapPin, Slash, Pentagon, Spline, Circle, Magnet, WandSparkles, MapPinned, Undo2, Redo2 };
+    const appIcons = { Crosshair, FolderOpen, MapPinPlus, Pencil, Save, Scan, Trash2, X, Check, Search, MousePointer2, MapPin, Slash, Pentagon, Spline, Circle, Magnet, WandSparkles, MapPinned, Undo2, Redo2 };
     function icons() { createIcons({ icons: appIcons }); }
     function formatDistance(value) {
       if (!Number.isFinite(value)) return 'nicht berechenbar';

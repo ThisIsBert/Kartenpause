@@ -1,11 +1,27 @@
 // Shared layout controls; map sizing follows the workspace ResizeObserver.
 export function setupWorkspace() {
+  const rail = document.getElementById('toolRail');
+  function positionTooltip() {
+    const railRect = rail.getBoundingClientRect();
+    for (const button of rail.querySelectorAll('.tool-button')) {
+      const tooltip = button.querySelector('.tool-tooltip');
+      if (!tooltip) continue;
+      const rect = button.getBoundingClientRect();
+      tooltip.hidden = rect.bottom <= railRect.top || rect.top >= railRect.bottom;
+      tooltip.style.left = `${railRect.right + 8}px`;
+      tooltip.style.top = `${Math.max(20, Math.min(window.innerHeight - 20, rect.top + rect.height / 2))}px`;
+    }
+  }
+  rail.addEventListener('pointerover', positionTooltip);
+  rail.addEventListener('focusin', positionTooltip);
+  rail.addEventListener('scroll', () => positionTooltip());
+  window.addEventListener('resize', positionTooltip);
   // Keep wheel gestures in the inspector, including inertial events that reach
   // the map immediately after the pointer leaves a scroll boundary.
   let sidebarWheelAt = -Infinity;
   document.addEventListener('wheel', event => {
     const now = performance.now();
-    if (event.target.closest('#sidebar, #drawingSidebar, #toolRail')) {
+    if (event.target.closest('#sidebar, #drawingSidebar, #geoSidebar, #toolRail')) {
       sidebarWheelAt = now;
     } else if (event.target.closest('#workspace') && now - sidebarWheelAt < 220) {
       sidebarWheelAt = now;

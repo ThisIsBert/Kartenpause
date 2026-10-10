@@ -15,6 +15,18 @@ npm.cmd run dev
 
 Vite zeigt anschließend die lokale Adresse an. Ein Produktions-Build entsteht mit `npm.cmd run build` im Verzeichnis `dist/`.
 
+## Geodaten suchen
+
+Das Lupensymbol in der Werkzeugleiste öffnet eine eigene Suchkarte im aktuellen Kartenausschnitt. Die Zeichnung und ihre Ansicht bleiben erhalten. Ab drei Zeichen erscheinen nach einer kurzen Tipp-Pause Ortsvorschläge; Pfeil ab führt zur Trefferliste, Enter wählt einen Treffer. Alternativ auf die Suchkarte klicken. Die Objektliste enthält Objekte in der Nähe und umgebende Gebiete, etwa Verwaltungsgrenzen.
+
+Ein Objekt anklicken, um seine Geometrie orange in der Vorschau zu sehen. Sobald die vollständige Form geladen ist, erscheint direkt neben dem Objektnamen **Auswählen**. Damit wird sie für die Übernahme vorgemerkt; ausgewählte Objekte erscheinen grün und können einzeln aus der Liste entfernt werden. Weitere Suchen behalten diese Auswahl. Bereits geladene Formen bleiben bis zum Schließen der Suche im Speicher. **Fertig** übernimmt alle ausgewählten Objekte als einen rückgängig machbaren Schritt und öffnet das Auswahlwerkzeug. **Abbrechen** verwirft nur die Suchauswahl. Bei einer gefüllten Auswahl muss vor einem Werkzeugwechsel Fertig oder Abbrechen gewählt werden. Es gibt hier keinen separaten GeoJSON-Export; übernommenen Objekten stehen die normalen Bearbeitungs- und Exportwerkzeuge zur Verfügung.
+
+Mehrteilige Geometrien und Löcher bleiben erhalten. Namen, OSM-Eigenschaften, Herkunft und ursprüngliche OSM-ID werden mitgeführt. Bereits vorhandene OSM-IDs werden nicht erneut importiert. Große Relationen zeigen zunächst nur ihre gestrichelte Ausdehnung; daneben erscheint in der Objektliste **Jetzt laden**, anschließend **Auswählen**. Während Suche, Laden und Verarbeitung erscheint der Ladecursor. Statusmeldungen unterscheiden Download, Zusammensetzen, Prüfung und Kartendarstellung; die Worker-Verarbeitung zeigt zusätzlich die vergangene Zeit. Laden und Umwandlung lassen sich abbrechen. Fehlgeschlagene oder unvollständige Antworten werden nicht importiert.
+
+Große Multipolygone werden im Worker über einen Endpunktindex zusammengesetzt. Ein räumlicher Index für die Außenränder beschleunigt die Zuordnung der Löcher, ohne Koordinaten zu vereinfachen. Mehrdeutige Verbindungen verwenden weiterhin den allgemeinen OSM-Konverter. Die Konvertierung wird nach zwei Minuten mit einem Hinweis beendet, statt unbegrenzt ohne Rückmeldung zu warten. `npm.cmd run test:geodata` prüft die Ringzuordnung, Geometrieerhaltung und den Umgang mit unvollständigen Daten.
+
+Die Ortssuche verwendet [Photon](https://github.com/komoot/photon) mit 450 ms Tipp-Pause, höchstens einer neuen Suchanfrage pro Sekunde und einem begrenzten Sitzungscache. Überholte Anfragen werden abgebrochen. Objektlisten und vollständige Formen kommen von Overpass; beide Dienste benötigen Internet. Die öffentlichen Dienste garantieren keine Verfügbarkeit. Für andere Installationen lassen sich die Endpunkte beim Build über `VITE_PHOTON_URL` und `VITE_OVERPASS_URL` ersetzen. Der öffentliche Nominatim-Dienst wird nicht für Autovervollständigung verwendet. Die Daten unterliegen der [OpenStreetMap-Attribution und ODbL](https://www.openstreetmap.org/copyright).
+
 ## Manuell nachzeichnen
 
 Die Anwendung startet direkt mit der Zeichenfläche; eine Pixelkarte ist optional. Links wählst du ein Werkzeug über sein Icon (mit Tooltip), rechts erscheinen Anleitung und Einstellungen. Die Objektliste und Objektbearbeitung gehören zum Werkzeug **Auswahl**. Beim Werkzeugwechsel beginnt die rechte Spalte wieder oben. Nachlaufende Scrollereignisse aus der Werkzeugspalte werden beim Übergang auf die Karte abgefangen. Die rechte Spalte lässt sich am Trennstreifen ziehen oder nach Fokussierung mit den Pfeiltasten verstellen.
@@ -105,6 +117,7 @@ Auswahl und Umrissberechnung laufen im Hintergrund auf der Originalauflösung. D
 - `src/geo/thin-plate-spline.js` korrigiert lokale Restabweichungen auf Grundlage des besten Projektionsmodells.
 - `src/styles.css` enthält das Layout und die Kartendarstellung.
 - `src/drawing/` enthält Zeichenwerkzeuge, Stützpunktbearbeitung und GeoJSON-Geometrien.
+- `src/geodata/` enthält die Suchoberfläche, Photon-/Overpass-Abfragen und die Geometrieumwandlung im Worker (integriert aus dem Ablauf von Ich-Will-Geodaten).
 - `tests/` enthält portable End-to-End- und Zoom-Regressionstests.
 
 ## Testen und veröffentlichen

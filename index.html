@@ -22,9 +22,11 @@
   </div>
   <div class="tool-divider"></div>
   <button id="leaveDrawing" class="tool-button" title="Georeferenzieren" aria-label="Georeferenzieren" aria-pressed="false"><i data-lucide="map-pinned"></i><span class="tool-tooltip">Georeferenzieren</span></button>
+  <button id="openGeodata" class="tool-button" title="Geodaten suchen" aria-label="Geodaten suchen" aria-pressed="false"><i data-lucide="search"></i><span class="tool-tooltip">Geodaten suchen</span></button>
   <button data-tool="files" class="tool-button" title="Import / Export" aria-label="Import / Export" aria-pressed="false"><i data-lucide="folder-open"></i><span class="tool-tooltip">Import / Export</span></button>
 </nav>
 <header id="mapToolbar" aria-label="Kartenansicht">
+  <span id="geoToolbarTitle">Geodaten suchen · OpenStreetMap</span>
   <label for="basemap">Basiskarte</label>
   <select id="basemap"><option value="esriStreet" selected>Esri Straße</option><option value="esriTopo">Esri Topografie</option><option value="osm">OpenStreetMap</option></select>
   <div id="rasterControls" role="group" aria-label="Pixelkarte">
@@ -77,6 +79,7 @@
   </aside>
 
   <main id="workspace">
+    <div id="geoMap" aria-label="Karte zur Geodatensuche" hidden></div>
     <section id="sourcePanel" class="map-panel"><div class="panelbar"><strong>Originalbild</strong><button id="sourceFit" class="icon" title="Ganzes Bild anzeigen" aria-label="Ganzes Bild anzeigen"><i data-lucide="scan"></i></button></div><div id="sourceMap" aria-label="Originalbild mit Referenzpunkten"></div></section>
     <section class="map-panel"><div class="panelbar"><strong>Basiskarte</strong><span id="alignmentLabel">Noch nicht angepasst</span><button id="zoomImage" class="icon" title="Auf die angepasste Vorlage zoomen" aria-label="Auf die angepasste Vorlage zoomen"><i data-lucide="scan"></i></button></div><div id="map" aria-label="Georeferenzierte Karte"></div></section>
   </main>
@@ -175,6 +178,32 @@
     </div>
     <div id="areaActions" class="commands tool-actions" hidden><button id="areaApply" class="primary"><i data-lucide="check"></i> Fertig</button><button id="areaCancel"><i data-lucide="x"></i> Abbrechen</button></div>
     <div id="sectionActions" class="commands tool-actions" hidden><button id="sectionApply" class="primary"><i data-lucide="check"></i> Fertig</button><button id="sectionCancel"><i data-lucide="x"></i> Abbrechen</button></div>
+  </aside>
+  <aside id="geoSidebar" aria-label="Geodaten suchen" hidden>
+    <h1>Geodaten suchen</h1>
+    <p class="hint">Suche einen Ort oder klicke auf die Karte. Wähle aus den dort gefundenen Objekten die Formen aus, die du in deiner Zeichnung weiterbearbeiten möchtest.</p>
+    <form id="geoSearchForm" role="search">
+      <label for="geoQuery">Ort oder Adresse</label>
+      <div class="commands"><input id="geoQuery" type="search" autocomplete="off" placeholder="z. B. Donau, Wien …" aria-controls="geoSuggestions" aria-describedby="geoSearchStatus" /><button type="submit" class="icon" title="Suchen" aria-label="Suchen"><i data-lucide="search"></i></button></div>
+    </form>
+    <p id="geoSearchStatus" class="hint" role="status"></p>
+    <div id="geoSuggestions" class="geo-list" aria-label="Ortsvorschläge"></div>
+    <h2>Objekte am Ort</h2>
+    <div id="geoObjects" class="geo-list" aria-label="Gefundene Geodaten"></div>
+    <p id="geoStatus" role="status"></p>
+    <p id="geoError" role="alert"></p>
+    <button id="geoStop" hidden>Laden abbrechen</button>
+    <section class="geo-preview" aria-label="Objektvorschau">
+      <h2>Vorschau <span class="geo-swatch preview" aria-hidden="true"></span></h2>
+      <p id="geoPreviewName"></p>
+      <div id="geoPreviewDetails"></div>
+      <div id="geoLarge" hidden><p class="hint">Dieses Objekt umfasst einen großen Bereich. Mit „Jetzt laden“ neben dem Objektnamen lädst du die vollständige Form. Die gestrichelte Umrandung allein lässt sich nicht übernehmen.</p></div>
+    </section>
+    <h2><span id="geoChosenCount">Zur Übernahme ausgewählt (0)</span> <span class="geo-swatch chosen" aria-hidden="true"></span></h2>
+    <div id="geoChosen" aria-label="Zur Übernahme ausgewählte Objekte"></div>
+    <p class="hint">„Fertig“ fügt die ausgewählten Objekte deiner Zeichnung hinzu. „Abbrechen“ verwirft diese Auswahl. Deine vorhandenen Objekte bleiben erhalten.</p>
+    <p class="hint geo-attribution">Daten: <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">© OpenStreetMap-Mitwirkende · ODbL</a>. Ortssuche: <a href="https://photon.komoot.io" target="_blank" rel="noopener">Photon</a>.</p>
+    <div class="commands tool-actions"><button id="geoFinish" class="primary" disabled><i data-lucide="check"></i> Fertig</button><button id="geoCancel"><i data-lucide="x"></i> Abbrechen</button></div>
   </aside>
   <script type="module" src="/src/main.js"></script>
 </body>

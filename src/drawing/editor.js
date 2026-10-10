@@ -9,6 +9,7 @@ import { vertexCount, geometryCounts } from './simplification.js';
 import { setBusy } from './busy.js';
 import { linearObject } from './rework-geometry.js';
 import { createSectionEditor } from './section-editor.js';
+import { createGeodataTool } from '../geodata/tool.js';
 
 const labels = { multiLine: 'Mehrteilige Linie', multiPoint: 'Punktgruppe', collection: 'Geometriesammlung', point: 'Punkt', line: 'Linie', polygon: 'Polygon', multiPolygon: 'Mehrteilige Fläche', curve: 'Geschwungene Linie', curvePolygon: 'Geschwungenes Polygon' };
 
@@ -19,6 +20,7 @@ export function createDrawingEditor({ map, sourceMap, canEnter, onModeChange, on
   map.getPane('drawingShapes').style.zIndex = 450;
   const renderer = L.svg({ pane: 'drawingShapes' });
   let drawingView = null, displayedTool = null;
+  let geodata = null;
   const toolLabels = { select: 'Auswahl', point: 'Punkt', line: 'Linie', polygon: 'Polygon', curve: 'Kurve', curvePolygon: 'Kurvenfläche', magnetic: 'Magnetisch zeichnen', wand: 'Zauberstab', section: 'Randabschnitt ersetzen', files: 'Import / Export' };
   let active = false, tool = 'select', objects = [], selectedId = null, vertexIndex = null, draft = null;
   let undo = [], redo = [], layers = new Map();
@@ -57,7 +59,7 @@ export function createDrawingEditor({ map, sourceMap, canEnter, onModeChange, on
       return simplify(dense, Math.max(.001, Math.hypot(a[0] - b[0], a[1] - b[1]) * .15)).slice(0, -1);
     };
     const parts = polygons.map(polygon => ({ vertices: ringToWorld(polygon[0]), holes: polygon.slice(1).map(ringToWorld) }));
-    const object = { id: areaEdit?.id || crypto.randomUUID(), name: areaEdit?.name || `Ausgewählte Fläche ${objects.length + 1}`,
+    const object = { ...(areaEdit?.properties ? { properties: areaEdit.properties } : {}), id: areaEdit?.id || crypto.randomUUID(), name: areaEdit?.name || `Ausgewählte Fläche ${objects.length + 1}`,
       ...(parts.length === 1 ? { kind: 'polygon', ...parts[0] } : { kind: 'multiPolygon', parts }) };
     record();
     if (areaEdit) objects = objects.map(existing => existing.id === areaEdit.id ? object : existing);
@@ -80,7 +82,7 @@ export function createDrawingEditor({ map, sourceMap, canEnter, onModeChange, on
   el('reworkArea').onclick = async () => {
     const original = selected();
     if (!original || !isClosed(original.kind) || simplification || reworking()) return;
-    const object = linearObject(original), session = { id: object.id, name: object.name };
+    const object = linearObject(original), session = { id: object.id, name: object.name, properties: structuredClone(object.properties) };
     areaEdit = session; tool = 'wand'; vertexIndex = null;
     el('wandMode').value = 'add'; render();
     const polygons = polygonParts(object).map(part => [part.vertices, ...(part.holes || [])]);
@@ -97,6 +99,7 @@ export function createDrawingEditor({ map, sourceMap, canEnter, onModeChange, on
   };
 
   function history(from, to) {
+    if (geodata?.active) return;
     if (section.active) { if (from === undo) section.undo(); return; }
     if (simplification) { cancelSimplification(); return; }
     if (tool === 'wand' && (areaEdit || wand.hasDraft || wand.canUndo || wand.canRedo)) { wand.history(from === redo); return; }
@@ -164,14 +167,14 @@ export function createDrawingEditor({ map, sourceMap, canEnter, onModeChange, on
       : tool === 'point' ? 'Auf die Karte klicken, um einen Punkt zu setzen.'
         : `Stützpunkte durch Klicken setzen. ${isClosed(tool) ? 'Mindestens drei' : 'Mindestens zwei'} Punkte. Mit Enter oder „Fertig“ abschließen, Esc bricht ab.`;
     if (section.active) el('drawingHelp').textContent = 'Wähle Anfang und Ende des Randabschnitts und zeichne den neuen Verlauf. Mit „Fertig“ speicherst du ihn; Esc verwirft die Änderungen.';
-    document.querySelectorAll('[data-tool]').forEach(button => { button.setAttribute('aria-pressed', String(active && button.dataset.tool === tool)); button.disabled = reworking(); });
+    document.querySelectorAll('[data-tool]').forEach(button => { button.setAttribute('aria-pressed', String(active && !geodata?.active && button.dataset.tool === tool)); button.disabled = reworking(); });
     map.getContainer().classList.toggle('drawing-crosshair', active && !['select', 'files'].includes(tool));
     el('magneticSettings').hidden = tool !== 'magnetic' && !section.active;
     el('magneticActiveSettings').hidden = tool !== 'magnetic' && !section.magneticMode;
-    magnetic.setEnabled(active && (tool === 'magnetic' || section.magneticMode));
+    magnetic.setEnabled(active && !geodata?.active && (tool === 'magnetic' || section.magneticMode));
     el('magneticClose').hidden = section.active;
     el('wandSettings').hidden = tool !== 'wand';
-    wand.setEnabled(active && tool === 'wand');
+    wand.setEnabled(active && !geodata?.active && tool === 'wand');
     const list = el('drawingObjects'); list.replaceChildren();
     for (const object of objects) {
       const button = document.createElement('button');
@@ -302,6 +305,7 @@ export function createDrawingEditor({ map, sourceMap, canEnter, onModeChange, on
   }
 
   function setMode(value) {
+    if (geodata?.active && !geodata.canLeave()) return;
     if (value && !canEnter()) return;
     if (draft || magnetic.hasDraft || wand.hasDraft || simplification || reworking()) { message('Bitte zuerst die begonnene Form oder Vorschau übernehmen oder verwerfen.'); return; }
     if (active === value) return true;
@@ -350,7 +354,7 @@ export function createDrawingEditor({ map, sourceMap, canEnter, onModeChange, on
   }
 
   function mapClick(e) {
-    if (!active || tool === 'files') return;
+    if (!active || geodata?.active || tool === 'files') return;
     if (simplification) { message('Bitte die Vereinfachung zuerst übernehmen oder verwerfen.'); return; }
     if (section.active) { section.click(e.latlng, e.originalEvent); return; }
     if (tool === 'magnetic') { magnetic.click(e.latlng, e.originalEvent); return; }
@@ -378,6 +382,7 @@ export function createDrawingEditor({ map, sourceMap, canEnter, onModeChange, on
 
   document.querySelectorAll('[data-tool]').forEach(button => {
     button.onclick = () => {
+      if (geodata?.active && !geodata.canLeave()) return;
       if (draft || magnetic.hasDraft || wand.hasDraft || simplification || reworking()) { message('Bitte zuerst die begonnene Form oder Vorschau übernehmen oder verwerfen.'); return; }
       if (!active && !setMode(true)) return;
       tool = button.dataset.tool; selectedId = null; vertexIndex = null; message(''); render();
@@ -447,7 +452,7 @@ export function createDrawingEditor({ map, sourceMap, canEnter, onModeChange, on
     else el('zoomImage').click();
   };
   function loadGeoJSON(text) {
-    if (draft || magnetic.hasDraft || wand.hasDraft || simplification || reworking()) { message('Bitte zuerst die begonnene Bearbeitung abschließen oder verwerfen.'); return; }
+    if (draft || magnetic.hasDraft || wand.hasDraft || simplification || reworking()) { const error = 'Bitte zuerst die begonnene Bearbeitung abschließen oder verwerfen.'; message(error); return { error }; }
     try {
       const imported = importGeoJSON(text, p => project(L.latLng(p[1], p[0])));
       record(); for (const object of imported) objects.push(object);
@@ -457,7 +462,8 @@ export function createDrawingEditor({ map, sourceMap, canEnter, onModeChange, on
       for (const object of imported) for (const ring of objectRings(object)) for (const p of ring) bounds.extend(unproject(p));
       map.fitBounds(bounds, { padding: [30, 30], maxZoom: 16 });
       message(`${imported.length} Objekte importiert. Mit Rückgängig wieder entfernen.`);
-    } catch (error) { message(`Import fehlgeschlagen: ${error.message}`); }
+      return { count: imported.length };
+    } catch (error) { message(`Import fehlgeschlagen: ${error.message}`); return { error: error.message }; }
   }
   el('importDrawing').onclick = () => el('importDrawingFile').click();
   el('importDrawingFile').onchange = async event => {
@@ -486,16 +492,16 @@ export function createDrawingEditor({ map, sourceMap, canEnter, onModeChange, on
   };
   const editingText = target => target instanceof Element && !!target.closest('input, textarea, select, [contenteditable="true"]');
   document.addEventListener('paste', e => {
-    if (!active || editingText(e.target)) return;
+    if (!active || geodata?.active || editingText(e.target)) return;
     e.preventDefault(); loadGeoJSON(e.clipboardData.getData('text/plain'));
   });
   document.addEventListener('copy', e => {
-    if (!active || !selected() || draft || simplification || reworking() || editingText(e.target) || window.getSelection()?.toString()) return;
+    if (!active || geodata?.active || !selected() || draft || simplification || reworking() || editingText(e.target) || window.getSelection()?.toString()) return;
     e.clipboardData.setData('text/plain', JSON.stringify(feature(selected()), null, 2));
     e.preventDefault(); message('Ausgewähltes Objekt als GeoJSON kopiert.');
   });
   document.addEventListener('keydown', e => {
-    if (!active || editingText(e.target)) return;
+    if (!active || geodata?.active || editingText(e.target)) return;
     if (section.active && (e.key === 'Delete' || e.key === 'Backspace')) { e.preventDefault(); section.deleteVertex(); return; }
     if (section.active && e.key === 'Enter') { e.preventDefault(); section.enter(); return; }
     if (e.key === 'Escape' && reworking()) { e.preventDefault(); if (section.active) section.cancel(); else cancelArea(); return; }
@@ -508,7 +514,22 @@ export function createDrawingEditor({ map, sourceMap, canEnter, onModeChange, on
     else if (e.key === 'Delete' || e.key === 'Backspace') { e.preventDefault(); if (vertexIndex !== null) deleteVertex(); else deleteObject(); }
   });
   window.addEventListener('beforeunload', e => {
-    if (draft || magnetic.hasDraft || wand.hasDraft || reworking() || JSON.stringify(objects) !== savedObjects) { e.preventDefault(); e.returnValue = ''; }
+    if (geodata?.hasSelection || draft || magnetic.hasDraft || wand.hasDraft || reworking() || JSON.stringify(objects) !== savedObjects) { e.preventDefault(); e.returnValue = ''; }
   });
+  const sourceIds = () => new Set(objects.map(object => object.properties?.sourceId).filter(Boolean));
+  geodata = createGeodataTool({ drawingMap: map, getSourceIds: sourceIds,
+    onImport(features) {
+      const known = sourceIds();
+      const unique = features.filter(feature => { if (known.has(feature.id)) return false; known.add(feature.id); return true; });
+      if (!unique.length) return { error: 'Diese Objekte sind bereits in der Zeichnung vorhanden.' };
+      return loadGeoJSON(JSON.stringify({ type: 'FeatureCollection', features: unique }));
+    },
+    onClose() { render(); el('drawingSidebar').scrollTop = 0; document.querySelector(`[data-tool="${tool}"]`)?.focus(); }
+  });
+  el('openGeodata').onclick = () => {
+    if (draft || magnetic.hasDraft || wand.hasDraft || simplification || reworking()) { message('Bitte zuerst die begonnene Form oder Vorschau übernehmen oder verwerfen.'); return; }
+    if (!active && !setMode(true)) return;
+    geodata.open(); updateUI();
+  };
   setMode(true);
 }

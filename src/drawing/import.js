@@ -1,6 +1,6 @@
 // Parse completely before changing the drawing: malformed imports are atomic.
 export function importGeoJSON(text, project, makeId = () => crypto.randomUUID()) {
-  const root = JSON.parse(text.replace(/^\uFEFF/, '')), result = [];
+  const root = typeof text === 'string' ? JSON.parse(text.replace(/^\uFEFF/, '')) : text, result = [];
   const point = p => {
     if (!Array.isArray(p) || p.length < 2 || !p.every(Number.isFinite) || Math.abs(p[0]) > 180 || Math.abs(p[1]) >= 90) throw new Error('Ungültige WGS84-Koordinate (Längengrad, Breitengrad).');
     return project(p);

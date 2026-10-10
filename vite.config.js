@@ -11,7 +11,7 @@ export default defineConfig({
       'operation/union/UnaryUnionOp', 'operation/valid/IsValidOp',
       'algorithm/RobustLineIntersector', 'algorithm/InteriorPointArea',
       'algorithm/PointLocation', 'geom/Coordinate', 'geom/Envelope', 'index/strtree/STRtree'
-    ].map(path => `jsts/org/locationtech/jts/${path}.js`)
+    ].map(path => `jsts/org/locationtech/jts/${path}.js`).concat('osmtogeojson')
   },
   build: {
     outDir: 'dist'

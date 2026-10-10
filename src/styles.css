@@ -120,14 +120,15 @@ body, body.drawing-mode {
   color: #243633;
   background: #f3f6f5;
 }
-#toolRail { grid-column: 1; grid-row: 1 / -1; background: #fff; border-right: 1px solid #d8e1de; padding: 10px 7px; display: flex; flex-direction: column; align-items: center; gap: 6px; z-index: 1100; }
+#toolRail { grid-column: 1; grid-row: 1 / -1; min-height: 0; overflow-y: auto; overflow-x: hidden; scrollbar-width: thin; background: #fff; border-right: 1px solid #d8e1de; padding: 10px 7px; display: flex; flex-direction: column; align-items: center; gap: 6px; z-index: 1100; }
+#toolRail > *, #drawingTools { flex-shrink: 0; }
 .brand { display: grid; place-items: center; width: 36px; height: 36px; margin-bottom: 12px; background: #176c65; color: white; border-radius: 10px; font-weight: 750; font-size: 22px; }
 #drawingTools { display: flex; flex-direction: column; gap: 6px; }
 .tool-button { position: relative; display: grid; place-items: center; width: 44px; height: 42px; padding: 10px; border: 1px solid transparent; border-radius: 8px; }
 .tool-button svg { width: 21px; height: 21px; }
 .tool-button[aria-pressed="true"] { color: #105a53; background: #e1f1ed; border-color: #89b7af; box-shadow: inset 3px 0 #176c65; }
 .tool-divider { width: 30px; border-top: 1px solid #d8e1de; margin: 6px 0; }
-.tool-tooltip { position: absolute; left: calc(100% + 12px); top: 50%; transform: translateY(-50%); background: #243633; color: white; border-radius: 5px; padding: 7px 10px; white-space: nowrap; font-size: 13px; pointer-events: none; visibility: hidden; }
+.tool-tooltip { position: fixed; left: 66px; top: 50%; transform: translateY(-50%); background: #243633; color: white; border-radius: 5px; padding: 7px 10px; white-space: nowrap; font-size: 13px; pointer-events: none; visibility: hidden; }
 .tool-button:hover .tool-tooltip, .tool-button:focus-visible .tool-tooltip { visibility: visible; }
 #mapToolbar { grid-column: 2 / -1; grid-row: 1; display: flex; flex-wrap: wrap; align-items: center; gap: 10px; padding: 10px 16px; border-bottom: 1px solid #d8e1de; background: white; font-size: 12px; min-height: 38px; }
 #basemap { width: 158px; font-size: 12px; border: 1px solid #b8c9c4; border-radius: 5px; }
@@ -142,7 +143,7 @@ body, body.drawing-mode {
 .drawing-mode #sourcePanel { display: none; }
 .drawing-mode .map-panel { grid-template-rows: minmax(0, 1fr); }
 .drawing-mode .map-panel > .panelbar { display: none; }
-#sidebar, .drawing-mode #sidebar, #drawingSidebar {
+#sidebar, .drawing-mode #sidebar, #drawingSidebar, #geoSidebar {
   grid-column: 4; grid-row: 2; display: block; height: auto; min-height: 0; padding: 22px 20px;
   border: 0; background: white; transform: none; visibility: visible; transition: none;
 }
@@ -153,7 +154,7 @@ body, body.drawing-mode {
 #drawingStatus:not(:empty) { padding: 10px; border-left: 3px solid #176c65; background: #edf5f2; }
 #drawingStatus:empty { display: none; }
 #drawingActions { margin: 18px 0; }
-#sidebar, #drawingSidebar, #drawingObjects, #toolRail { overscroll-behavior: contain; }
+#sidebar, #drawingSidebar, #geoSidebar, #drawingObjects, #toolRail { overscroll-behavior: contain; }
 .tool-actions, #drawingActions { padding-top: 16px; margin-top: 24px; border-top: 1px solid #d8e1de; }
 #imageFilename { overflow-wrap: anywhere; }
 #drawingObjects { max-height: 32vh; }
@@ -164,7 +165,7 @@ select:focus-visible, #sidebarResize:focus-visible { outline: 3px solid #287ac7;
 @media (max-width: 1000px) {
   body, body.drawing-mode { grid-template-columns: 54px minmax(0, 1fr) 6px min(var(--sidebar-width), 300px); }
   #toolRail { padding-inline: 4px; }
-  #sidebar, #drawingSidebar { padding: 16px 12px; }
+  #sidebar, #drawingSidebar, #geoSidebar { padding: 16px 12px; }
   #mapToolbar { padding: 8px; gap: 8px; }
   #workspace:not(.single) { grid-template-columns: minmax(0, 1fr); grid-template-rows: minmax(0, 1fr) minmax(0, 1fr); }
   .drawing-mode #workspace:not(.single) { grid-template-rows: minmax(0, 1fr); }
@@ -173,9 +174,47 @@ select:focus-visible, #sidebarResize:focus-visible { outline: 3px solid #287ac7;
   body, body.drawing-mode { grid-template-columns: 50px minmax(0, 1fr); grid-template-rows: auto minmax(180px, 1fr) minmax(160px, 38vh); }
   #mapToolbar { grid-column: 2; }
   #workspace, .drawing-mode #workspace { grid-column: 2; grid-row: 2; }
-  #sidebar, .drawing-mode #sidebar, #drawingSidebar { grid-column: 2; grid-row: 3; border-top: 1px solid #d8e1de; }
+  #sidebar, .drawing-mode #sidebar, #drawingSidebar, #geoSidebar { grid-column: 2; grid-row: 3; border-top: 1px solid #d8e1de; }
   #sidebarResize { display: none; }
   #rasterControls { flex-wrap: wrap; border: 0; padding: 0; }
   #toolRail { overflow-y: auto; overflow-x: hidden; }
   #toolRail > *, #drawingTools { flex-shrink: 0; }
 }
+
+/* A separate search map keeps the drawing's view and layers untouched. */
+#workspace { position: relative; }
+#geoMap { position: absolute; inset: 0; z-index: 1000; }
+#geoSidebar { box-sizing: border-box; min-width: 0; overflow: auto; }
+#geoSidebar h1 { font-size: 22px; }
+#geoToolbarTitle { display: none; }
+.geodata-mode #mapToolbar > * { display: none; }
+.geodata-mode #mapToolbar #geoToolbarTitle { display: inline; font-weight: 600; }
+.geodata-mode #drawingSidebar { display: none; }
+.geodata-mode #workspace > .map-panel { visibility: hidden; }
+#geoQuery { min-width: 0; width: 100%; box-sizing: border-box; padding: 9px; font: inherit; border: 1px solid #aeb5bc; border-radius: 4px; }
+#geoSidebar label { font-size: 13px; }
+.geo-list { display: grid; gap: 5px; }
+#geoObjects, #geoSuggestions { max-height: 30vh; overflow: auto; overscroll-behavior: contain; }
+.geo-result { text-align: left; padding: 9px 10px; font-size: 13px; overflow-wrap: anywhere; }
+.geo-result strong, .geo-result span { display: block; }
+.geo-result span { color: #657670; font-size: 11px; margin-top: 4px; }
+.geo-result[aria-pressed="true"] { border-color: #ce4b13; background: #fff5ee; }
+.geo-object-row { display: flex; align-items: center; gap: 6px; }
+.geo-object-row .geo-result { flex: 1; min-width: 0; }
+.geo-object-action { flex: 0 0 auto; width: auto; max-width: 110px; font-size: 12px; }
+#geoObjects:empty::after { content: "Wähle einen Ortsvorschlag oder klicke auf die Karte."; font-size: 13px; color: #657670; }
+#geoStatus:not(:empty), #geoError:not(:empty) { padding: 10px; background: #edf5f2; border-left: 3px solid #176c65; }
+#geoError:not(:empty) { background: #fff2e8; border-color: #ce4b13; }
+#geoStatus:empty, #geoError:empty, #geoSearchStatus:empty { display: none; }
+.geo-preview { border-block: 1px solid #d8e1de; margin-top: 18px; padding-bottom: 16px; }
+.geo-preview h2 { margin-top: 16px; }
+.geo-swatch { display: inline-block; width: 10px; height: 10px; border-radius: 50%; }
+.geo-swatch.preview { background: #ce4b13; }
+.geo-swatch.chosen { background: #176c65; }
+#geoPreviewDetails details { margin-bottom: 12px; }
+#geoPreviewDetails dl { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 2fr); gap: 5px 8px; overflow-wrap: anywhere; }
+#geoPreviewDetails dd { margin: 0; }
+#geoChosen { font-size: 13px; line-height: 1.5; color: #657670; }
+.geo-chosen-row { display: flex; align-items: center; gap: 6px; margin-bottom: 6px; }
+.geo-chosen-name { text-align: left; overflow-wrap: anywhere; border-color: #89b7af; background: #edf5f2; }
+.geo-attribution { font-size: 11px; }
