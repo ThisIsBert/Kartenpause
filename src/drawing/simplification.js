@@ -1,5 +1,6 @@
 import { isClosed, objectRings, polygonParts } from './geometry.js';
 import { simplify } from './simplify-path.js';
+import { linearObject } from './rework-geometry.js';
 
 export const vertexCount = object => objectRings(object).reduce((sum, ring) => sum + ring.length, 0);
 const area = ring => ring.reduce((sum, a, i) => {
@@ -151,6 +152,7 @@ export function simplifyObject(original, amount) {
   const strength = Math.max(0, Math.min(100, Number(amount) || 0)) / 100;
   const clone = () => structuredClone(original);
   if (!strength || original.kind === 'point') return clone();
+  if (objectRings(original).length && (original.curveSegments || original.holeCurveSegments || original.parts?.some(part=>part.curveSegments || part.holeCurveSegments))) original=linearObject(original);
   const result = clone(), closed = isClosed(original.kind);
   const allPoints = objectRings(original).flat();
   const box = bounds(allPoints.map(([x, y]) => ({ minX: x, maxX: x, minY: y, maxY: y })));

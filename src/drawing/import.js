@@ -1,3 +1,4 @@
+import { restoreCurves } from './curve-import.js';
 // Parse completely before changing the drawing: malformed imports are atomic.
 export function importGeoJSON(text, project, makeId = () => crypto.randomUUID()) {
   const root = typeof text === 'string' ? JSON.parse(text.replace(/^\uFEFF/, '')) : text, result = [];
@@ -36,9 +37,9 @@ export function importGeoJSON(text, project, makeId = () => crypto.randomUUID())
   }
   function add(g, properties = {}, sourceId) {
     const extra = structuredClone(properties);
-    for (const key of ['drawingTool', 'controlPoints', 'holeControlPoints', 'partControlPoints', 'interpolation', 'samplesPerSegment']) delete extra[key];
+    for (const key of ['drawingTool', 'controlPoints', 'holeControlPoints', 'partControlPoints', 'interpolation', 'samplesPerSegment', 'curveDefinition']) delete extra[key];
     if (sourceId !== undefined && extra.sourceId === undefined) extra.sourceId = sourceId;
-    result.push({ ...geometry(g), id: makeId(), name: String(properties.name || properties.tags?.name || `Import ${result.length + 1}`), properties: extra });
+    result.push({ ...(restoreCurves(g,properties,project)||geometry(g)), id: makeId(), name: String(properties.name || properties.tags?.name || `Import ${result.length + 1}`), properties: extra });
   }
   function read(value) {
     if (!value || typeof value !== 'object') throw new Error('Kein GeoJSON-Objekt.');

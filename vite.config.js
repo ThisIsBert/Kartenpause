@@ -8,7 +8,7 @@ export default defineConfig({
   optimizeDeps: {
     include: [
       'io/GeoJSONReader', 'io/GeoJSONWriter', 'operation/polygonize/Polygonizer',
-      'operation/union/UnaryUnionOp', 'operation/valid/IsValidOp',
+      'operation/union/UnaryUnionOp', 'operation/overlay/OverlayOp', 'operation/valid/IsValidOp',
       'algorithm/RobustLineIntersector', 'algorithm/InteriorPointArea',
       'algorithm/PointLocation', 'geom/Coordinate', 'geom/Envelope', 'index/strtree/STRtree'
     ].map(path => `jsts/org/locationtech/jts/${path}.js`).concat('osmtogeojson')

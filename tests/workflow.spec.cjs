@@ -255,7 +255,7 @@ test('Zeichenmodus: alle Geometrien bearbeiten, kopieren und exportieren', async
   const map = page.locator('#map');
   // Await the grid transition so the same clicks refer to stable map coordinates.
   await expect.poll(async () => Math.round((await map.boundingBox()).width)).toBe(1014);
-  for (const kind of ['point', 'line', 'polygon', 'curve', 'curvePolygon']) {
+  for (const [index, kind] of ['point', 'line', 'polygon', 'curve', 'curvePolygon'].entries()) {
     await page.locator(`[data-tool="${kind}"]`).click();
     await map.click({ position: { x: 320, y: 300 } });
     if (kind !== 'point') {
@@ -264,8 +264,24 @@ test('Zeichenmodus: alle Geometrien bearbeiten, kopieren und exportieren', async
       await map.click({ position: { x: 600, y: 360 } });
       await page.keyboard.press('Enter');
     }
+    const name = `Test ${kind}`;
+    await page.locator('#drawingName').fill(name);
+    // Clicking Speichern must also commit the currently edited name.
+    const saving = page.waitForEvent('download');
+    await page.locator('#saveSelectedDrawing').click();
+    const saved = await saving;
+    expect(saved.suggestedFilename()).toBe(`${name}.geojson`);
+    const data = JSON.parse(require('node:fs').readFileSync(await saved.path(), 'utf8'));
+    expect(data.type).toBe('FeatureCollection');
+    expect(data.features).toHaveLength(1);
+    expect(data.features[0].properties.name).toBe(name);
+    expect(data.features[0].geometry.type).toBe(['Point', 'LineString', 'Polygon', 'LineString', 'Polygon'][index]);
+    await expect(page.locator('#drawingObjects .drawing-object-select')).toHaveCount(index + 1);
   }
-  await expect(page.locator('#drawingObjects button')).toHaveCount(5);
+  await expect(page.locator('#drawingObjects .drawing-object-select')).toHaveCount(5);
+  await expect(page.locator('#saveSelectedDrawing')).toHaveText('Speichern');
+  await expect(page.locator('#copyDrawing')).toHaveText('In die Zwischenablage kopieren');
+  await expect(page.locator('#deleteVertex')).toHaveCount(0);
   await expect(page.locator('.drawing-vertex')).toHaveCount(3);
   await expect(page.locator('.drawing-midpoint')).toHaveCount(3);
   await page.locator('.drawing-midpoint').last().click();
@@ -285,7 +301,7 @@ test('Zeichenmodus: alle Geometrien bearbeiten, kopieren und exportieren', async
   expect(copied.geometry.type).toBe('Polygon');
   expect(copied.geometry.coordinates[0].length).toBeGreaterThan(100);
   expect(copied.geometry.coordinates[0][0]).toEqual(copied.geometry.coordinates[0].at(-1));
-  await page.locator('#drawingObjects button').first().click();
+  await page.locator('#drawingObjects .drawing-object-select').first().click();
   await page.keyboard.press('Control+c');
   const copiedPoint = JSON.parse(await page.evaluate(() => navigator.clipboard.readText()));
   expect(copiedPoint.geometry.type).toBe('Point');
@@ -300,15 +316,19 @@ test('Zeichenmodus: alle Geometrien bearbeiten, kopieren und exportieren', async
   expect(JSON.parse(await page.evaluate(() => navigator.clipboard.readText())).geometry).toEqual(copiedPoint.geometry);
   await page.locator('#redoDrawing').click();
   await page.locator('#deleteDrawing').click();
-  await expect(page.locator('#drawingObjects button')).toHaveCount(4);
+  await expect(page.locator('#drawingObjects .drawing-object-select')).toHaveCount(4);
   await page.locator('#undoDrawing').click();
-  await expect(page.locator('#drawingObjects button')).toHaveCount(5);
-  await page.locator('#drawingObjects button').last().click();
+  await expect(page.locator('#drawingObjects .drawing-object-select')).toHaveCount(5);
+  await page.locator('#drawingObjects .drawing-object-select').last().click();
   await page.locator('.drawing-vertex').last().click();
-  await page.locator('#deleteVertex').click();
+  await page.keyboard.press('Delete');
   await expect(page.locator('.drawing-vertex')).toHaveCount(3);
-  await expect(page.locator('#deleteVertex')).toBeDisabled();
+  // The minimum vertex count still applies when using the keyboard.
+  await page.locator('.drawing-vertex').last().click();
+  await page.keyboard.press('Backspace');
+  await expect(page.locator('.drawing-vertex')).toHaveCount(3);
   await page.locator('#undoDrawing').click();
+  await page.screenshot({ path: 'output/playwright/drawing-mode.png', fullPage: true });
   const downloadEvent = page.waitForEvent('download');
   await page.locator('[data-tool="files"]').click();
   await page.locator('#saveDrawing').click();
@@ -322,12 +342,11 @@ test('Zeichenmodus: alle Geometrien bearbeiten, kopieren und exportieren', async
     const coordinates = f.geometry.type === 'Point' ? [f.geometry.coordinates] : f.geometry.type === 'Polygon' ? f.geometry.coordinates[0] : f.geometry.coordinates;
     expect(coordinates.every(([lon, lat]) => Number.isFinite(lon) && Math.abs(lon) <= 180 && Number.isFinite(lat) && Math.abs(lat) <= 90)).toBe(true);
   }
-  await page.screenshot({ path: 'output/playwright/drawing-mode.png', fullPage: true });
   await page.locator('#leaveDrawing').click();
   await expect(page.locator('#sidebar')).toBeVisible();
   await expect(page.locator('#map .point-marker:not(.predicted-marker)')).toHaveCount(5);
   await page.locator('#enterDrawing').click();
-  await expect(page.locator('#drawingObjects button')).toHaveCount(5);
+  await expect(page.locator('#drawingObjects .drawing-object-select')).toHaveCount(5);
   await page.locator('[data-tool="polygon"]').click();
   await map.click({ position: { x: 350, y: 450 } });
   await expect(page.locator('#finishDrawing')).toBeDisabled();
@@ -335,7 +354,7 @@ test('Zeichenmodus: alle Geometrien bearbeiten, kopieren und exportieren', async
   await expect(page.locator('#drawingSidebar')).toBeVisible();
   await page.keyboard.press('Escape');
   await expect(page.locator('.drawing-vertex')).toHaveCount(0);
-  await expect(page.locator('#drawingObjects button')).toHaveCount(5);
+  await expect(page.locator('#drawingObjects .drawing-object-select')).toHaveCount(5);
   expect(errors).toEqual([]);
 });
 
@@ -408,7 +427,7 @@ test('Magnetisch: Originalpixel, Pipette, Vorschau, Zwischenanker und Export', a
   await map.click({ position: { x: left + 12, y } });
   await map.click({ position: { x: right - 12, y } });
   await expect(page.locator('#magneticAccept')).toBeEnabled();
-  await expect(page.locator('#drawingObjects button')).toHaveCount(0);
+  await expect(page.locator('#drawingObjects .drawing-object-select')).toHaveCount(0);
   await expect(page.locator('#finishDrawing')).toBeDisabled();
   // Replace the endpoint with a closer intermediate anchor without committing.
   await map.click({ position: { x: middle, y } });
@@ -426,21 +445,21 @@ test('Magnetisch: Originalpixel, Pipette, Vorschau, Zwischenanker und Export', a
   await page.keyboard.press('Enter');
   await expect(page.locator('#finishDrawing')).toBeEnabled();
   await page.locator('#finishDrawing').click();
-  await expect(page.locator('#drawingObjects button')).toHaveCount(1);
+  await expect(page.locator('#drawingObjects .drawing-object-select')).toHaveCount(1);
   await context.grantPermissions(['clipboard-read', 'clipboard-write']);
   await page.locator('#copyDrawing').click();
   const feature = JSON.parse(await page.evaluate(() => navigator.clipboard.readText()));
   expect(feature.geometry.type).toBe('LineString');
   expect(feature.geometry.coordinates.every(p => Math.abs(p[1] - 50) < .15)).toBe(true);
   expect(feature.geometry.coordinates.at(-1)[0] - feature.geometry.coordinates[0][0]).toBeGreaterThan(12);
-  await page.locator('#undoDrawing').click(); await expect(page.locator('#drawingObjects button')).toHaveCount(0);
-  await page.locator('#redoDrawing').click(); await expect(page.locator('#drawingObjects button')).toHaveCount(1);
+  await page.locator('#undoDrawing').click(); await expect(page.locator('#drawingObjects .drawing-object-select')).toHaveCount(0);
+  await page.locator('#redoDrawing').click(); await expect(page.locator('#drawingObjects .drawing-object-select')).toHaveCount(1);
   await page.locator('[data-tool="magnetic"]').click();
   await map.click({ position: { x: left + 12, y } });
   await map.click({ position: { x: right - 12, y } });
   await page.keyboard.press('Escape');
   await expect(page.locator('#magneticSettings')).toBeHidden();
-  await expect(page.locator('#drawingObjects button')).toHaveCount(1);
+  await expect(page.locator('#drawingObjects .drawing-object-select')).toHaveCount(1);
   expect(errors).toEqual([]);
 });
 
@@ -459,10 +478,10 @@ test('Magnetisch: Polygon erst nach bestätigter Schließkante', async ({ page, 
   }
   await page.locator('#magneticClose').click();
   await expect(page.locator('#magneticAccept')).toBeEnabled();
-  await expect(page.locator('#drawingObjects button')).toHaveCount(0);
+  await expect(page.locator('#drawingObjects .drawing-object-select')).toHaveCount(0);
   await page.screenshot({ path: 'output/playwright/magnetic-preview.png', fullPage: true });
   await page.locator('#magneticAccept').click();
-  await expect(page.locator('#drawingObjects button')).toHaveCount(1);
+  await expect(page.locator('#drawingObjects .drawing-object-select')).toHaveCount(1);
   await context.grantPermissions(['clipboard-read', 'clipboard-write']);
   await page.locator('#copyDrawing').click();
   const feature = JSON.parse(await page.evaluate(() => navigator.clipboard.readText()));
@@ -667,7 +686,7 @@ test('Zauberstab: Auswahl, Inseln, Löcher, Korrekturpinsel und bearbeitbarer Ex
   await expect.poll(selectedCount).toBe(removedCount);
   await page.screenshot({ path: 'output/playwright/wand-selection.png', fullPage: true });
   await page.locator('#finishDrawing').click();
-  await expect(page.locator('#drawingObjects button')).toHaveCount(1);
+  await expect(page.locator('#drawingObjects .drawing-object-select')).toHaveCount(1);
   await context.grantPermissions(['clipboard-read', 'clipboard-write']); await page.locator('#copyDrawing').click();
   const before = JSON.parse(await page.evaluate(() => navigator.clipboard.readText()));
   expect(before.geometry.type).toBe('Polygon'); expect(before.geometry.coordinates).toHaveLength(3);
@@ -682,7 +701,7 @@ test('Zauberstab: Auswahl, Inseln, Löcher, Korrekturpinsel und bearbeitbarer Ex
   await page.locator('#wandMode').selectOption('replace'); await page.locator('#wandContiguous').uncheck();
   await map.click({ position: sample }); await expect(page.locator('#finishDrawing')).toBeEnabled();
   await page.locator('#finishDrawing').click();
-  await expect(page.locator('#drawingObjects button')).toHaveCount(2);
+  await expect(page.locator('#drawingObjects .drawing-object-select')).toHaveCount(2);
   await page.locator('#copyDrawing').click();
   const multi = JSON.parse(await page.evaluate(() => navigator.clipboard.readText()));
   expect(multi.geometry.type).toBe('MultiPolygon');
@@ -734,11 +753,11 @@ test('Zauberstab: Auswahl, Inseln, Löcher, Korrekturpinsel und bearbeitbarer Ex
   await page.locator('#copyDrawing').click();
   expect(JSON.parse(await page.evaluate(() => navigator.clipboard.readText()))).toEqual(simplified);
   await page.locator('#deleteDrawing').click();
-  await expect(page.locator('#drawingObjects button')).toHaveCount(1);
+  await expect(page.locator('#drawingObjects .drawing-object-select')).toHaveCount(1);
   await page.locator('[data-tool="wand"]').click();
   await map.click({ position: sample }); await expect(page.locator('#finishDrawing')).toBeEnabled();
   await page.keyboard.press('Escape'); await expect(page.locator('#wandSettings')).toBeHidden();
-  await expect(page.locator('#drawingObjects button')).toHaveCount(1);
+  await expect(page.locator('#drawingObjects .drawing-object-select')).toHaveCount(1);
   expect(errors).toEqual([]);
 });
 
@@ -818,7 +837,7 @@ test('Vereinfachung: große Zauberstab-Objekte begrenzen Griffe und bleiben erne
   await map.click({ position: { x: bounds.left + 1, y: bounds.top + 1 } });
   await expect(page.locator('#finishDrawing')).toBeEnabled();
   await page.locator('#finishDrawing').click();
-  await expect(page.locator('#drawingObjects button')).toHaveCount(1);
+  await expect(page.locator('#drawingObjects .drawing-object-select')).toHaveCount(1);
   await expect(page.locator('#simplifyStatus')).toContainText('2800 Stützpunkte');
   expect(await page.locator('.drawing-vertex, .drawing-midpoint').count()).toBeLessThanOrEqual(600);
   await context.grantPermissions(['clipboard-read', 'clipboard-write']);
@@ -857,7 +876,7 @@ test('GeoJSON: Datei und Zwischenablage, Bearbeiten und exaktes Folgen eines Pol
   await expect.poll(async () => Math.round((await page.locator('#map').boundingBox()).width)).toBe(1014);
   const polygon = { type: 'Feature', properties: { name: 'Quellfläche', category: 'test' }, geometry: { type: 'Polygon', coordinates: [[[0, 0], [1, 0], [1, 1], [.7, 1], [.3, 1], [0, 1], [0, 0]]] } };
   await page.locator('#importDrawingFile').setInputFiles({ name: 'test.geojson', mimeType: 'application/json', buffer: Buffer.from(JSON.stringify(polygon)) });
-  await expect(page.locator('#drawingObjects button')).toHaveCount(1);
+  await expect(page.locator('#drawingObjects .drawing-object-select')).toHaveCount(1);
   const imported = await copiedFeature(page, context);
   expect(imported.properties.category).toBe('test');
   await page.locator('#drawingName').fill('Neue Fläche'); await page.locator('#drawingName').press('Tab');
@@ -879,16 +898,16 @@ test('GeoJSON: Datei und Zwischenablage, Bearbeiten und exaktes Folgen eines Pol
   const coords = line.geometry.coordinates;
   for (const p of coords) expect(p[1]).toBeCloseTo(1, 10);
   for (const x of [.3, .7]) expect(coords.some(p => Math.abs(p[0] - x) < 1e-12)).toBe(true);
-  await expect(page.locator('#drawingObjects button')).toHaveCount(2);
+  await expect(page.locator('#drawingObjects .drawing-object-select')).toHaveCount(2);
   await page.locator('[data-tool="files"]').click();
   await page.locator('#pasteDrawing').click();
-  await expect(page.locator('#drawingObjects button')).toHaveCount(3);
+  await expect(page.locator('#drawingObjects .drawing-object-select')).toHaveCount(3);
   expect((await copiedFeature(page, context)).id).not.toBe(line.id);
   await page.locator('#undoDrawing').click();
-  await expect(page.locator('#drawingObjects button')).toHaveCount(2);
+  await expect(page.locator('#drawingObjects .drawing-object-select')).toHaveCount(2);
   await page.evaluate(() => document.dispatchEvent(new ClipboardEvent('paste', { clipboardData: (() => { const data = new DataTransfer(); data.setData('text/plain', '{broken'); return data; })() })));
   await expect(page.locator('#drawingStatus')).toContainText('Import fehlgeschlagen');
-  await expect(page.locator('#drawingObjects button')).toHaveCount(2);
+  await expect(page.locator('#drawingObjects .drawing-object-select')).toHaveCount(2);
   expect(errors).toEqual([]);
 });
 
@@ -901,7 +920,7 @@ for (const gap of [0, .01]) test(`GeoJSON: Randabschnitt folgt dem Nachbarpolygo
     feature('Quelle', [[0, 0], [1 - gap, 0], [1 - gap, .3], [1 - gap, .7], [1 - gap, 1], [0, 1]])
   ] };
   await page.locator('#importDrawingFile').setInputFiles({ name: 'neighbor.geojson', mimeType: 'application/json', buffer: Buffer.from(JSON.stringify(data)) });
-  await expect(page.locator('#drawingObjects button')).toHaveCount(2);
+  await expect(page.locator('#drawingObjects .drawing-object-select')).toHaveCount(2);
   await page.waitForTimeout(400);
   await page.locator('#reworkSection').click();
   await page.locator('#magneticSource').selectOption('polygon');
@@ -945,7 +964,7 @@ test('Weiterbearbeiten: bestehende Mehrfachfläche mit Pinsel korrigieren, verwe
     await expect(page.locator('#areaApply')).toBeEnabled();
     await expect(page.locator('#wandStatus')).not.toHaveText(before);
     await page.locator(apply ? '#areaApply' : '#areaCancel').click();
-    await expect(page.locator('#drawingObjects button')).toHaveCount(1);
+    await expect(page.locator('#drawingObjects .drawing-object-select')).toHaveCount(1);
     const result = await copiedFeature(page, context);
     expect(result.id).toBe(original.id); expect(result.properties.name).toBe(original.properties.name);
     if (!apply) expect(result).toEqual(original);
@@ -980,7 +999,7 @@ test('Weiterbearbeiten: Randabschnitt zwischen Kantenpunkten manuell ersetzen', 
   const result = await copiedFeature(page, context);
   expect(result.id).toBe(original.id); expect(result.properties.controlPoints).toHaveLength(7);
   for (const point of original.properties.controlPoints) expect(result.properties.controlPoints).toContainEqual(point);
-  await expect(page.locator('#drawingObjects button')).toHaveCount(1);
+  await expect(page.locator('#drawingObjects .drawing-object-select')).toHaveCount(1);
   await page.locator('#undoDrawing').click(); expect(await copiedFeature(page, context)).toEqual(original);
   await page.locator('#redoDrawing').click(); expect(await copiedFeature(page, context)).toEqual(result);
   await page.locator('#reworkSection').click(); await map.click({ position: { x: 600, y: 400 } });
@@ -1033,7 +1052,7 @@ test('Weiterbearbeiten: innerhalb eines Ersatzabschnitts magnetisch und manuell 
   expect(result.id).toBe(original.id); expect(result.geometry.type).toBe('LineString');
   expect(result.geometry.coordinates[0]).toEqual(original.geometry.coordinates[0]);
   expect(result.geometry.coordinates.at(-1)).toEqual(original.geometry.coordinates.at(-1));
-  await expect(page.locator('#drawingObjects button')).toHaveCount(1);
+  await expect(page.locator('#drawingObjects .drawing-object-select')).toHaveCount(1);
   expect(errors).toEqual([]);
 });
 
@@ -1054,7 +1073,7 @@ test('GeoJSON: Fluss als ein Objekt, Punktgruppen und Sammlungen bleiben bearbei
     [[0, 0], [.3, 0], [.5, .5]], [[1, 1], [.7, .5], [.5, .5]]
   ] } };
   await page.locator('#importDrawingFile').setInputFiles({ name: 'river.geojson', mimeType: 'application/json', buffer: Buffer.from(JSON.stringify(river)) });
-  await expect(page.locator('#drawingObjects button')).toHaveCount(1);
+  await expect(page.locator('#drawingObjects .drawing-object-select')).toHaveCount(1);
   expect(rounded((await copiedFeature(page, context)).geometry)).toEqual(river.geometry);
   await page.waitForTimeout(400);
   await page.locator('[data-tool="magnetic"]').click();
@@ -1069,7 +1088,7 @@ test('GeoJSON: Fluss als ein Objekt, Punktgruppen und Sammlungen bleiben bearbei
   const group = { type: 'GeometryCollection', geometries: [{ type: 'MultiPoint', coordinates: [[-.2, 0], [1.2, 1]] }, river.geometry,
     { type: 'Polygon', coordinates: [[[2, 0], [3, 0], [3, 1], [2, 0]]] }] };
   await page.locator('#importDrawingFile').setInputFiles({ name: 'group.geojson', mimeType: 'application/json', buffer: Buffer.from(JSON.stringify(group)) });
-  await expect(page.locator('#drawingObjects button')).toHaveCount(3);
+  await expect(page.locator('#drawingObjects .drawing-object-select')).toHaveCount(3);
   await page.waitForTimeout(400);
   expect(rounded((await copiedFeature(page, context)).geometry)).toEqual(group);
   const handleLocator = page.locator('.drawing-vertex').first();
@@ -1154,4 +1173,124 @@ for (const correction of ['points', 'faces']) test(`Randkorrektur: magnetischen 
   await page.locator('#undoDrawing').click(); expect(await copiedFeature(page, context)).toEqual(original);
   await page.locator('#redoDrawing').click(); expect(await copiedFeature(page, context)).toEqual(result);
   expect(errors).toEqual([]);
+});
+
+test('Flächenoperationen: Mehrfachauswahl, Kombinieren, Subtraktion und Verlauf', async ({ page, context }) => {
+  const errors = []; page.on('pageerror', error => errors.push(error.message));
+  await openApp(page); await page.locator('#enterDrawing').click();
+  const polygon = (name,x) => ({ type:'Feature', properties:{name,custom:name}, geometry:{type:'Polygon',coordinates:[[[x,0],[x+4,0],[x+4,4],[x,4],[x,0]]]}});
+  await page.locator('#importDrawingFile').setInputFiles({name:'areas.geojson',mimeType:'application/json',buffer:Buffer.from(JSON.stringify({type:'FeatureCollection',features:[polygon('A',0),polygon('B',2),{type:'Feature',properties:{name:'Linie'},geometry:{type:'LineString',coordinates:[[0,0],[6,4]]}}]}))});
+  const list=page.locator('#drawingObjects .drawing-object-select');
+  await expect(list).toHaveCount(3); await expect(page.locator('#unionDrawings')).toBeDisabled();
+  const originalA=await copiedFeature(page,context);
+  await list.nth(1).click({modifiers:['Control']});
+  await expect(list.nth(0)).toHaveText('1. A'); await expect(list.nth(1)).toHaveText('2. B');
+  await expect(page.locator('#drawingSelection')).toBeHidden(); await expect(page.locator('.drawing-vertex')).toHaveCount(0);
+  await expect(page.locator('#unionDrawings')).toBeEnabled();
+  await list.nth(2).click({modifiers:['Control']}); await expect(page.locator('#unionDrawings')).toBeDisabled();
+  await expect(list.filter({hasText:/^[123]\. /})).toHaveCount(3);
+  await list.nth(2).click({modifiers:['Control']});
+  await list.nth(1).click({modifiers:['Control']});
+  const secondShape=page.locator('#map .leaflet-drawingShapes-pane path').nth(1);
+  const shapeBox=await secondShape.boundingBox();
+  await secondShape.click({position:{x:shapeBox.width*.9,y:shapeBox.height*.8},modifiers:['Control']});
+  await expect(list.nth(1)).toHaveText('2. B');
+  await page.screenshot({path:'output/playwright/polygon-pair.png',fullPage:true});
+  await page.locator('#unionDrawings').click(); await expect(list).toHaveCount(4);
+  const union=await copiedFeature(page,context); expect(union.properties.name).toBe('A + B'); expect(union.id).not.toBe(originalA.id);
+  expect(union.geometry.type).toBe('Polygon'); expect(Math.max(...union.geometry.coordinates[0].map(p=>p[0]))).toBeCloseTo(6,8);
+  await page.locator('#undoDrawing').click(); await expect(list).toHaveCount(3); await expect(list.nth(1)).toHaveAttribute('aria-pressed','true');
+  await page.locator('#redoDrawing').click(); await expect(list).toHaveCount(4); expect((await copiedFeature(page,context)).id).toBe(union.id);
+  await page.locator('#undoDrawing').click();
+  await page.locator('#subtractDrawings').click(); await expect(list).toHaveCount(4);
+  const difference=await copiedFeature(page,context); expect(difference.properties.name).toBe('A − B');
+  expect(Math.max(...difference.geometry.coordinates[0].map(p=>p[0]))).toBeCloseTo(2,8);
+  await list.nth(0).click(); expect((await copiedFeature(page,context))).toEqual(originalA);
+  await list.nth(1).click(); await list.nth(0).click({modifiers:['Shift']});
+  await expect(list.nth(1)).toHaveText('1. B'); await expect(list.nth(0)).toHaveText('2. A');
+  await page.locator('#subtractDrawings').click(); await expect(list).toHaveCount(5);
+  const reverse=await copiedFeature(page,context); expect(reverse.properties.name).toBe('B − A');
+  expect(Math.min(...reverse.geometry.coordinates[0].map(p=>p[0]))).toBeCloseTo(4,8);
+  await list.nth(0).click(); await list.nth(2).click({modifiers:['Control']});
+  await expect(page.locator('#unionDrawings')).toBeDisabled(); await expect(page.locator('#subtractDrawings')).toBeDisabled();
+  await list.nth(2).click({modifiers:['Control']}); await expect(page.locator('#drawingSelection')).toBeVisible();
+  await list.nth(1).click({modifiers:['Control']}); await list.nth(0).click({modifiers:['Control']});
+  await expect(page.locator('#drawingName')).toHaveValue('B');
+  await page.keyboard.press('Escape'); await expect(page.locator('#drawingObjects .drawing-object-select[aria-pressed="true"]')).toHaveCount(0);
+  expect(errors).toEqual([]);
+});
+
+test('Flächenoperationen: Löcher, leere Ergebnisse, ungültige Flächen und Abbruch', async ({ page, context }) => {
+  await openApp(page); await page.locator('#enterDrawing').click();
+  const polygon = (name,ring) => ({type:'Feature',properties:{name},geometry:{type:'Polygon',coordinates:[ring]}});
+  const outer=[[0,0],[4,0],[4,4],[0,4],[0,0]], inner=[[1,1],[3,1],[3,3],[1,3],[1,1]];
+  await page.locator('#importDrawingFile').setInputFiles({name:'holes.geojson',mimeType:'application/json',buffer:Buffer.from(JSON.stringify({type:'FeatureCollection',features:[polygon('Außen',outer),polygon('Innen',inner),polygon('Gleich',outer),polygon('Ungültig',[[0,0],[4,4],[0,4],[4,0],[0,0]])]}))});
+  const list=page.locator('#drawingObjects .drawing-object-select'); await expect(list).toHaveCount(4);
+  await list.nth(1).click({modifiers:['Control']}); await page.locator('#subtractDrawings').click(); await expect(list).toHaveCount(5);
+  expect((await copiedFeature(page,context)).geometry.coordinates).toHaveLength(2);
+  await page.locator('#undoDrawing').click(); await list.nth(0).click(); await list.nth(2).click({modifiers:['Control']});
+  await page.locator('#subtractDrawings').click(); await expect(page.locator('#drawingStatus')).toContainText('Ergebnis ist leer'); await expect(list).toHaveCount(4);
+  await list.nth(0).click(); await list.nth(3).click({modifiers:['Control']}); await page.locator('#unionDrawings').click();
+  await expect(page.locator('#drawingStatus')).toContainText('ungültigen Rand'); await expect(list).toHaveCount(4);
+  await list.nth(0).click(); await list.nth(1).click({modifiers:['Control']});
+  await page.route('**/src/drawing/polygon-operation-worker.js*',async route=>{await new Promise(resolve=>setTimeout(resolve,2000)); await route.continue().catch(()=>{});});
+  await page.locator('#subtractDrawings').click(); await expect(page.locator('#cancelPolygonOperation')).toBeVisible();
+  await page.keyboard.press('Delete'); await expect(list).toHaveCount(4); await page.keyboard.press('Escape');
+  await expect(page.locator('#cancelPolygonOperation')).toBeHidden(); await expect(page.locator('#drawingStatus')).toContainText('abgebrochen');
+  await expect(page.locator('#unionDrawings')).toBeEnabled(); await expect(list).toHaveCount(4);
+});
+
+
+test('Mehrfachoperationen: drei Flächen, Schnittmenge, XOR und Löschicons',async({page,context})=>{
+  const errors=[];page.on('pageerror',error=>errors.push(error.message));
+  await openApp(page);await page.locator('#enterDrawing').click();
+  const polygon=(name,x)=>({type:'Feature',properties:{name},geometry:{type:'Polygon',coordinates:[[[x,0],[x+4,0],[x+4,4],[x,4],[x,0]]]}});
+  await page.locator('#importDrawingFile').setInputFiles({name:'many.geojson',mimeType:'application/json',buffer:Buffer.from(JSON.stringify({type:'FeatureCollection',features:[polygon('A',0),polygon('B',2),polygon('C',3)]}))});
+  const list=page.locator('#drawingObjects .drawing-object-select');
+  await list.nth(1).click({modifiers:['Control']});await list.nth(2).click({modifiers:['Control']});
+  await expect(list.nth(2)).toHaveText('3. C');
+  for(const id of ['unionDrawings','subtractDrawings','intersectDrawings','xorDrawings'])await expect(page.locator('#'+id)).toBeEnabled();
+  await page.screenshot({path:'output/playwright/multi-selection.png',fullPage:true});
+  await page.locator('#unionDrawings').click();await expect(list).toHaveCount(4);const union=await copiedFeature(page,context);
+  expect(Math.max(...union.geometry.coordinates[0].map(p=>p[0]))).toBeCloseTo(7,8);await page.locator('#undoDrawing').click();
+  await page.locator('#subtractDrawings').click();await expect(list).toHaveCount(4);const subtracted=await copiedFeature(page,context);
+  expect(subtracted.properties.name).toBe('A − (B + C)');expect(Math.max(...subtracted.geometry.coordinates[0].map(p=>p[0]))).toBeCloseTo(2,8);await page.locator('#undoDrawing').click();
+  await page.locator('#intersectDrawings').click();await expect(list).toHaveCount(4);const intersection=await copiedFeature(page,context);
+  expect(Math.min(...intersection.geometry.coordinates[0].map(p=>p[0]))).toBeCloseTo(3,8);expect(Math.max(...intersection.geometry.coordinates[0].map(p=>p[0]))).toBeCloseTo(4,8);await page.locator('#undoDrawing').click();
+  await page.locator('#xorDrawings').click();await expect(list).toHaveCount(4);const xor=await copiedFeature(page,context);
+  expect(xor.geometry.type).toBe('MultiPolygon');expect(xor.geometry.coordinates).toHaveLength(3);await page.locator('#undoDrawing').click();
+  await page.locator('#drawingObjects .drawing-object-delete').nth(1).click();await expect(list).toHaveCount(2);
+  await expect(list.nth(0)).toHaveText('1. A');await expect(list.nth(1)).toHaveText('2. C');
+  await page.locator('#undoDrawing').click();await expect(list).toHaveCount(3);await expect(list.nth(2)).toHaveText('3. C');
+  await list.nth(0).click();await page.locator('#drawingObjects .drawing-object-delete').nth(2).click();await expect(list).toHaveCount(2);await expect(page.locator('#drawingName')).toHaveValue('A');
+  await page.locator('#undoDrawing').click();await expect(list).toHaveCount(3);
+  await page.locator('#redoDrawing').click();await expect(list).toHaveCount(2);expect(errors).toEqual([]);
+});
+
+test('Kurvenerhalt: SVG-Kurve, kompakte Kombination, Bearbeiten und GeoJSON-Wiederladen',async({page,context})=>{
+  const errors=[];page.on('pageerror',error=>errors.push(error.message));
+  await openApp(page);await page.locator('#enterDrawing').click();
+  await expect.poll(async()=>Math.round((await page.locator('#map').boundingBox()).width)).toBe(1014);
+  await page.locator('[data-tool="curvePolygon"]').click();
+  for(const [x,y] of [[320,300],[470,200],[600,300],[470,450]])await page.locator('#map').click({position:{x,y}});
+  await page.keyboard.press('Enter');await expect(page.locator('.drawing-vertex')).toHaveCount(4);
+  await expect(page.locator('#map .leaflet-drawingShapes-pane path').first()).toHaveAttribute('d',/C/);
+  const curve=await copiedFeature(page,context), points=curve.geometry.coordinates[0];
+  const xs=points.map(p=>p[0]),ys=points.map(p=>p[1]);const left=(Math.min(...xs)+Math.max(...xs))/2,right=Math.max(...xs)+1,bottom=Math.min(...ys)-1,top=Math.max(...ys)+1;
+  const cutter={type:'Feature',properties:{name:'Rechteck'},geometry:{type:'Polygon',coordinates:[[[left,bottom],[right,bottom],[right,top],[left,top],[left,bottom]]]}};
+  await page.locator('#importDrawingFile').setInputFiles({name:'rectangle.geojson',mimeType:'application/json',buffer:Buffer.from(JSON.stringify(cutter))});
+  const list=page.locator('#drawingObjects .drawing-object-select');await list.first().click();await list.nth(1).click({modifiers:['Control']});
+  await page.locator('#unionDrawings').click();await expect(list).toHaveCount(3);
+  const count=await page.locator('.drawing-vertex').count();expect(count).toBeLessThanOrEqual(12);expect(count).toBeGreaterThanOrEqual(3);
+  await expect(page.locator('#map .leaflet-drawingShapes-pane path').last()).toHaveAttribute('d',/C/);
+  const combined=await copiedFeature(page,context);expect(combined.properties.curveDefinition.version).toBe(1);
+  await page.locator('.drawing-midpoint').first().click();await expect(page.locator('.drawing-vertex')).toHaveCount(count+1);
+  const before=await copiedFeature(page,context);
+  const handle=await page.locator('.drawing-vertex').first().boundingBox();await page.mouse.move(handle.x+9,handle.y+9);await page.mouse.down();await page.mouse.move(handle.x+35,handle.y+25,{steps:4});await page.mouse.up();
+  expect((await copiedFeature(page,context)).geometry).not.toEqual(before.geometry);await page.locator('#undoDrawing').click();
+  const downloadEvent=page.waitForEvent('download');await page.locator('#saveSelectedDrawing').click();const download=await downloadEvent;const saved=await download.path();
+  page.once('dialog',dialog=>dialog.accept());await page.reload();await expect(page.locator('#drawingSidebar')).toBeVisible();await page.locator('#importDrawingFile').setInputFiles(saved);
+  await expect(page.locator('.drawing-vertex')).toHaveCount(count+1);await expect(page.locator('#map .leaflet-drawingShapes-pane path').first()).toHaveAttribute('d',/C/);
+  expect((await copiedFeature(page,context)).properties.curveDefinition.version).toBe(1);
+  await page.screenshot({path:'output/playwright/curve-preserved.png',fullPage:true});expect(errors).toEqual([]);
 });

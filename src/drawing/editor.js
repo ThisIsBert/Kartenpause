@@ -1,5 +1,7 @@
 import L from 'leaflet';
-import { isClosed, isCurved, minimumPoints, sampledPoints, segmentPoint, toFeature, polygonParts, objectRings, geometryLeaves, ringEntries } from './geometry.js';
+import { createElement, Trash2 } from 'lucide';
+import { curveLayer } from './curve-layer.js';
+import { isClosed, minimumPoints, sampledPoints, edgePoint, splitEdge, removeVertex, sampledRings, toFeature, polygonParts, objectRings, geometryLeaves, ringEntries } from './geometry.js';
 import { createMagneticTool, densifyPixels } from './magnetic.js';
 import { simplify } from './simplify-path.js';
 import { createWand } from './wand.js';
@@ -22,23 +24,24 @@ export function createDrawingEditor({ map, sourceMap, canEnter, onModeChange, on
   let drawingView = null, displayedTool = null;
   let geodata = null;
   const toolLabels = { select: 'Auswahl', point: 'Punkt', line: 'Linie', polygon: 'Polygon', curve: 'Kurve', curvePolygon: 'Kurvenfläche', magnetic: 'Magnetisch zeichnen', wand: 'Zauberstab', section: 'Randabschnitt ersetzen', files: 'Import / Export' };
-  let active = false, tool = 'select', objects = [], selectedId = null, vertexIndex = null, draft = null;
+  let active = false, tool = 'select', objects = [], selectedIds = [], vertexIndex = null, draft = null;
   let undo = [], redo = [], layers = new Map();
   let savedObjects = JSON.stringify(objects);
   let vertexRing = 0;
   let simplification = null, simplifyAmount = 0;
   let simplifyWorker = null, simplifyTimer = null, simplifyBusy = false, simplifyGeneration = 0;
-  let areaEdit = null;
-  const selected = () => objects.find(object => object.id === selectedId);
+  let areaEdit = null, polygonWorker = null;
+  const selection = () => selectedIds.map(id => objects.find(object => object.id === id)).filter(Boolean);
+  const selected = () => selectedIds.length === 1 ? objects.find(object => object.id === selectedIds[0]) : undefined;
   const project = ll => { const p = L.CRS.EPSG3857.project(ll); return [p.x, p.y]; };
   const unproject = p => L.CRS.EPSG3857.unproject(L.point(p));
   const toLonLat = p => { const ll = unproject(p); return [ll.lng, ll.lat]; };
   const feature = object => toFeature(object, toLonLat);
   const message = text => { el('drawingStatus').textContent = text; };
-  const snapshot = () => JSON.stringify({ objects, selectedId });
+  const snapshot = () => JSON.stringify({ objects, selectedIds });
   const record = () => { undo.push(snapshot()); if (undo.length > 100) undo.shift(); redo = []; };
   const magnetic = createMagneticTool({ map, renderer, getOriginalRaster, getBasemapRaster,
-    getObjects: () => objects.filter(object => !section.active || object.id !== selectedId),
+    getObjects: () => objects.filter(object => !section.active || object.id !== selectedIds[0]),
     project, unproject, onState: updateUI, onComplete({ pixels, source, closed }) {
     record();
     const projected = source.vector ? pixels : (source.basemap ? pixels : densifyPixels(pixels)).map(p => project(source.pixelToLatLng(p)));
@@ -49,7 +52,7 @@ export function createDrawingEditor({ map, sourceMap, canEnter, onModeChange, on
     if (closed) vertices = vertices.slice(0, -1);
     if (vertices.length < (closed ? 3 : 2)) { message('Die Form ist zu klein. Bitte weiter auseinanderliegende Anker setzen.'); render(); return; }
     const object = { id: crypto.randomUUID(), kind: closed ? 'polygon' : 'line', name: `Magnetische ${closed ? 'Fläche' : 'Linie'} ${objects.length + 1}`, vertices };
-    objects.push(object); selectedId = object.id; vertexIndex = null; tool = 'select';
+    objects.push(object); selectedIds = [object.id]; vertexIndex = null; tool = 'select';
     message('Magnetische Zeichnung übernommen. Alle Stützpunkte sind bearbeitbar.'); render();
   } });
   const wand = createWand({ map, renderer, getOriginalRaster, onState: updateUI, onComplete({ polygons, source }) {
@@ -64,7 +67,7 @@ export function createDrawingEditor({ map, sourceMap, canEnter, onModeChange, on
     record();
     if (areaEdit) objects = objects.map(existing => existing.id === areaEdit.id ? object : existing);
     else objects.push(object);
-    areaEdit = null; selectedId = object.id; vertexIndex = null; vertexRing = 0; tool = 'select';
+    areaEdit = null; selectedIds = [object.id]; vertexIndex = null; vertexRing = 0; tool = 'select';
     message(`${parts.length} Teilfläche(n) einschließlich ihrer Löcher als ein Objekt übernommen.`); render();
   } });
 
@@ -75,7 +78,7 @@ export function createDrawingEditor({ map, sourceMap, canEnter, onModeChange, on
     },
     onCancel() { tool = 'select'; message('Original unverändert.'); render(); }
   });
-  const reworking = () => !!areaEdit || section.active;
+  const reworking = () => !!areaEdit || section.active || !!polygonWorker;
   function cancelArea() {
     areaEdit = null; tool = 'select'; wand.cancel(); message('Original unverändert.'); render();
   }
@@ -99,7 +102,7 @@ export function createDrawingEditor({ map, sourceMap, canEnter, onModeChange, on
   };
 
   function history(from, to) {
-    if (geodata?.active) return;
+    if (geodata?.active || polygonWorker) return;
     if (section.active) { if (from === undo) section.undo(); return; }
     if (simplification) { cancelSimplification(); return; }
     if (tool === 'wand' && (areaEdit || wand.hasDraft || wand.canUndo || wand.canRedo)) { wand.history(from === redo); return; }
@@ -110,7 +113,7 @@ export function createDrawingEditor({ map, sourceMap, canEnter, onModeChange, on
     }
     if (!from.length) return;
     to.push(snapshot());
-    ({ objects, selectedId } = JSON.parse(from.pop()));
+    ({ objects, selectedIds = [] } = JSON.parse(from.pop()));
     vertexIndex = null; render();
   }
 
@@ -136,7 +139,7 @@ export function createDrawingEditor({ map, sourceMap, canEnter, onModeChange, on
     el('sectionSettings').hidden = !section.active;
     if (section.active) el('sectionConnect').disabled = !section.canConnect;
     el('drawingName').value = object?.name || '';
-    for (const id of ['drawingName', 'copyDrawing', 'deleteDrawing']) el(id).disabled = !!simplification;
+    for (const id of ['drawingName', 'saveSelectedDrawing', 'copyDrawing', 'deleteDrawing']) el(id).disabled = !!simplification;
     el('simplifyDrawing').disabled = !object || geometryLeaves(object).every(part => part.kind === 'point');
     el('simplifyDrawing').value = simplifyAmount;
     el('simplifyValue').textContent = `${simplifyAmount} %`;
@@ -146,8 +149,6 @@ export function createDrawingEditor({ map, sourceMap, canEnter, onModeChange, on
         : `${vertexCount(object)} Stützpunkte. Regler zeigt eine Vorschau; 0 stellt die Ausgangsform wieder her.${vertexCount(object) > 1000 ? ' Bei großen Formen werden Griffe ausgedünnt. Zum Bearbeiten einzelner Punkte hineinzoomen.' : ''}`;
     el('applySimplification').disabled = !simplification || simplifyBusy;
     el('cancelSimplification').disabled = !simplification;
-    const selectedRing = object && objectRings(object)[vertexRing];
-    el('deleteVertex').disabled = !!simplification || vertexIndex === null || !selectedRing || selectedRing.length <= minimumPoints(ringEntries(object)[vertexRing].kind);
     el('finishDrawing').disabled = section.active || (tool === 'wand' ? !wand.canFinish : tool === 'magnetic' ? !magnetic.canFinish : !draft || draft.vertices.length < minimumPoints(draft.kind));
     el('cancelDrawing').disabled = !pending;
     el('undoDrawing').disabled = !undo.length && !draft && !magnetic.canUndo && !simplification && !section.active;
@@ -159,9 +160,16 @@ export function createDrawingEditor({ map, sourceMap, canEnter, onModeChange, on
     el('importDrawing').disabled = pending;
     el('pasteDrawing').disabled = pending;
     el('drawingCount').textContent = `Objekte (${objects.length})`;
+    const chosen = selection(), canCombine = chosen.length >= 2 && chosen.every(object => isClosed(object.kind)) && !pending;
+    for(const id of ['unionDrawings','subtractDrawings','intersectDrawings','xorDrawings']) el(id).disabled=!canCombine;
+    el('cancelPolygonOperation').hidden = !polygonWorker;
+    el('polygonSelectionHelp').textContent = polygonWorker ? 'Berechne Ergebnisfläche … Esc bricht die Berechnung ab.'
+      : chosen.length >= 2 ? chosen.map((object,i)=>`${i+1}: ${object.name}`).join(' · ') + (chosen.every(object=>isClosed(object.kind)) ? '. Subtrahieren zieht alle weiteren Flächen von der ersten ab. Schnittmenge behält nur die gemeinsame Fläche; Exklusiv (XOR) behält Bereiche mit einer ungeraden Anzahl überlagerter Flächen.' : '. Flächenoperationen sind nur für Flächen möglich.') + ' Das Ergebnis wird als neues Objekt angelegt; die Ausgangsobjekte bleiben erhalten.'
+      : 'Weitere Objekte mit Strg/⌘ oder Umschalt anklicken. Das Ergebnis wird als neues Objekt angelegt; die Ausgangsobjekte bleiben erhalten.';
+    if (polygonWorker) el('undoDrawing').disabled = el('redoDrawing').disabled = true;
     el('undoDrawing').title = (draft ? 'Letzten Punkt zurück' : magnetic.hasDraft ? 'Letzten Abschnitt zurück' : wand.hasDraft ? 'Letzte Auswahländerung zurück' : 'Rückgängig') + ' (Strg+Z)';
     el('drawingHelp').textContent = tool === 'files' ? 'Lade vorhandene Objekte oder speichere deine Zeichnung für die Weiterarbeit.' : tool === 'select'
-      ? 'Objekt anklicken. Stützpunkte ziehen; + auf einer Kante fügt einen Punkt hinzu. Stützpunkt anklicken und mit Entf löschen.'
+      ? 'Objekt anklicken; mit Strg/⌘ oder Umschalt weitere auswählen. Stützpunkte ziehen; + fügt einen Punkt hinzu. Stützpunkt anklicken und mit Entf löschen.'
       : tool === 'magnetic' ? 'Enter übernimmt die Vorschau. Ohne Vorschau schließt „Fertig“ die Linie ab. Für Flächen „Polygon schließen“ wählen und die Schließkante bestätigen. Esc bricht die Zeichnung ab.'
       : tool === 'wand' ? 'Farbfläche auswählen und bei Bedarf mit dem Pinsel korrigieren. Fertig übernimmt die Umrisse, Esc verwirft die Auswahl.'
       : tool === 'point' ? 'Auf die Karte klicken, um einen Punkt zu setzen.'
@@ -177,25 +185,69 @@ export function createDrawingEditor({ map, sourceMap, canEnter, onModeChange, on
     wand.setEnabled(active && !geodata?.active && tool === 'wand');
     const list = el('drawingObjects'); list.replaceChildren();
     for (const object of objects) {
-      const button = document.createElement('button');
-      button.textContent = object.name;
-      button.setAttribute('aria-pressed', String(object.id === selectedId));
-      button.onclick = () => select(object.id);
-      list.append(button);
+      const row=document.createElement('div'); row.className='drawing-object-row';
+      const button = document.createElement('button'); button.className='drawing-object-select';
+      const index = chosen.findIndex(item => item.id === object.id);
+      button.textContent = `${chosen.length >= 2 && index !== -1 ? `${index + 1}. ` : ''}${object.name}`;
+      button.setAttribute('aria-pressed', String(index !== -1));
+      button.onclick = event => select(object.id, event.ctrlKey || event.metaKey || event.shiftKey);
+      const remove=document.createElement('button'); remove.className='drawing-object-delete';
+      remove.title=`„${object.name}“ löschen`; remove.setAttribute('aria-label',remove.title); remove.disabled=pending;
+      const icon=createElement(Trash2); icon.setAttribute('aria-hidden','true'); remove.append(icon);
+      remove.onclick=()=>deleteObject(object.id);
+      row.append(button,remove); list.append(row);
     }
   }
 
-  function select(id) {
+  function select(id, additive = false) {
     if (draft || magnetic.hasDraft || wand.hasDraft || simplification || reworking()) { message('Bitte zuerst die begonnene Form oder Vorschau übernehmen oder verwerfen.'); return; }
-    selectedId = id; vertexIndex = null; tool = 'select'; message(''); render();
+    if (!additive) selectedIds=[id];
+    else if (selectedIds.includes(id)) selectedIds=selectedIds.filter(chosen=>chosen!==id);
+    else selectedIds.push(id);
+    vertexIndex=null; tool='select'; message(''); render();
   }
+
+  function stopPolygonOperation() {
+    polygonWorker?.terminate(); polygonWorker = null; setBusy('polygon-operation', false);
+  }
+  function cancelPolygonOperation() {
+    stopPolygonOperation(); message('Flächenberechnung abgebrochen. Ausgangsobjekte unverändert.'); render();
+  }
+  function operatePolygons(operation) {
+    const chosen = selection();
+    if (chosen.length < 2 || !chosen.every(object => isClosed(object.kind)) || draft || magnetic.hasDraft || wand.hasDraft || simplification || reworking()) return;
+    const symbols={union: '+', difference: '−', intersection: '∩', xor: '⊕'};
+    const fail = error => { stopPolygonOperation(); message(`Flächenberechnung fehlgeschlagen: ${error} Die Ausgangsobjekte bleiben erhalten.`); render(); };
+    try {
+      const worker = new Worker(new URL('./polygon-operation-worker.js', import.meta.url), { type: 'module' });
+      polygonWorker = worker; setBusy('polygon-operation', true); vertexIndex = null; render();
+      worker.onmessage = ({ data }) => {
+        if (polygonWorker !== worker) return;
+        if (data.error) { fail(data.error); return; }
+        stopPolygonOperation();
+        if (!data.result) { message('Das Ergebnis ist leer oder enthält keine Fläche; kein neues Objekt angelegt.'); render(); return; }
+        record();
+        const result = { ...data.result, id: crypto.randomUUID(), name: operation==='difference' && chosen.length>2 ? `${chosen[0].name} − (${chosen.slice(1).map(object=>object.name).join(' + ')})` : chosen.map(object=>object.name).join(` ${symbols[operation]} `) };
+        objects.push(result); selectedIds = [result.id]; vertexRing = 0;
+        message(data.result.curveFallback ? 'Ergebnis angelegt. An problematischen Schnittstellen musste der Rand in Stützpunkte umgewandelt werden; die Ausgangskurven bleiben erhalten.' : 'Ergebnis als neues Flächenobjekt angelegt. Kurven bleiben bearbeitbar; die Ausgangsobjekte bleiben erhalten. Mit Rückgängig entfernen.'); render();
+      };
+      worker.onerror = () => { if (polygonWorker === worker) fail('Hintergrundberechnung nicht verfügbar.'); };
+      worker.postMessage({ objects:chosen, operation });
+    } catch (error) { fail(error.message); }
+  }
+  el('unionDrawings').onclick = () => operatePolygons('union');
+  el('subtractDrawings').onclick = () => operatePolygons('difference');
+  el('intersectDrawings').onclick = () => operatePolygons('intersection');
+  el('xorDrawings').onclick = () => operatePolygons('xor');
+  el('cancelPolygonOperation').onclick = cancelPolygonOperation;
 
   function drawShape(object, temporary = false) {
 
-    const style = { renderer, color: object.id === selectedId ? '#ce4b13' : '#176c65', weight: 3,
+    const style = { renderer, color: object.id === selectedIds[0] ? '#ce4b13' : selectedIds.includes(object.id) ? '#287ac7' : '#176c65', weight: 3,
       fillOpacity: .16, bubblingMouseEvents: false, interactive: active && !temporary,
       dashArray: temporary ? '6 6' : undefined };
     const leafLayer = part => {
+      const curved=curveLayer(part,unproject,style); if(curved)return curved;
       const points = sampledPoints(part).map(unproject);
       return part.kind === 'point' ? L.circleMarker(points[0], { ...style, radius: 7, fillOpacity: 1 })
         : isClosed(part.kind) ? L.polygon(polygonLatLngs(part), style) : L.polyline(points, style);
@@ -204,21 +256,21 @@ export function createDrawingEditor({ map, sourceMap, canEnter, onModeChange, on
     layer.addTo(shapes);
     if (!temporary) {
       layers.set(object.id, layer);
-      layer.on('click', e => tool === 'select' ? select(object.id) : mapClick(e));
+      layer.on('click', e => tool === 'select' ? select(object.id, e.originalEvent?.ctrlKey || e.originalEvent?.metaKey || e.originalEvent?.shiftKey) : mapClick(e));
       layer.bindTooltip(() => { const span = document.createElement('span'); span.textContent = object.name; return span; });
     }
     return layer;
   }
 
   function polygonLatLngs(object) {
-    const parts = polygonParts(object).map(part => [sampledPoints({ ...part, kind: object.kind === 'multiPolygon' ? 'polygon' : object.kind }).map(unproject),
-      ...(part.holes || []).map(ring => ring.map(unproject))]);
-    return object.kind === 'multiPolygon' ? parts : parts[0];
+    const parts=polygonParts(object).map(part=>sampledRings({...part,kind:part.kind || (object.kind==='multiPolygon'?'polygon':object.kind)}).map(ring=>ring.map(unproject)));
+    return object.kind==='multiPolygon'?parts:parts[0];
   }
 
   function updateShape(object) {
     const layer = layers.get(object.id);
     const update = (target, part) => {
+      if (target.setGeometry) { target.setGeometry(part); return; }
       if (part.kind === 'point') target.setLatLng(unproject(part.vertices[0]));
       else target.setLatLngs(isClosed(part.kind) ? polygonLatLngs(part) : sampledPoints(part).map(unproject));
     };
@@ -245,12 +297,12 @@ export function createDrawingEditor({ map, sourceMap, canEnter, onModeChange, on
       if (cells.has(cell)) return false;
       cells.add(cell); shown++; return true;
     };
-    ringEntries(object).forEach(({ vertices, kind, partIndex, holeIndex }, index) => {
+    ringEntries(object).forEach(({ vertices, kind, partIndex, holeIndex, shape }, index) => {
       const prefix = `${object.kind === 'multiPolygon' ? `Teilfläche ${partIndex + 1}: ` : ''}${holeIndex ? `Loch ${holeIndex}: ` : ''}`;
-      renderRingHandles(object, vertices, index, prefix, visible, kind);
+      renderRingHandles(object, vertices, index, prefix, visible, kind, shape);
     });
   }
-  function renderRingHandles(object, vertices, ringIndex, prefix, visible, kind = object.kind) {
+  function renderRingHandles(object, vertices, ringIndex, prefix, visible, kind = object.kind, shape = object) {
     const midpointMarkers = [];
     vertices.forEach((point, index) => {
       if (!visible(point, vertexIndex === index && vertexRing === ringIndex)) return;
@@ -270,13 +322,13 @@ export function createDrawingEditor({ map, sourceMap, canEnter, onModeChange, on
     if (kind === 'point') return;
     const count = vertices.length - (isClosed(kind) ? 0 : 1);
     for (let i = 0; i < count; i++) {
-      const point = segmentPoint(vertices, i, .5, isCurved(kind), isClosed(kind));
+      const point = edgePoint(shape, i, .5);
       if (!visible(point)) continue;
       const mid = marker(point, 'drawing-midpoint', `Stützpunkt zwischen ${i + 1} und ${(i + 1) % vertices.length + 1} hinzufügen`, true);
       let inserted = false;
       const insert = () => {
         if (inserted) return;
-        record(); vertices.splice(i + 1, 0, point); vertexIndex = i + 1; vertexRing = ringIndex;
+        record(); splitEdge(shape,i); vertexIndex = i + 1; vertexRing = ringIndex;
         inserted = true;
       };
       mid.on('dragstart', () => {
@@ -335,13 +387,13 @@ export function createDrawingEditor({ map, sourceMap, canEnter, onModeChange, on
     if (tool === 'wand') { wand.finish(); return; }
     if (tool === 'magnetic') { magnetic.finish(); return; }
     if (!draft || draft.vertices.length < minimumPoints(draft.kind)) return;
-    record(); objects.push(draft); selectedId = draft.id; draft = null; vertexIndex = null; tool = 'select';
+    record(); objects.push(draft); selectedIds = [draft.id]; draft = null; vertexIndex = null; tool = 'select';
     message('Objekt angelegt. Die Stützpunkte sind jetzt bearbeitbar.'); render();
   }
 
-  function deleteObject() {
-    if (!selected() || draft || simplification || reworking()) return;
-    record(); objects = objects.filter(object => object.id !== selectedId); selectedId = null; vertexIndex = null;
+  function deleteObject(id=selected()?.id) {
+    if (!objects.some(object=>object.id===id) || draft || magnetic.hasDraft || wand.hasDraft || simplification || reworking()) return;
+    record(); objects=objects.filter(object=>object.id!==id); selectedIds=selectedIds.filter(chosen=>chosen!==id); vertexIndex=null;
     message('Objekt gelöscht. Mit Rückgängig wiederherstellen.'); render();
   }
 
@@ -350,21 +402,21 @@ export function createDrawingEditor({ map, sourceMap, canEnter, onModeChange, on
     if (!object || vertexIndex === null || draft || simplification || reworking()) return;
     const vertices = objectRings(object)[vertexRing];
     if (!vertices || vertices.length <= minimumPoints(ringEntries(object)[vertexRing].kind)) { message('Diese Form benötigt ihre verbleibenden Stützpunkte.'); return; }
-    record(); vertices.splice(vertexIndex, 1); vertexIndex = null; render();
+    record(); removeVertex(ringEntries(object)[vertexRing].shape,vertexIndex); vertexIndex = null; render();
   }
 
   function mapClick(e) {
-    if (!active || geodata?.active || tool === 'files') return;
+    if (!active || geodata?.active || polygonWorker || tool === 'files') return;
     if (simplification) { message('Bitte die Vereinfachung zuerst übernehmen oder verwerfen.'); return; }
     if (section.active) { section.click(e.latlng, e.originalEvent); return; }
     if (tool === 'magnetic') { magnetic.click(e.latlng, e.originalEvent); return; }
     if (tool === 'wand') { wand.click(e.latlng); return; }
-    if (tool === 'select') { selectedId = null; vertexIndex = null; render(); return; }
+    if (tool === 'select') { selectedIds = []; vertexIndex = null; render(); return; }
     // Ignore the second click of a double-click rather than making duplicate vertices.
     if (e.originalEvent?.detail > 1) return;
     const point = project(e.latlng);
     if (!draft) {
-      selectedId = null; vertexIndex = null;
+      selectedIds = []; vertexIndex = null;
       draft = { id: crypto.randomUUID(), kind: tool, name: `${labels[tool]} ${objects.length + 1}`, vertices: [] };
     }
     if (draft.vertices.length && Math.hypot(...point.map((v, i) => v - draft.vertices.at(-1)[i])) < 1e-6) return;
@@ -385,7 +437,7 @@ export function createDrawingEditor({ map, sourceMap, canEnter, onModeChange, on
       if (geodata?.active && !geodata.canLeave()) return;
       if (draft || magnetic.hasDraft || wand.hasDraft || simplification || reworking()) { message('Bitte zuerst die begonnene Form oder Vorschau übernehmen oder verwerfen.'); return; }
       if (!active && !setMode(true)) return;
-      tool = button.dataset.tool; selectedId = null; vertexIndex = null; message(''); render();
+      tool = button.dataset.tool; selectedIds = []; vertexIndex = null; message(''); render();
     };
   });
   el('enterDrawing').onclick = () => setMode(true);
@@ -439,8 +491,7 @@ export function createDrawingEditor({ map, sourceMap, canEnter, onModeChange, on
   };
   el('undoDrawing').onclick = () => history(undo, redo);
   el('redoDrawing').onclick = () => history(redo, undo);
-  el('deleteDrawing').onclick = deleteObject;
-  el('deleteVertex').onclick = deleteVertex;
+  el('deleteDrawing').onclick = () => deleteObject();
   el('drawingName').onchange = () => {
     if (!selected()) return;
     record(); selected().name = el('drawingName').value.trim() || labels[selected().kind]; render();
@@ -456,7 +507,7 @@ export function createDrawingEditor({ map, sourceMap, canEnter, onModeChange, on
     try {
       const imported = importGeoJSON(text, p => project(L.latLng(p[1], p[0])));
       record(); for (const object of imported) objects.push(object);
-      selectedId = imported[0].id; vertexIndex = null; tool = 'select';
+      selectedIds = [imported[0].id]; vertexIndex = null; tool = 'select';
       render();
       const bounds = L.latLngBounds([]);
       for (const object of imported) for (const ring of objectRings(object)) for (const p of ring) bounds.extend(unproject(p));
@@ -475,11 +526,20 @@ export function createDrawingEditor({ map, sourceMap, canEnter, onModeChange, on
     try { loadGeoJSON(await navigator.clipboard.readText()); }
     catch { message('Zwischenablage nicht freigegeben. Bitte auf die Karte klicken und Strg+V verwenden.'); }
   };
-  el('saveDrawing').onclick = () => {
-    const collection = { type: 'FeatureCollection', features: objects.map(feature) };
+  function saveObjects(exportedObjects) {
+    const collection = { type: 'FeatureCollection', features: exportedObjects.map(feature) };
     const url = URL.createObjectURL(new Blob([JSON.stringify(collection, null, 2)], { type: 'application/geo+json' }));
-    const link = document.createElement('a'); link.href = url; link.download = drawingFilename(objects); link.click();
+    const link = document.createElement('a'); link.href = url; link.download = drawingFilename(exportedObjects); link.click();
     setTimeout(() => URL.revokeObjectURL(url), 1000);
+  }
+  el('saveSelectedDrawing').onclick = () => {
+    const object = selected();
+    if (!object || draft || simplification || reworking()) return;
+    saveObjects([object]);
+    message('Ausgewähltes Objekt als GeoJSON gespeichert.');
+  };
+  el('saveDrawing').onclick = () => {
+    saveObjects(objects);
     savedObjects = JSON.stringify(objects);
     message(`${objects.length} Objekte als GeoJSON gespeichert.`);
   };
@@ -502,6 +562,7 @@ export function createDrawingEditor({ map, sourceMap, canEnter, onModeChange, on
   });
   document.addEventListener('keydown', e => {
     if (!active || geodata?.active || editingText(e.target)) return;
+    if (polygonWorker) { if (e.key === 'Escape') { e.preventDefault(); cancelPolygonOperation(); } return; }
     if (section.active && (e.key === 'Delete' || e.key === 'Backspace')) { e.preventDefault(); section.deleteVertex(); return; }
     if (section.active && e.key === 'Enter') { e.preventDefault(); section.enter(); return; }
     if (e.key === 'Escape' && reworking()) { e.preventDefault(); if (section.active) section.cancel(); else cancelArea(); return; }
@@ -510,7 +571,7 @@ export function createDrawingEditor({ map, sourceMap, canEnter, onModeChange, on
     else if (e.key === 'Enter' && tool === 'magnetic') { e.preventDefault(); magnetic.enter(); }
     else if (e.key === 'Enter' && tool === 'wand') { e.preventDefault(); wand.finish(); }
     else if (e.key === 'Enter' && draft) { e.preventDefault(); finish(); }
-    else if (e.key === 'Escape') { if (simplification) { cancelSimplification(); return; } magnetic.cancel(); wand.cancel(); draft = null; selectedId = null; vertexIndex = null; tool = 'select'; message(''); render(); }
+    else if (e.key === 'Escape') { if (simplification) { cancelSimplification(); return; } magnetic.cancel(); wand.cancel(); draft = null; selectedIds = []; vertexIndex = null; tool = 'select'; message(''); render(); }
     else if (e.key === 'Delete' || e.key === 'Backspace') { e.preventDefault(); if (vertexIndex !== null) deleteVertex(); else deleteObject(); }
   });
   window.addEventListener('beforeunload', e => {

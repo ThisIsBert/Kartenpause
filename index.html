@@ -145,13 +145,17 @@
       <p id="wandStatus" role="status" aria-live="polite"></p>
     </div>
     <section id="objectPanel">
+    <div class="commands"><button id="unionDrawings" disabled>Kombinieren</button><button id="subtractDrawings" disabled>Subtrahieren</button></div>
+    <div class="commands"><button id="intersectDrawings" disabled>Schnittmenge</button><button id="xorDrawings" disabled>Exklusiv (XOR)</button></div>
+    <button id="cancelPolygonOperation" hidden>Berechnung abbrechen</button>
+    <p id="polygonSelectionHelp" class="hint" aria-live="polite">Weitere Objekte mit Strg/⌘ oder Umschalt anklicken. Das Ergebnis wird als neues Objekt angelegt; die Ausgangsobjekte bleiben erhalten.</p>
     <h2 id="drawingCount">Objekte (0)</h2>
     <div id="drawingObjects" class="stack" aria-label="Gezeichnete Objekte"></div>
     <fieldset id="drawingSelection" disabled>
       <legend>Ausgewähltes Objekt</legend>
       <label for="drawingName">Name</label><input id="drawingName" type="text" maxlength="200" />
-      <div class="commands"><button id="copyDrawing">Kopieren</button><button id="deleteDrawing">Löschen</button></div>
-      <button id="deleteVertex" disabled>Stützpunkt löschen</button>
+      <div class="commands"><button id="saveSelectedDrawing">Speichern</button><button id="deleteDrawing">Löschen</button></div>
+      <button id="copyDrawing">In die Zwischenablage kopieren</button>
       <button id="reworkArea">Fläche weiterbearbeiten</button>
       <button id="reworkSection">Randabschnitt ersetzen</button>
       <div class="row"><label for="simplifyDrawing">Vereinfachen und glätten</label><output id="simplifyValue">0 %</output></div>
