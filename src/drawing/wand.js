@@ -2,7 +2,7 @@ import L from 'leaflet';
 import { densifyPixels } from './magnetic.js';
 import { setBusy } from './busy.js';
 
-export function createWand({ map, renderer, getOriginalRaster, onState, onComplete }) {
+export function createWand({ map, renderer, getOriginalRaster, getBasemapRaster, onState, onComplete }) {
   const el = id => document.getElementById(id), group = L.layerGroup().addTo(map);
   const canvas = document.createElement('canvas'); canvas.className = 'selection-paint'; canvas.hidden = true; canvas.tabIndex = 0;
   canvas.setAttribute('aria-label', 'Auswahl mit Pinsel bearbeiten'); map.getContainer().append(canvas);
@@ -11,11 +11,29 @@ export function createWand({ map, renderer, getOriginalRaster, onState, onComple
   let renderedPolygons = null;
   let preserveExisting = false;
   let referenceModel = null;
+  let mapMoving = false;
+  const basemapMode = () => el('wandSource').value === 'basemap';
+  const pixelUnit = () => basemapMode() ? 'Kartenpixel' : 'Originalpixel';
+  const sourceInfo = () => source?.basemap ? ` · Basiskarte, Zoom ${source.zoom}` : '';
+  const sourceLocked = () => busy || !!count || !!stroke || !!undo.length || !!redo.length || preserveExisting;
+  map.on('movestart zoomstart', () => { mapMoving = true; });
+  map.on('moveend zoomend', () => {
+    mapMoving = false;
+    if (source?.basemap && !sourceLocked()) releaseSource();
+  });
+  map.on('layeradd layerremove', e => {
+    if (e.layer instanceof L.TileLayer && source?.basemap && !sourceLocked()) releaseSource();
+  });
   const status = text => { el('wandStatus').textContent = text; };
   const painting = () => el('wandMode').value.startsWith('paint');
+  function releaseSource() {
+    generation++; worker?.terminate(); worker = null;
+    source = null; mask = null; cursor = null;
+  }
   function ensureSource() {
     if (!source) {
-      const next = getOriginalRaster();
+      if (basemapMode() && mapMoving) throw new Error('Bitte warten, bis die Kartenbewegung beendet ist.');
+      const next = basemapMode() ? getBasemapRaster() : getOriginalRaster();
       if (next.raster.width * next.raster.height > 25000000) throw new Error('Für die Flächenauswahl bitte eine Vorlage mit höchstens 25 Millionen Pixeln verwenden.');
       source = next; mask = new Uint8Array(source.raster.width * source.raster.height);
     }
@@ -47,6 +65,9 @@ export function createWand({ map, renderer, getOriginalRaster, onState, onComple
     if (wantsPaint && !dragging) { dragging = map.dragging.enabled(); map.dragging.disable(); }
     if (!wantsPaint && dragging) { map.dragging.enable(); dragging = false; }
     el('wandClear').disabled = busy || !mask || !count;
+    el('wandSource').disabled = sourceLocked();
+    el('wandBasemapHint').hidden = !basemapMode();
+    el('wandBrushSizeValue').textContent = `${el('wandBrushSize').value} ${pixelUnit()}`;
     if (renderedPolygons !== polygons || !enabled) {
       renderedPolygons = polygons;
       group.clearLayers();
@@ -67,7 +88,7 @@ export function createWand({ map, renderer, getOriginalRaster, onState, onComple
   function compute(operation, base = mask, saveHistory = true) {
     const id = ++generation, before = snapshot();
     busy = true; startWorker();
-    status(`${count.toLocaleString('de-DE')} Originalpixel ausgewählt · Auswahl wird aus den Originalpixeln berechnet …`); changed();
+    status(`${count.toLocaleString('de-DE')} ${pixelUnit()} ausgewählt${sourceInfo()} · Auswahl wird berechnet …`); changed();
     worker.onmessage = ({ data }) => {
       if (data.id !== generation) return;
       busy = false;
@@ -83,7 +104,7 @@ export function createWand({ map, renderer, getOriginalRaster, onState, onComple
           window.kartenpauseWandDebug = data.debug;
           window.kartenpauseShowWandDebug = async () => (await import('./wand-debug.js')).showWandDebug(window.kartenpauseWandDebug);
         }
-        status(`${count.toLocaleString('de-DE')} Originalpixel ausgewählt · ${polygons.length} Fläche(n). Mit „Fertig“ als ein Objekt übernehmen.`);
+        status(`${count.toLocaleString('de-DE')} ${pixelUnit()} ausgewählt${sourceInfo()} · ${polygons.length} Fläche(n). Mit „Fertig“ als ein Objekt übernehmen.`);
       }
       changed();
     };
@@ -96,10 +117,9 @@ export function createWand({ map, renderer, getOriginalRaster, onState, onComple
     pointer = null; gestures.forEach(handler => handler.enable()); gestures = []; paint();
   }
   function reset() {
-    generation++; worker?.terminate(); worker = null; busy = false; cancelStroke();
+    releaseSource(); busy = false; cancelStroke();
     delete window.kartenpauseWandDebug;
     delete window.kartenpauseShowWandDebug;
-    mask = source ? new Uint8Array(source.raster.width * source.raster.height) : null;
     polygons = []; count = 0; undo = []; redo = []; cursor = null; preserveExisting = false; referenceModel = null; status(''); changed();
   }
   const eventPixel = e => {
@@ -134,6 +154,10 @@ export function createWand({ map, renderer, getOriginalRaster, onState, onComple
   canvas.addEventListener('pointerleave', () => { if (!stroke) { cursor = null; paint(); } });
   for (const name of ['click', 'dblclick', 'mousedown', 'touchstart']) canvas.addEventListener(name, e => e.stopPropagation());
   el('wandMode').onchange = () => { cancelStroke(); changed(); };
+  el('wandSource').onchange = () => {
+    if (sourceLocked()) { el('wandSource').value = source?.basemap ? 'basemap' : 'raster'; return; }
+    reset(); status(basemapMode() ? 'Passend zoomen, dann in die gewünschte Farbfläche der Basiskarte klicken.' : 'In die gewünschte Farbfläche klicken.');
+  };
   el('wandAlgorithm').onchange = () => {
     const intelligent = el('wandAlgorithm').value === 'intelligent';
     el('wandToleranceLabel').textContent = intelligent ? 'Empfindlichkeit' : 'Farbtoleranz';
@@ -141,7 +165,7 @@ export function createWand({ map, renderer, getOriginalRaster, onState, onComple
     el('wandContiguous').closest('label').hidden = intelligent;
     el('wandAlgorithmHint').hidden = !intelligent;
   };
-  el('wandBrushSize').oninput = () => { el('wandBrushSizeValue').textContent = `${el('wandBrushSize').value} Originalpixel`; paint(); };
+  el('wandBrushSize').oninput = () => { el('wandBrushSizeValue').textContent = `${el('wandBrushSize').value} ${pixelUnit()}`; paint(); };
   el('wandTolerance').oninput = () => { el('wandToleranceValue').textContent = el('wandTolerance').value; };
   el('wandClear').onclick = () => { if (mask && !busy) compute({ type: 'restore' }, new Uint8Array(mask.length)); };
   return {
@@ -158,7 +182,7 @@ export function createWand({ map, renderer, getOriginalRaster, onState, onComple
         };
         const pixel = point => {
           const p = source.latLngToPixel(unproject(point), .5);
-          if (!p) throw new Error('Die Fläche liegt teilweise außerhalb der Pixelkarte oder ist nicht rückprojizierbar. Bitte den Randabschnitt-Modus verwenden.');
+          if (!p) throw new Error(source.basemap ? 'Die Fläche liegt teilweise außerhalb des Kartenausschnitts. Bitte die Karte passend ausrichten oder herauszoomen und die Fläche erneut öffnen.' : 'Die Fläche liegt teilweise außerhalb der Pixelkarte oder ist nicht rückprojizierbar. Bitte den Randabschnitt-Modus verwenden.');
           return p;
         };
         const converted = [];
@@ -202,7 +226,7 @@ export function createWand({ map, renderer, getOriginalRaster, onState, onComple
       if (!enabled || busy || painting()) return;
       try {
         ensureSource(); const seed = source.latLngToPixel(ll);
-        if (!seed) { status('Bitte innerhalb der Pixelkarte klicken.'); return; }
+        if (!seed) { status(source.basemap ? 'Bitte innerhalb des beim ersten Klick erfassten Kartenausschnitts klicken. Für einen neuen Ausschnitt die Auswahl abschließen oder abbrechen.' : 'Bitte innerhalb der Pixelkarte klicken.'); return; }
         const operation = { type: 'select', seed, mode: el('wandMode').value, tolerance: Number(el('wandTolerance').value), contiguous: el('wandContiguous').checked,
           algorithm: el('wandAlgorithm').value, debug: window.kartenpauseWandDebugEnabled === true };
         compute(operation);
@@ -213,7 +237,7 @@ export function createWand({ map, renderer, getOriginalRaster, onState, onComple
       const from = forward ? redo : undo, to = forward ? undo : redo;
       if (!from.length) return;
       to.push(snapshot()); ({ mask, polygons, count, referenceModel } = from.pop());
-      status(`${count.toLocaleString('de-DE')} Originalpixel ausgewählt.`); changed();
+      status(`${count.toLocaleString('de-DE')} ${pixelUnit()} ausgewählt${sourceInfo()}.`); changed();
     },
     finish() { if (count && !busy && !stroke) { const result = { polygons, source }; reset(); onComplete(result); } },
     cancel: reset

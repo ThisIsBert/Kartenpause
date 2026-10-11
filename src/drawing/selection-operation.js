@@ -17,7 +17,7 @@ export function createSelectionProcessor(raster) {
       if (data.algorithm === 'intelligent') {
         intelligent ??= prepareIntelligent(raster);
         const result = selectIntelligent(intelligent, data.seed, data.tolerance, data.debug,
-          data.mode === 'add' ? referenceModel : null, data.mode === 'add' ? mask : null);
+          data.mode === 'add' ? referenceModel : null, data.mode === 'add' ? mask : null, { mode: data.mode });
         ({ mask: region, debug } = result);
         if (data.mode !== 'subtract') referenceModel = result.referenceModel;
       } else {

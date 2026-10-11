@@ -565,6 +565,74 @@ test('Intelligenter Zauberstab: Farbgedächtnis, schmaler Seitenarm und atomarer
   expect(errors).toEqual([]);
 });
 
+test('Intelligenter Zauberstab: Basiskarte ohne Pixelvorlage, präzises Abziehen und feste Geografie nach Zoom', async ({ page, context }) => {
+  test.setTimeout(120_000);
+  const errors = []; page.on('pageerror', e => errors.push(e.message));
+  const tile = await page.evaluate(() => {
+    const canvas = document.createElement('canvas'); canvas.width = canvas.height = 256;
+    const ctx = canvas.getContext('2d');
+    ctx.fillStyle = '#decfa3'; ctx.fillRect(0, 0, 256, 256);
+    ctx.fillStyle = '#7ab87d'; ctx.fillRect(80, 80, 96, 96);
+    ctx.fillStyle = '#dc9bab'; ctx.fillRect(125, 95, 3, 60);
+    return canvas.toDataURL().split(',')[1];
+  });
+  await page.route('https://server.arcgisonline.com/**', route => route.fulfill({ contentType: 'image/png', body: Buffer.from(tile, 'base64') }));
+  await page.goto('/');
+  await expect(page.locator('#drawingSidebar')).toBeVisible();
+  const map = page.locator('#map');
+  await expect.poll(async () => Math.round((await map.boundingBox()).width)).toBe(1014);
+  await expect.poll(() => page.locator('#map .leaflet-tile-loaded').count()).toBeGreaterThan(0);
+  const box = await map.boundingBox();
+  let chosen;
+  for (const image of await page.locator('#map .leaflet-tile-loaded').all()) {
+    const b = await image.boundingBox();
+    if (b && b.x > box.x + 60 && b.y > box.y + 60 && b.x + 256 < box.x + box.width && b.y + 256 < box.y + box.height) {
+      chosen = { x: b.x - box.x, y: b.y - box.y, url: await image.getAttribute('src') }; break;
+    }
+  }
+  expect(chosen).toBeTruthy();
+  const [, zoom, tileY, tileX] = chosen.url.match(/\/tile\/(\d+)\/(\d+)\/(\d+)/).map(Number);
+  await page.locator('[data-tool="wand"]').click();
+  await page.locator('#wandSource').selectOption('basemap');
+  await page.locator('#wandAlgorithm').selectOption('intelligent');
+  await setRange(page, '#wandTolerance', 5);
+  await map.click({ position: { x: chosen.x + 100, y: chosen.y + 110 } });
+  await expect(page.locator('#finishDrawing')).toBeEnabled();
+  await expect(page.locator('#wandStatus')).toContainText(`Basiskarte, Zoom ${zoom}`);
+  await expect(page.locator('#wandSource')).toBeDisabled();
+  await expect(page.locator('#wandBrushSizeValue')).toContainText('Kartenpixel');
+  const count = async () => Number((await page.locator('#wandStatus').textContent()).match(/^[\d.]+/)?.[0]?.replaceAll('.', ''));
+  const first = await count(); expect(first).toBe(96 * 96);
+  await page.locator('#wandMode').selectOption('subtract');
+  await map.click({ position: { x: chosen.x + 126, y: chosen.y + 110 } });
+  await expect.poll(count).toBe(first - 3 * 60);
+  await page.locator('#undoDrawing').click(); await expect.poll(count).toBe(first);
+  await page.locator('#redoDrawing').click(); await expect.poll(count).toBe(first - 3 * 60);
+  await page.locator('#map .leaflet-control-zoom-in').click();
+  await page.mouse.move(box.x + 600, box.y + 400); await page.mouse.down();
+  await page.mouse.move(box.x + 680, box.y + 440, { steps: 10 }); await page.mouse.up();
+  await expect.poll(count).toBe(first - 3 * 60);
+  await expect(page.locator('#wandStatus')).toContainText(`Basiskarte, Zoom ${zoom}`);
+  await page.screenshot({ path: 'output/playwright/basemap-wand.png', fullPage: true });
+  await page.locator('#finishDrawing').click();
+  await context.grantPermissions(['clipboard-read', 'clipboard-write']); await page.locator('#copyDrawing').click();
+  const feature = JSON.parse(await page.evaluate(() => navigator.clipboard.readText()));
+  expect(feature.geometry.type).toBe('Polygon'); expect(feature.geometry.coordinates).toHaveLength(2);
+  const ring = feature.geometry.coordinates[0];
+  const longitude = x => x / (256 * 2 ** zoom) * 360 - 180;
+  expect(Math.min(...ring.map(p => p[0]))).toBeCloseTo(longitude(tileX * 256 + 80), 6);
+  expect(Math.max(...ring.map(p => p[0]))).toBeCloseTo(longitude(tileX * 256 + 176), 6);
+  const latitude = y => Math.atan(Math.sinh(Math.PI * (1 - 2 * y / (256 * 2 ** zoom)))) * 180 / Math.PI;
+  expect(Math.max(...ring.map(p => p[1]))).toBeCloseTo(latitude(tileY * 256 + 80), 6);
+  expect(Math.min(...ring.map(p => p[1]))).toBeCloseTo(latitude(tileY * 256 + 176), 6);
+  await page.locator('[data-tool="wand"]').click();
+  await expect(page.locator('#wandSource')).toBeEnabled();
+  await page.locator('#wandSource').selectOption('raster');
+  await map.click({ position: { x: 400, y: 350 } });
+  await expect(page.locator('#wandStatus')).toContainText('Bitte zuerst eine Pixelkarte einpassen');
+  expect(errors).toEqual([]);
+});
+
 test('Intelligenter Zauberstab: Worker, Moduswechsel, Verlauf, Pinsel und MultiPolygon-Export', async ({ page, context }) => {
   const errors = []; page.on('pageerror', e => errors.push(e.message));
   await openApp(page); await loadSyntheticProject(page, false, 'wand');

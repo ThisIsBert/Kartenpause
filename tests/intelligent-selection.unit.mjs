@@ -287,3 +287,46 @@ test('a second click recovers a missed real river branch without learning the gr
   assert.ok(recovered > 250, 'follow the branch beyond the small click probe');
   assert.ok(land < 5, 'do not turn surrounding gray land into the learned color');
 });
+
+for (const thickness of [1, 2, 5]) test(`subtract targets a ${thickness}px clicked strip rather than the surrounding original color`, () => {
+  const r = raster(160, 110, pink);
+  rect(r, 40, 30, 70, thickness, green);
+  rect(r, 40, 65, 70, thickness, green); // Disconnected area of the same color.
+  const process = createSelectionProcessor(r), referenceModel = run(r, [15, 15]).referenceModel;
+  const base = new Uint8Array(r.width * r.height).fill(1);
+  const result = process({ type: 'select', algorithm: 'intelligent', mode: 'subtract', seed: [75, 30],
+    tolerance: 5, mask: base.slice(), referenceModel, debug: true });
+  assert.equal(at(r, result.mask, 75, 30), 0, 'clicked strip removed');
+  assert.equal(at(r, result.mask, 100, 30), 0, 'strip followed beyond click neighborhood');
+  assert.equal(at(r, result.mask, 75, 29), 1, 'original color retained');
+  assert.equal(at(r, result.mask, 75, 65), 1, 'disconnected strip retained');
+  assert.equal(result.count, base.length - 70 * thickness);
+  assert.deepEqual(result.referenceModel, referenceModel, 'subtract never learns a new addition color');
+  assert.notDeepEqual(result.debug.reference.color, referenceModel.color);
+  assert.deepEqual(rasterizePolygons(result.polygons, r.width, r.height), result.mask);
+});
+
+test('precise subtraction retains tiny clicked islands even under heavy feature reduction', () => {
+  const r = raster(320, 240, pink);
+  rect(r, 100, 100, 3, 3, green);
+  const p = prepareIntelligent(r, { maxCoarsePixels: 1200 });
+  assert.ok(p.scale >= 8);
+  const { mask } = selectIntelligent(p, [101, 101], 5, false, null, null, { mode: 'subtract' });
+  assert.equal(total(mask), 9);
+  assert.equal(at(r, mask, 101, 101), 1);
+  assert.equal(at(r, mask, 99, 101), 0);
+});
+
+test('subtraction bridges thin ink inside the clicked fill and stops at transparency or a competing area', () => {
+  const r = raster(160, 110, pink);
+  rect(r, 30, 30, 100, 20, green);
+  rect(r, 70, 30, 2, 20, black);
+  rect(r, 100, 30, 1, 20, [0, 0, 0, 0]);
+  const p = prepareIntelligent(r);
+  const { mask } = selectIntelligent(p, [50, 40], 5, false, null, null, { mode: 'subtract' });
+  assert.equal(at(r, mask, 80, 40), 1);
+  assert.equal(at(r, mask, 70, 40), 1);
+  assert.equal(at(r, mask, 110, 40), 0);
+  assert.equal(at(r, mask, 50, 20), 0);
+  assert.throws(() => selectIntelligent(p, [100, 40], 5, false, null, null, { mode: 'subtract' }), /sichtbare/);
+});

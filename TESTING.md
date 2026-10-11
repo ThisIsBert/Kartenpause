@@ -106,3 +106,9 @@ Wenn bereits ein lokaler Server läuft, kann der Testport separat gewählt werde
 Die Browserprüfung mit kontrollierten Kartenkacheln wurde ohne Pixelvorlage durchgeführt: schwarze Kartenlinie mit blauem kreuzendem Element, Pipette, Übernahme eines Abschnitts bei Zoom 6, Verschieben um 650 Bildschirmpixel, Fortsetzung außerhalb der ersten Aufnahme, anschließend Herauszoomen auf 5 beziehungsweise Hineinzoomen auf 7, Vorschau, Übernahme, GeoJSON-Koordinaten und Rückgängig/Wiederholen. Screenshot: `output/playwright/basemap-pan-zoom.png` und `output/playwright/basemap-pan-zoom-in.png`. Die vier bestehenden Browsertests „Magnetisch:“ prüfen weiterhin den Originalpixelmodus.
 
 Live-Kacheln von Esri Street, Esri Topo und OSM waren in der Prüfungsumgebung nicht erreichbar (Lade-Timeout; auch direkte Abrufe scheiterten). Der tatsächliche Pixelzugriff dieser Anbieter bleibt deshalb vor Ort zu prüfen; die erfolgreiche Browserprüfung verwendete kontrollierte Kachelantworten.
+
+## Präzises Abziehen und Zauberstab auf der Basiskarte
+
+`npm.cmd run test:wand` prüft zusätzlich das Abziehen ein bis fünf Pixel schmaler fremdfarbiger Streifen, getrennte gleichfarbige Regionen, kleine Inseln bei starker Merkmalsreduktion, Überbrücken dünner Überlagerungen, Transparenzgrenzen und Erhalt der Hinzufügen-Farbreferenz.
+
+`npm.cmd run test:ui -- --grep "Intelligenter Zauberstab:|Zauberstab: Auswahl"` prüft die bestehende Pixelkarten-Auswahl sowie Basiskarten ohne Pixelvorlage mit kontrollierten Kachelantworten. Der Basiskartentest prüft gezieltes Abziehen eines drei Pixel schmalen Streifens, Rückgängig/Wiederholen, Quellensperre während der Auswahl und unveränderte geografische Exportkoordinaten nach Zoom und Verschieben. Screenshot: `output/playwright/basemap-wand.png`.

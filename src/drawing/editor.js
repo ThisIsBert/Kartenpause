@@ -52,7 +52,7 @@ export function createDrawingEditor({ map, sourceMap, canEnter, onModeChange, on
     objects.push(object); selectedId = object.id; vertexIndex = null; tool = 'select';
     message('Magnetische Zeichnung übernommen. Alle Stützpunkte sind bearbeitbar.'); render();
   } });
-  const wand = createWand({ map, renderer, getOriginalRaster, onState: updateUI, onComplete({ polygons, source }) {
+  const wand = createWand({ map, renderer, getOriginalRaster, getBasemapRaster, onState: updateUI, onComplete({ polygons, source }) {
     const ringToWorld = ring => {
       const dense = densifyPixels([...ring, ring[0]]).map(p => project(source.pixelToLatLng(p)));
       const a = project(source.pixelToLatLng(ring[0])), b = project(source.pixelToLatLng([ring[0][0] + 1, ring[0][1]]));
