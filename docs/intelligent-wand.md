@@ -20,6 +20,14 @@ Diese Ergänzung wächst direkt auf Originalpixeln und verwendet die bisherige R
 
 Das Modell ist Teil jedes Auswahl-Snapshots. **Rückgängig/Wiederholen** stellt Maske und Farbmodell gemeinsam wieder her; Fehler übernehmen weder Maske noch gelernte Nuancen. Pinsel und intelligentes **Abziehen** verändern die Farbreferenz nicht. Eine vollständig geleerte Auswahl, Abbruch, Abschluss, Laden vorhandener Geometrie oder eine tatsächlich ausgeführte klassische Farbauswahl entfernt die Referenz. Reines Umschalten des Algorithmus verändert sie nicht. **Auswahl ersetzen** definiert eine neue Referenz. Besteht noch kein Modell, legt auch der erste intelligente Hinzufügen-Klick eines an. Farbreferenzen werden nicht in GeoJSON gespeichert.
 
+**Abziehen** verwendet eine eigene, direkt am angeklickten Originalpixel verankerte Farbreferenz. Nur ähnliche Nachbarpixel in einem Radius von zwei Pixeln stabilisieren diese Farbe. Die Umgebungsmehrheit und die gespeicherte Hinzufügen-Farbfamilie bestimmen sie nicht. Die zusammenhängende Kandidatenfläche wächst auf den Originalpixeln, überbrückt dünne Überlagerungen und wird anschließend am Rand verfeinert. Dadurch bleiben auch schmale Streifen und kleine Inseln bei reduzierten Bildmerkmalen anklickbar. Nur die Schnittmenge mit der bestehenden Auswahl wird entfernt; die Hinzufügen-Farbreferenz bleibt erhalten.
+
+## Basiskarte als Quelle
+
+Unter **Fläche auswählen aus → Basiskarte (aktuelle Zoomstufe)** funktioniert der Zauberstab auch ohne Pixelvorlage. Der erste Klick erfasst ausschließlich die geladenen Basiskartenkacheln des sichtbaren Ausschnitts, ohne Zeichnungen, Bildüberlagerung oder Bedienelemente. Erkennung und Pinselgrößen arbeiten dann in Kartenpixeln dieser Zoomstufe. Klassischer und intelligenter Modus verwenden dieselbe Quellenauswahl.
+
+Während einer Auswahl einschließlich ihres Verlaufs bleibt die Aufnahme mit ihrer geografischen Abbildung fest. Verschieben und Zoomen verändern weder Maske noch spätere GeoJSON-Koordinaten. Weitere Korrekturen beziehen sich auf den ursprünglichen Ausschnitt; die Quellenauswahl ist bis zum Abschluss oder Abbruch gesperrt. Eine neue Auswahl erfasst den dann aktuellen Zoom und Ausschnitt. Auch vorhandene Flächen lassen sich auf der Basiskarte weiterbearbeiten, wenn sie vollständig im Ausschnitt liegen. Fehlende oder noch ladende Kacheln und gesperrter Pixelzugriff werden als Statusmeldung angezeigt.
+
 `selection-operation.js` hält nur vorbereitete Bildfeatures im Cache; das Farbmodell wird als explizites `referenceModel` mit dem Auftrag übergeben und zurückgeliefert. Deshalb beeinflussen alte Worker-Aufträge oder zurückgenommene Klicks nicht unbemerkt den nächsten Auftrag.
 
 ### Erste Auswahl und „Auswahl ersetzen“

@@ -129,10 +129,13 @@
       </div>
     </div>
     <div id="wandSettings" hidden>
-      <p class="hint">In eine Farbfläche klicken. Ähnliche Farben werden auf der Originalkarte markiert. Mit dem Pinsel korrigieren und mit „Fertig“ als ein gemeinsames Flächenobjekt übernehmen. Inseln und Löcher bleiben erhalten.</p>
+      <p class="hint">In eine Farbfläche klicken. Mit dem Pinsel korrigieren und mit „Fertig“ als ein gemeinsames Flächenobjekt übernehmen. Inseln und Löcher bleiben erhalten.</p>
+      <label for="wandSource">Fläche auswählen aus</label>
+      <select id="wandSource"><option value="raster">Pixelkarte</option><option value="basemap">Basiskarte (aktuelle Zoomstufe)</option></select>
+      <p id="wandBasemapHint" class="hint" hidden>Vor dem ersten Klick passend zoomen. Die Auswahl nutzt die Basiskarte im dann sichtbaren Ausschnitt und Zoom. Dieser Ausschnitt bleibt bis zum Abschluss oder Abbruch erhalten, auch beim Verschieben und Zoomen. Danach lässt sich ein neuer Ausschnitt auswählen.</p>
       <label for="wandAlgorithm">Erkennung</label>
       <select id="wandAlgorithm"><option value="classic">Klassisch: Farbähnlichkeit</option><option value="intelligent">Intelligent: Fläche erkennen</option></select>
-      <p id="wandAlgorithmHint" class="hint" hidden>Erkennt die Farbfläche und überbrückt dünne Überlagerungen. „Hinzufügen“ ergänzt dieselbe Flächenfarbe und lernt passende Nuancen, auch in schmalen Seitenarmen. „Auswahl ersetzen“ beginnt mit einer neuen Farbe.</p>
+      <p id="wandAlgorithmHint" class="hint" hidden>Erkennt die Farbfläche und überbrückt dünne Überlagerungen. „Hinzufügen“ ergänzt dieselbe Flächenfarbe und lernt passende Nuancen, auch in schmalen Seitenarmen. „Abziehen“ erkennt die direkt angeklickte Farbe unabhängig davon. „Auswahl ersetzen“ beginnt mit einer neuen Farbe.</p>
       <label for="wandMode">Werkzeug</label>
       <select id="wandMode"><option value="replace">Zauberstab: Auswahl ersetzen</option><option value="add">Zauberstab: hinzufügen</option><option value="subtract">Zauberstab: abziehen</option><option value="paintAdd">Pinsel: hinzufügen</option><option value="paintSubtract">Pinsel: entfernen</option></select>
       <div class="row"><label id="wandToleranceLabel" for="wandTolerance">Farbtoleranz</label><output id="wandToleranceValue">18</output></div>

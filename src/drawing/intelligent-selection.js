@@ -58,8 +58,32 @@ function learnAddition(prepared, point, tolerance, reference) {
 }
 
 function growAddition(prepared, seed, tolerance, previousReference, existingMask) {
+  const point = checkedSeed(prepared.raster, seed);
+  const reference = learnAddition(prepared, point, tolerance, previousReference);
+  return growDetail(prepared, point, tolerance, reference, existingMask);
+}
+
+// Subtraction follows the clicked color, even in tiny islands or narrow strips.
+// A neighborhood majority could otherwise replace it with the surrounding fill.
+function growSubtraction(prepared, seed, tolerance) {
+  const { raster } = prepared, point = checkedSeed(raster, seed), [sx, sy] = point;
+  const clicked = lab(raster.data, (sy * raster.width + sx) * 4), samples = [clicked];
+  const clusterRadius = Math.max(2, Math.min(8, tolerance * .4 + 2));
+  for (let y = Math.max(0, sy - 2); y <= Math.min(raster.height - 1, sy + 2); y++) {
+    for (let x = Math.max(0, sx - 2); x <= Math.min(raster.width - 1, sx + 2); x++) {
+      const i = (y * raster.width + x) * 4;
+      if ((x - sx) ** 2 + (y - sy) ** 2 > 4 || raster.data[i + 3] < 128) continue;
+      const color = lab(raster.data, i);
+      if (regionDistance(color, clicked) <= clusterRadius) samples.push(color);
+    }
+  }
+  const color = medianColor(samples);
+  const reference = { color, spread: median(samples.map(p => regionDistance(p, color))) };
+  return growDetail(prepared, point, tolerance, reference);
+}
+
+function growDetail(prepared, point, tolerance, reference, existingMask = null) {
   const { raster, settings } = prepared, { width, height, data } = raster;
-  const point = checkedSeed(raster, seed), reference = learnAddition(prepared, point, tolerance, previousReference);
   const threshold = Math.max(2, tolerance) + Math.min(4, reference.spread * .5);
   const rivals = competingColors(prepared, reference, threshold);
   const mask = new Uint8Array(width * height), states = new Uint8Array(mask.length);
@@ -85,7 +109,7 @@ function growAddition(prepared, seed, tolerance, previousReference, existingMask
     chunks[c][tail++ % chunkSize] = i;
   };
   const first = point[1] * width + point[0];
-  if (state(first) !== 1) throw new Error('Die Farbnuance am Klick ist zu unruhig. Bitte einen benachbarten Punkt im Seitenarm wählen.');
+  if (state(first) !== 1) throw new Error('Die Farbnuance am Klick ist zu unruhig. Bitte einen benachbarten Punkt in der Farbfläche wählen.');
   push(first);
   while (head < tail) {
     const i = chunks[Math.floor(head / chunkSize)][head++ % chunkSize], x = i % width, y = Math.floor(i / width);
@@ -483,8 +507,9 @@ export function refineIntelligent(raster, coarse, reference, threshold, settings
   return { mask, corridor: distance };
 }
 
-export function selectIntelligent(prepared, seed, tolerance = 18, debug = false, previousReference = null, existingMask = null) {
-  const coarse = previousReference ? growAddition(prepared, seed, tolerance, previousReference, existingMask) : growIntelligent(prepared, seed, tolerance);
+export function selectIntelligent(prepared, seed, tolerance = 18, debug = false, previousReference = null, existingMask = null, { mode } = {}) {
+  const coarse = mode === 'subtract' ? growSubtraction(prepared, seed, tolerance)
+    : previousReference ? growAddition(prepared, seed, tolerance, previousReference, existingMask) : growIntelligent(prepared, seed, tolerance);
   const refined = refineIntelligent(prepared.raster, coarse.mask, coarse.reference, coarse.threshold, prepared.settings, coarse.rivals);
   return {
     mask: refined.mask,
