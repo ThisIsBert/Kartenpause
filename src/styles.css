@@ -218,3 +218,8 @@ select:focus-visible, #sidebarResize:focus-visible { outline: 3px solid #287ac7;
 .geo-chosen-row { display: flex; align-items: center; gap: 6px; margin-bottom: 6px; }
 .geo-chosen-name { text-align: left; overflow-wrap: anywhere; border-color: #89b7af; background: #edf5f2; }
 .geo-attribution { font-size: 11px; }
+
+.drawing-object-row { display: flex; gap: 6px; align-items: stretch; }
+.drawing-object-select { flex: 1; min-width: 0; }
+#drawingObjects .drawing-object-delete { width: 36px; flex: 0 0 36px; display: grid; place-items: center; padding: 7px; color: #8a342b; }
+#drawingObjects .drawing-object-delete:hover { background: #fff1ee; border-color: #bf6558; }

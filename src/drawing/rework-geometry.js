@@ -2,12 +2,14 @@ import { isClosed, isCurved, objectRings, sampledPoints, ringEntries } from './g
 
 export function linearObject(object) {
   const result = structuredClone(object);
-  if (result.parts) result.parts = result.parts.map(linearObject);
-  if (isCurved(object.kind)) {
+  if (result.parts) result.parts = result.parts.map(part=>linearObject({ ...part, kind:part.kind || (object.kind==='multiPolygon'?'polygon':object.kind==='multiPoint'?'point':'line') }));
+  if (isCurved(object.kind) || object.curveSegments?.some(Boolean)) {
     result.vertices = sampledPoints(object);
     if (isClosed(object.kind)) result.vertices.pop();
     result.kind = isClosed(object.kind) ? 'polygon' : 'line';
   }
+  if (object.holes) result.holes=object.holes.map((vertices,i)=>sampledPoints({kind:'polygon',vertices,curveSegments:object.holeCurveSegments?.[i]}).slice(0,-1));
+  delete result.curveSegments; delete result.holeCurveSegments;
   return result;
 }
 
