@@ -55,6 +55,24 @@ function contains(ring, [x, y]) {
   return inside;
 }
 
+// At a diagonal contact, one walk can trace both the outside and a touching
+// hole. Split at repeated grid vertices so each output ring stays simple.
+// The directed edges (and therefore every selected pixel) are unchanged.
+function splitContacts(ring) {
+  const path = [], positions = new Map(), rings = [];
+  for (const point of [...ring, ring[0]]) {
+    const key = point.join(','), start = positions.get(key);
+    if (start !== undefined) {
+      rings.push(path.slice(start));
+      for (const p of path.slice(start + 1)) positions.delete(p.join(','));
+      path.length = start + 1;
+    } else {
+      positions.set(key, path.length); path.push(point);
+    }
+  }
+  return rings;
+}
+
 export function selectionPolygons(mask, width, height) {
   const edges = [], starts = new Map(), stride = width + 1;
   const edge = (x, y, nx, ny, direction) => {
@@ -88,11 +106,13 @@ export function selectionPolygons(mask, width, height) {
       if (!candidates.length) throw new Error('Der Auswahlrand konnte nicht geschlossen werden.');
       current = candidates[0];
     } while (true);
-    const reduced = ring.filter((p, i) => {
-      const a = ring[(i - 1 + ring.length) % ring.length], b = ring[(i + 1) % ring.length];
-      return (p[0] - a[0]) * (b[1] - p[1]) !== (p[1] - a[1]) * (b[0] - p[0]);
-    });
-    if (reduced.length >= 3) rings.push({ ring: reduced, area: area(reduced) });
+    for (const simple of splitContacts(ring)) {
+      const reduced = simple.filter((p, i) => {
+        const a = simple[(i - 1 + simple.length) % simple.length], b = simple[(i + 1) % simple.length];
+        return (p[0] - a[0]) * (b[1] - p[1]) !== (p[1] - a[1]) * (b[0] - p[0]);
+      });
+      if (reduced.length >= 3) rings.push({ ring: reduced, area: area(reduced) });
+    }
   }
   const outers = rings.filter(r => r.area > 0).map(r => ({ ...r, holes: [] }));
   for (const hole of rings.filter(r => r.area < 0)) {

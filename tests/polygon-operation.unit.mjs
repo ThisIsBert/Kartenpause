@@ -2,6 +2,8 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { combinePolygons, operatePolygons } from '../src/drawing/polygon-operation.js';
 import { toFeature } from '../src/drawing/geometry.js';
+import GeoJSONReader from 'jsts/org/locationtech/jts/io/GeoJSONReader.js';
+import IsValidOp from 'jsts/org/locationtech/jts/operation/valid/IsValidOp.js';
 const rect = (x, y, w, h) => ({ kind: 'polygon', vertices: [[x,y], [x+w,y], [x+w,y+h], [x,y+h]] });
 const ringArea = ring => Math.abs(ring.reduce((sum,p,i) => { const q=ring[(i+1)%ring.length]; return sum+p[0]*q[1]-q[0]*p[1]; },0))/2;
 const area = object => { if (!object) return 0; const g=toFeature(object,p=>p).geometry; return (g.type==='Polygon'?[g.coordinates]:g.coordinates).reduce((sum,rings)=>sum+ringArea(rings[0])-rings.slice(1).reduce((n,r)=>n+ringArea(r),0),0); };
@@ -54,4 +56,34 @@ test('multiple polygons support union, first minus all others, intersection and 
   assert.equal(area(operatePolygons([objects[0],objects[0]],'xor')),0);
   assert.equal(operatePolygons([rect(0,0,1,1),rect(1,0,1,1)],'intersection'),null);
   assert.equal(operatePolygons([rect(0,0,1,1),rect(10,0,1,1)],'intersection'),null);
+});
+
+test('self-touching raster boundaries forming a hole work without losing area or changing inputs', () => {
+  const touching = { id: 'wand', name: 'Zauberstab', kind: 'polygon',
+    vertices: [[0,0],[4,0],[4,4],[0,4],[0,2],[1,3],[2,2],[1,1],[0,2]] };
+  const enclosing = rect(-1,-1,6,6), before = structuredClone(touching);
+  const expected = { union: 36, difference: 22, intersection: 14, xor: 22 };
+  for (const [operation, expectedArea] of Object.entries(expected)) {
+    const result = combinePolygons(enclosing, touching, operation);
+    assert.equal(area(result), expectedArea);
+    assert.equal(new IsValidOp(new GeoJSONReader().read(toFeature(result,p=>p).geometry)).isValid(), true);
+  }
+  assert.equal(combinePolygons(touching, touching, 'difference'), null);
+  assert.deepEqual(touching, before);
+});
+
+test('real crossings and misplaced holes report the object, reason and exact location', () => {
+  const crossing = { id: 'crossing', name: 'Kreuzung', kind: 'polygon', vertices: [[0,0],[4,4],[0,4],[4,0]] };
+  assert.throws(() => combinePolygons(rect(-1,-1,6,6), crossing, 'difference'), error => {
+    assert.match(error.message, /Kreuzung.*ungültigen Rand/);
+    const [issue] = error.issues;
+    assert.equal(issue.objectId, crossing.id); assert.equal(issue.objectName, crossing.name);
+    assert.deepEqual(issue.point, [2,2]); assert.ok(issue.segments.length >= 2);
+    assert.match(issue.reason, /kreuzen/); return true;
+  });
+  const outsideHole = { ...rect(0,0,4,4), name:'Falsches Loch', holes:[rect(5,5,1,1).vertices] };
+  assert.throws(() => combinePolygons(rect(-1,-1,8,8), outsideHole, 'union'), error => {
+    assert.match(error.message, /Loch liegt außerhalb/);
+    assert.ok(error.issues[0].point); return true;
+  });
 });

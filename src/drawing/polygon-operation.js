@@ -4,6 +4,28 @@ import OverlayOp from 'jsts/org/locationtech/jts/operation/overlay/OverlayOp.js'
 import IsValidOp from 'jsts/org/locationtech/jts/operation/valid/IsValidOp.js';
 import { isClosed, toFeature, hasCurves } from './geometry.js';
 import { curveReconstructor } from './curve-reconstruction.js';
+import { linearObject } from './rework-geometry.js';
+import { normalizePolygonContacts, sectionIntersections } from './section-geometry.js';
+
+const validationReasons = [
+  'Ungültige Flächengeometrie', 'Wiederholter Randpunkt', 'Loch liegt außerhalb des Außenrands',
+  'Ineinanderliegende Löcher', 'Flächeninneres ist getrennt', 'Randabschnitte kreuzen sich oder überlagern sich',
+  'Rand berührt oder kreuzt sich selbst', 'Ineinanderliegende Teilflächen', 'Doppelter Rand',
+  'Zu wenige unterschiedliche Randpunkte', 'Ungültige Koordinate', 'Rand ist nicht geschlossen'
+];
+
+function invalidBoundary(object, validation, linear) {
+  const detail = validation.getValidationError(), coordinate = detail?.getCoordinate();
+  const point = coordinate ? [coordinate.x, coordinate.y] : null;
+  const reason = validationReasons[detail?.getErrorType()] || validationReasons[0];
+  const nearby = point ? sectionIntersections(linear).filter(issue =>
+    Math.hypot(issue.point[0] - point[0], issue.point[1] - point[1]) < 1e-7) : [];
+  const issue = { point, reason, objectId: object.id, objectName: object.name,
+    segments: nearby.flatMap(issue => issue.segments || []) };
+  const error = new Error(`Die Fläche „${object.name || 'Unbenannt'}“ hat einen ungültigen Rand: ${reason}. Bitte zuerst korrigieren.`);
+  error.issues = [issue];
+  return error;
+}
 
 // Calculate in the same projected plane used to display and edit the objects.
 // toFeature samples curved boundaries without changing the source vertices.
@@ -16,8 +38,13 @@ export function operatePolygons(objects, operation) {
   if (objects.length<2 || objects.some(object=>!object || !isClosed(object.kind))) throw new Error('Bitte mindestens zwei Flächen auswählen.');
   const reader=new GeoJSONReader(),writer=new GeoJSONWriter();
   const inputs=objects.map(object=>{
-    const geometry=reader.read(toFeature(object,p=>p).geometry);
-    if(!new IsValidOp(geometry).isValid())throw new Error('Eine ausgewählte Fläche hat einen ungültigen Rand. Bitte zuerst korrigieren.');
+    let geometry=reader.read(toFeature(object,p=>p).geometry);
+    const validation = new IsValidOp(geometry);
+    if (!validation.isValid()) {
+      const linear = linearObject(object), normalized = normalizePolygonContacts(linear);
+      if (!normalized) throw invalidBoundary(object, validation, linear);
+      geometry = reader.read(toFeature(normalized,p=>p).geometry);
+    }
     return geometry;
   });
   let geometry=inputs[0];

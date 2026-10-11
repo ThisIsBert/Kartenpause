@@ -17,7 +17,7 @@ const labels = { multiLine: 'Mehrteilige Linie', multiPoint: 'Punktgruppe', coll
 
 export function createDrawingEditor({ map, sourceMap, canEnter, onModeChange, onCancelGeoreference, getOriginalRaster, getBasemapRaster }) {
   const el = id => document.getElementById(id);
-  const shapes = L.layerGroup().addTo(map), handles = L.layerGroup().addTo(map);
+  const shapes = L.layerGroup().addTo(map), handles = L.layerGroup().addTo(map), polygonIssueLayer = L.layerGroup().addTo(map);
   map.createPane('drawingShapes');
   map.getPane('drawingShapes').style.zIndex = 450;
   const renderer = L.svg({ pane: 'drawingShapes' });
@@ -30,7 +30,7 @@ export function createDrawingEditor({ map, sourceMap, canEnter, onModeChange, on
   let vertexRing = 0;
   let simplification = null, simplifyAmount = 0;
   let simplifyWorker = null, simplifyTimer = null, simplifyBusy = false, simplifyGeneration = 0;
-  let areaEdit = null, polygonWorker = null;
+  let areaEdit = null, polygonWorker = null, polygonIssues = [];
   const selection = () => selectedIds.map(id => objects.find(object => object.id === id)).filter(Boolean);
   const selected = () => selectedIds.length === 1 ? objects.find(object => object.id === selectedIds[0]) : undefined;
   const project = ll => { const p = L.CRS.EPSG3857.project(ll); return [p.x, p.y]; };
@@ -39,7 +39,7 @@ export function createDrawingEditor({ map, sourceMap, canEnter, onModeChange, on
   const feature = object => toFeature(object, toLonLat);
   const message = text => { el('drawingStatus').textContent = text; };
   const snapshot = () => JSON.stringify({ objects, selectedIds });
-  const record = () => { undo.push(snapshot()); if (undo.length > 100) undo.shift(); redo = []; };
+  const record = () => { clearPolygonIssues(); undo.push(snapshot()); if (undo.length > 100) undo.shift(); redo = []; };
   const magnetic = createMagneticTool({ map, renderer, getOriginalRaster, getBasemapRaster,
     getObjects: () => objects.filter(object => !section.active || object.id !== selectedIds[0]),
     project, unproject, onState: updateUI, onComplete({ pixels, source, closed }) {
@@ -112,6 +112,7 @@ export function createDrawingEditor({ map, sourceMap, canEnter, onModeChange, on
       return;
     }
     if (!from.length) return;
+    clearPolygonIssues();
     to.push(snapshot());
     ({ objects, selectedIds = [] } = JSON.parse(from.pop()));
     vertexIndex = null; render();
@@ -163,6 +164,7 @@ export function createDrawingEditor({ map, sourceMap, canEnter, onModeChange, on
     const chosen = selection(), canCombine = chosen.length >= 2 && chosen.every(object => isClosed(object.kind)) && !pending;
     for(const id of ['unionDrawings','subtractDrawings','intersectDrawings','xorDrawings']) el(id).disabled=!canCombine;
     el('cancelPolygonOperation').hidden = !polygonWorker;
+    el('showPolygonIssue').hidden = !active || tool !== 'select' || !polygonIssues.some(issue => issue.point);
     el('polygonSelectionHelp').textContent = polygonWorker ? 'Berechne Ergebnisfläche … Esc bricht die Berechnung ab.'
       : chosen.length >= 2 ? chosen.map((object,i)=>`${i+1}: ${object.name}`).join(' · ') + (chosen.every(object=>isClosed(object.kind)) ? '. Subtrahieren zieht alle weiteren Flächen von der ersten ab. Schnittmenge behält nur die gemeinsame Fläche; Exklusiv (XOR) behält Bereiche mit einer ungeraden Anzahl überlagerter Flächen.' : '. Flächenoperationen sind nur für Flächen möglich.') + ' Das Ergebnis wird als neues Objekt angelegt; die Ausgangsobjekte bleiben erhalten.'
       : 'Weitere Objekte mit Strg/⌘ oder Umschalt anklicken. Das Ergebnis wird als neues Objekt angelegt; die Ausgangsobjekte bleiben erhalten.';
@@ -210,20 +212,47 @@ export function createDrawingEditor({ map, sourceMap, canEnter, onModeChange, on
   function stopPolygonOperation() {
     polygonWorker?.terminate(); polygonWorker = null; setBusy('polygon-operation', false);
   }
+  function clearPolygonIssues() {
+    polygonIssues = []; polygonIssueLayer.clearLayers();
+  }
+  function renderPolygonIssues() {
+    polygonIssueLayer.clearLayers();
+    if (!active || geodata?.active || tool !== 'select') return;
+    for (const issue of polygonIssues) {
+      for (const edge of issue.segments || []) L.polyline(edge.map(unproject), {
+        renderer, color: '#c22', weight: 4, dashArray: '3 5', interactive: false
+      }).addTo(polygonIssueLayer);
+      if (issue.point) {
+        const label = document.createElement('span');
+        label.textContent = `${issue.objectName || 'Fläche'}: ${issue.reason}`;
+        L.circleMarker(unproject(issue.point), { renderer, radius: 10, color: '#c22',
+          weight: 3, fillOpacity: .15, interactive: false, className: 'polygon-issue'
+        }).bindTooltip(label, { permanent: true, direction: 'right', className: 'section-issue' }).addTo(polygonIssueLayer);
+      }
+    }
+  }
+  el('showPolygonIssue').onclick = () => {
+    const points = polygonIssues.flatMap(issue => [...(issue.point ? [issue.point] : []), ...(issue.segments || []).flat()]);
+    if (points.length) map.fitBounds(L.latLngBounds(points.map(unproject)), { padding: [80, 80], maxZoom: 16, animate: false });
+  };
   function cancelPolygonOperation() {
     stopPolygonOperation(); message('Flächenberechnung abgebrochen. Ausgangsobjekte unverändert.'); render();
   }
   function operatePolygons(operation) {
     const chosen = selection();
     if (chosen.length < 2 || !chosen.every(object => isClosed(object.kind)) || draft || magnetic.hasDraft || wand.hasDraft || simplification || reworking()) return;
+    clearPolygonIssues();
     const symbols={union: '+', difference: '−', intersection: '∩', xor: '⊕'};
-    const fail = error => { stopPolygonOperation(); message(`Flächenberechnung fehlgeschlagen: ${error} Die Ausgangsobjekte bleiben erhalten.`); render(); };
+    const fail = (error, issues = []) => {
+      stopPolygonOperation(); polygonIssues = issues;
+      message(`Flächenberechnung fehlgeschlagen: ${error}${issues.some(issue => issue.point) ? ' Die Fehlerstelle ist rot markiert; „Fehlerstelle anzeigen“ zoomt dorthin.' : ''} Die Ausgangsobjekte bleiben erhalten.`); render();
+    };
     try {
       const worker = new Worker(new URL('./polygon-operation-worker.js', import.meta.url), { type: 'module' });
       polygonWorker = worker; setBusy('polygon-operation', true); vertexIndex = null; render();
       worker.onmessage = ({ data }) => {
         if (polygonWorker !== worker) return;
-        if (data.error) { fail(data.error); return; }
+        if (data.error) { fail(data.error, data.issues); return; }
         stopPolygonOperation();
         if (!data.result) { message('Das Ergebnis ist leer oder enthält keine Fläche; kein neues Objekt angelegt.'); render(); return; }
         record();
@@ -353,7 +382,7 @@ export function createDrawingEditor({ map, sourceMap, canEnter, onModeChange, on
       drawShape(draft, true);
       draft.vertices.forEach((point, i) => marker(point, 'drawing-vertex draft', `Neuer Stützpunkt ${i + 1}`));
     }
-    updateUI();
+    renderPolygonIssues(); updateUI();
   }
 
   function setMode(value) {

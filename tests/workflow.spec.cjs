@@ -1300,12 +1300,41 @@ test('Flächenoperationen: Löcher, leere Ergebnisse, ungültige Flächen und Ab
   await page.locator('#subtractDrawings').click(); await expect(page.locator('#drawingStatus')).toContainText('Ergebnis ist leer'); await expect(list).toHaveCount(4);
   await list.nth(0).click(); await list.nth(3).click({modifiers:['Control']}); await page.locator('#unionDrawings').click();
   await expect(page.locator('#drawingStatus')).toContainText('ungültigen Rand'); await expect(list).toHaveCount(4);
+  await expect(page.locator('#drawingStatus')).toContainText('Ungültig');
+  await expect(page.locator('.polygon-issue')).toHaveCount(1);
+  await expect(page.locator('#showPolygonIssue')).toBeVisible();
+  await page.locator('#showPolygonIssue').click();
+  await expect(page.locator('.polygon-issue')).toBeVisible();
+  await expect(page.locator('#map .section-issue')).toContainText('Ungültig');
   await list.nth(0).click(); await list.nth(1).click({modifiers:['Control']});
   await page.route('**/src/drawing/polygon-operation-worker.js*',async route=>{await new Promise(resolve=>setTimeout(resolve,2000)); await route.continue().catch(()=>{});});
   await page.locator('#subtractDrawings').click(); await expect(page.locator('#cancelPolygonOperation')).toBeVisible();
+  await expect(page.locator('.polygon-issue')).toHaveCount(0);
+  await expect(page.locator('#showPolygonIssue')).toBeHidden();
   await page.keyboard.press('Delete'); await expect(list).toHaveCount(4); await page.keyboard.press('Escape');
   await expect(page.locator('#cancelPolygonOperation')).toBeHidden(); await expect(page.locator('#drawingStatus')).toContainText('abgebrochen');
   await expect(page.locator('#unionDrawings')).toBeEnabled(); await expect(list).toHaveCount(4);
+});
+
+test('Flächenoperationen: Zauberstab-Rand mit punktförmig anliegendem Loch lässt sich abziehen', async ({ page, context }) => {
+  const errors=[]; page.on('pageerror',error=>errors.push(error.message));
+  await openApp(page); await page.locator('#enterDrawing').click();
+  const polygon = (name, vertices) => ({ type:'Feature', properties:{name}, geometry:{type:'Polygon',coordinates:[[...vertices,vertices[0]]]}});
+  const source=polygon('Ausgangsfläche',[[-1,-1],[5,-1],[5,5],[-1,5]]);
+  const wand=polygon('Zauberstab',[[0,0],[4,0],[4,4],[0,4],[0,2],[1,3],[2,2],[1,1],[0,2]]);
+  await page.locator('#importDrawingFile').setInputFiles({name:'touching-hole.geojson',mimeType:'application/json',buffer:Buffer.from(JSON.stringify({type:'FeatureCollection',features:[source,wand]}))});
+  const list=page.locator('#drawingObjects .drawing-object-select');
+  await list.nth(1).click(); const original = await copiedFeature(page,context);
+  await list.nth(0).click();
+  await list.nth(1).click({modifiers:['Control']}); await page.locator('#subtractDrawings').click();
+  await expect(list).toHaveCount(3); await expect(page.locator('#drawingStatus')).toContainText('Ergebnis als neues Flächenobjekt');
+  const result=await copiedFeature(page,context);
+  expect(result.geometry.type).toBe('MultiPolygon'); expect(result.geometry.coordinates).toHaveLength(2);
+  await page.locator('#undoDrawing').click(); await expect(list).toHaveCount(2);
+  await list.nth(1).click(); const unchanged=await copiedFeature(page,context);
+  expect(unchanged.geometry).toEqual(original.geometry);
+  await page.locator('#redoDrawing').click(); await expect(list).toHaveCount(3);
+  expect(errors).toEqual([]);
 });
 
 

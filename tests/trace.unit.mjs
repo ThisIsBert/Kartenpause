@@ -12,6 +12,8 @@ import { removeSpurs } from '../src/drawing/path-cleanup.js';
 import { drawingFilename } from '../src/drawing/export.js';
 import { importGeoJSON } from '../src/drawing/import.js';
 import { polygonHit, polygonPath, edgePath } from '../src/drawing/polygon-follow.js';
+import GeoJSONReader from 'jsts/org/locationtech/jts/io/GeoJSONReader.js';
+import IsValidOp from 'jsts/org/locationtech/jts/operation/valid/IsValidOp.js';
 
 test('GeoJSON imports all geometry types, keeps multipolygons and properties, rejects malformed data atomically', () => {
   const ring = [[0, 0], [10, 0], [10, 10], [0, 0]], hole = [[1, 1], [2, 1], [2, 2], [1, 1]];
@@ -223,6 +225,11 @@ test('all 3x3 selection patterns preserve their exact selected area', () => {
     const mask = Uint8Array.from({ length: 9 }, (_, i) => (bits >> i) & 1);
     const polygons = selectionPolygons(mask, 3, 3);
     assert.equal(polygons.flat().reduce((sum, ring) => sum + signedArea(ring), 0), mask.reduce((a, b) => a + b));
+    assert.deepEqual(rasterizePolygons(polygons, 3, 3), mask);
+    if (polygons.length) {
+      const geometry = new GeoJSONReader().read({ type:'MultiPolygon', coordinates:polygons.map(rings=>rings.map(ring=>[...ring,ring[0]])) });
+      assert.equal(new IsValidOp(geometry).isValid(), true, `Ungültiger Zauberstab-Umriss bei Maske ${bits}`);
+    }
   }
 });
 

@@ -79,6 +79,17 @@ function polygonized(object) {
   return converted.length === 1 ? { ...next, kind: 'polygon', ...converted[0] } : { ...next, kind: 'multiPolygon', parts: converted };
 }
 
+// A raster boundary can return to one vertex while enclosing a hole. JTS
+// recognizes this filled area, but overlay needs separate shell/hole rings.
+// Only accept this specific valid topology; crossings and misplaced holes
+// must still be reported rather than repaired without review.
+export function normalizePolygonContacts(object) {
+  const validation = new IsValidOp(asGeometry(object));
+  validation.setSelfTouchingRingFormingHoleValid(true);
+  if (!validation.isValid()) return null;
+  try { return polygonized(object); } catch { return null; }
+}
+
 export function prepareSection(result) {
   const cleaned = structuredClone(result);
   if (result.kind === 'collection') {
