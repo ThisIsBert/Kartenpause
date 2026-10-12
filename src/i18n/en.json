@@ -127,7 +127,6 @@
   " (Strg+Z)": " (Ctrl+Z)",
   "Lade vorhandene Objekte oder speichere deine Zeichnung für die Weiterarbeit.": "Load existing objects or save your drawing for later editing.",
   "Objekt anklicken; mit Strg/⌘ oder Umschalt weitere auswählen. Stützpunkte ziehen; + fügt einen Punkt hinzu. Stützpunkt anklicken und mit Entf löschen.": "Click an object; use Ctrl/⌘ or Shift to select more. Drag vertices; + adds a vertex. Click a vertex and press Delete to remove it.",
-  "Enter übernimmt die Vorschau. Ohne Vorschau schließt „Fertig“ die Linie ab. Für Flächen „Polygon schließen“ wählen und die Schließkante bestätigen. Esc bricht die Zeichnung ab.": "Enter accepts the preview. Without a preview, Done finishes the line. For areas, choose Close polygon and confirm the closing edge. Esc cancels the drawing.",
   "Farbfläche auswählen und bei Bedarf mit dem Pinsel korrigieren. Fertig übernimmt die Umrisse, Esc verwirft die Auswahl.": "Select a colored area and adjust it with the brush if needed. Done accepts the outlines; Esc discards the selection.",
   "Auf die Karte klicken, um einen Punkt zu setzen.": "Click the map to place a point.",
   "Stützpunkte durch Klicken setzen. {0} Punkte. Mit Enter oder „Fertig“ abschließen, Esc bricht ab.": "Click to add vertices. {0} points. Press Enter or Done to finish; Esc cancels.",
@@ -208,10 +207,8 @@
   "Linienfarbe: #{0}": "Line color: #{0}",
   "Ohne Farbvorgabe": "No target color",
   "Bitte warten, bis die Kartenbewegung beendet ist.": "Please wait until the map stops moving.",
-  "Schließenden Abschnitt prüfen und übernehmen.": "Check and accept the closing section.",
   "Kantenverlauf als Vorschau. Weiterklicken setzt fort; Alt korrigiert. Ohne passende Kante wird gerade verbunden.": "Edge path preview. Click ahead to continue; Alt corrects. Without a matching edge, a straight connection is used.",
   "Für den nächsten Abschnitt müssen letzter Anker und Ziel im Kartenausschnitt liegen. Bitte die Karte verschieben oder herauszoomen; die Zeichnung bleibt erhalten.": "The last anchor and the target must be visible for the next section. Please pan the map or zoom out; your drawing is preserved.",
-  "Schließenden Abschnitt prüfen. „Abschnitt übernehmen“ erstellt das Polygon.": "Check the closing section. Accept section creates the polygon.",
   "Weiterklicken übernimmt diesen Abschnitt. Ein Klick zurück in den Abschnitt korrigiert ihn. Alt: immer korrigieren; Umschalt: immer fortsetzen.": "Click ahead to accept this section. Clicking back inside the section corrects it. Alt: always correct; Shift: always continue.",
   "Die Suche konnte nicht ausgeführt werden. Bitte erneut versuchen.": "The search could not be performed. Please try again.",
   "Suche in der Basiskarte (Zoom {0}) …": "Searching the basemap (zoom {0}) …",
@@ -484,7 +481,6 @@
   "Maus über die Vorlage bewegen: 8-fache Pixellupe.": "Move the mouse over the source image: 8× pixel magnifier.",
   "Abschnitt übernehmen": "Accept section",
   "Vorschau verwerfen": "Discard preview",
-  "Polygon schließen …": "Close polygon …",
   "In eine Farbfläche klicken. Mit dem Pinsel korrigieren und mit „Fertig“ als ein gemeinsames Flächenobjekt übernehmen. Inseln und Löcher bleiben erhalten.": "Click a colored area. Adjust it with the brush and choose Done to import the outlines as one area object. Islands and holes are preserved.",
   "Fläche auswählen aus": "Select area from",
   "Vor dem ersten Klick passend zoomen. Die Auswahl nutzt die Basiskarte im dann sichtbaren Ausschnitt und Zoom. Dieser Ausschnitt bleibt bis zum Abschluss oder Abbruch erhalten, auch beim Verschieben und Zoomen. Danach lässt sich ein neuer Ausschnitt auswählen.": "Choose a suitable zoom level before the first click. The selection uses the basemap view and zoom at that moment. This view is retained until you finish or cancel, even while panning and zooming. You can then select a new view.",
@@ -550,5 +546,8 @@
   "Vergrößern": "Zoom in",
   "Verkleinern": "Zoom out",
   "Noch keine Objekte. Wähle links ein Zeichenwerkzeug oder lade eine Zeichnung über Import / Export.": "No objects yet. Choose a drawing tool on the left or load a drawing using Import / Export.",
-  "Wähle einen Ortsvorschlag oder klicke auf die Karte.": "Choose a place suggestion or click the map."
+  "Wähle einen Ortsvorschlag oder klicke auf die Karte.": "Choose a place suggestion or click the map.",
+  "Enter übernimmt die Vorschau. Ohne Vorschau schließt „Fertig“ die Linie ab. „Polygon schließen“ übernimmt die Vorschau und schließt die Fläche automatisch. Esc bricht die Zeichnung ab.": "Enter accepts the preview. Without a preview, Done finishes the line. Close polygon accepts the preview and closes the area automatically. Esc cancels the drawing.",
+  "Schließstrecke ermittelt. Polygon wird übernommen.": "Closing edge calculated. Saving the polygon.",
+  "Polygon schließen": "Close polygon"
 }

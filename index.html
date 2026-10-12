@@ -106,7 +106,7 @@
     </div>
     <div id="magneticSettings" hidden>
       <label for="magneticSource">Verlauf übernehmen aus</label>
-      <select id="magneticSource"><option value="raster">Pixelkarte</option><option value="polygon">Linien und Flächenränder</option><option value="basemap">Basiskarte (aktuelle Zoomstufe)</option></select>
+      <select id="magneticSource"><option value="raster">Pixelkarte</option><option value="polygon">Linien und Flächenränder</option><option value="basemap" selected>Basiskarte (aktuelle Zoomstufe)</option></select>
       <div id="magneticActiveSettings">
       <p id="polygonFollowHelp" class="hint" hidden>Klicke nahe an eine vorhandene Linie oder einen Flächenrand. Das Werkzeug folgt dem kürzeren Weg. Setze für längere Bögen Zwischenpunkte. Ohne passende Kante entsteht eine gerade Verbindung.</p>
       <p class="hint">Zwei Anker setzen. Weiterklicken hinter dem Endanker übernimmt die Vorschau und setzt fort. Zurück in den Abschnitt klicken korrigiert ihn. Alt erzwingt Korrektur, Umschalt Fortsetzen.</p>
@@ -125,14 +125,14 @@
       <p id="magneticPixel" class="hint">Maus über die Vorlage bewegen: 8-fache Pixellupe.</p>
       </div>
       <div class="commands"><button id="magneticAccept" class="primary" disabled>Abschnitt übernehmen</button><button id="magneticReject" disabled>Vorschau verwerfen</button></div>
-      <button id="magneticClose" disabled>Polygon schließen …</button>
+      <button id="magneticClose" disabled>Polygon schließen</button>
       <p id="magneticStatus" role="status" aria-live="polite"></p>
       </div>
     </div>
     <div id="wandSettings" hidden>
       <p class="hint">In eine Farbfläche klicken. Mit dem Pinsel korrigieren und mit „Fertig“ als ein gemeinsames Flächenobjekt übernehmen. Inseln und Löcher bleiben erhalten.</p>
       <label for="wandSource">Fläche auswählen aus</label>
-      <select id="wandSource"><option value="raster">Pixelkarte</option><option value="basemap">Basiskarte (aktuelle Zoomstufe)</option></select>
+      <select id="wandSource"><option value="raster">Pixelkarte</option><option value="basemap" selected>Basiskarte (aktuelle Zoomstufe)</option></select>
       <p id="wandBasemapHint" class="hint" hidden>Vor dem ersten Klick passend zoomen. Die Auswahl nutzt die Basiskarte im dann sichtbaren Ausschnitt und Zoom. Dieser Ausschnitt bleibt bis zum Abschluss oder Abbruch erhalten, auch beim Verschieben und Zoomen. Danach lässt sich ein neuer Ausschnitt auswählen.</p>
       <label for="wandAlgorithm">Erkennung</label>
       <select id="wandAlgorithm"><option value="classic">Klassisch: Farbähnlichkeit</option><option value="intelligent">Intelligent: Fläche erkennen</option></select>

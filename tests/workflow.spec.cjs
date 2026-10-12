@@ -209,6 +209,9 @@ async function loadSyntheticProject(page, distorted = false, traceKind = null) {
         context.fillStyle = '#dda96e'; context.fillRect(0, 0, 90, 120);
         context.fillStyle = '#6eb4dc'; context.fillRect(90, 0, 90, 120);
       }
+      else if (traceKind === 'triangle') {
+        context.beginPath(); context.moveTo(25, 25); context.lineTo(155, 25); context.lineTo(155, 95); context.closePath(); context.stroke();
+      }
       else if (traceKind === 'polygon') context.strokeRect(25, 25, 130, 70);
       else { context.beginPath(); context.moveTo(20, 60); context.lineTo(160, 60); context.stroke(); }
     }
@@ -463,32 +466,45 @@ test('Magnetisch: Originalpixel, Pipette, Vorschau, Zwischenanker und Export', a
   expect(errors).toEqual([]);
 });
 
-test('Magnetisch: Polygon erst nach bestätigter Schließkante', async ({ page, context }) => {
-  await openApp(page); await loadSyntheticProject(page, false, 'polygon');
+for (const source of ['raster', 'polygon'])
+for (const { points, pending } of [{ points: 3, pending: true }, { points: 4, pending: true }, { points: 4, pending: false }]) {
+test(`Magnetisch: Polygon direkt schließen mit ${points} Stützpunkten ${pending ? 'und offener Vorschau' : 'ohne Vorschau'} (${source})`, async ({ page, context }) => {
+  const errors = []; page.on('pageerror', e => errors.push(e.message));
+  await openApp(page); await loadSyntheticProject(page, false, points === 3 ? 'triangle' : 'polygon');
   await page.locator('#enterDrawing').click();
   const map = page.locator('#map');
   await expect.poll(async () => Math.round((await map.boundingBox()).width)).toBe(1014);
   const { left, right, top, bottom } = await darkRasterBounds(page);
   await page.locator('[data-tool="magnetic"]').click();
+  await page.locator('#magneticSource').selectOption(source);
   await map.click({ position: { x: left + 1, y: top + 1 } });
-  for (const [x, y] of [[right - 1, top + 1], [right - 1, bottom - 1], [left + 1, bottom - 1]]) {
+  await expect(page.locator('#magneticClose')).toBeDisabled();
+  const corners = [[right - 1, top + 1], [right - 1, bottom - 1], [left + 1, bottom - 1]].slice(0, points - 1);
+  for (const [i, [x, y]] of corners.entries()) {
     await map.click({ position: { x, y } });
     await expect(page.locator('#magneticAccept')).toBeEnabled();
-    await page.locator('#magneticAccept').click();
+    if (i === 0) await expect(page.locator('#magneticClose')).toBeDisabled();
+    if (!pending || i < corners.length - 1) await page.locator('#magneticAccept').click();
   }
-  await page.locator('#magneticClose').click();
-  await expect(page.locator('#magneticAccept')).toBeEnabled();
+  await expect(page.locator('#magneticClose')).toBeEnabled();
   await expect(page.locator('#drawingObjects .drawing-object-select')).toHaveCount(0);
-  await page.screenshot({ path: 'output/playwright/magnetic-preview.png', fullPage: true });
-  await page.locator('#magneticAccept').click();
+  if (pending) await page.screenshot({ path: `output/playwright/magnetic-preview-${source}-${points}.png`, fullPage: true });
+  await page.locator('#magneticClose').click();
   await expect(page.locator('#drawingObjects .drawing-object-select')).toHaveCount(1);
-  await context.grantPermissions(['clipboard-read', 'clipboard-write']);
-  await page.locator('#copyDrawing').click();
-  const feature = JSON.parse(await page.evaluate(() => navigator.clipboard.readText()));
+  await expect(page.locator('#magneticAccept')).toBeDisabled();
+  const feature = await copiedFeature(page, context);
   expect(feature.geometry.type).toBe('Polygon');
-  expect(feature.geometry.coordinates[0][0]).toEqual(feature.geometry.coordinates[0].at(-1));
+  const ring = feature.geometry.coordinates[0];
+  expect(ring[0]).toEqual(ring.at(-1));
+  // The pending endpoint and the computed closing edge must both survive export.
+  expect(ring.some(p => p[0] > 16 && p[1] < 47)).toBe(true);
+  if (points === 4) expect(ring.some(p => p[0] < 4 && p[1] < 47)).toBe(true);
   await expect(page.locator('.drawing-vertex')).toHaveCount(feature.properties.controlPoints.length);
+  await page.locator('#undoDrawing').click(); await expect(page.locator('#drawingObjects .drawing-object-select')).toHaveCount(0);
+  await page.locator('#redoDrawing').click(); expect(await copiedFeature(page, context)).toEqual(feature);
+  expect(errors).toEqual([]);
 });
+}
 
 test('Magnetisch: Weiterklicken übernimmt, Zurückklicken korrigiert', async ({ page, context }) => {
   await openApp(page); await loadSyntheticProject(page, false, 'line');

@@ -70,6 +70,7 @@ import { createBasemapRaster } from './drawing/basemap-source.js';
     };
 
     let image = null;
+    let sourceDefaultsHaveImage = false;
     let imageName = '';
     let imageData = '';
     let points = [], nextPointId = 1, capture = null, busy = false;
@@ -266,6 +267,14 @@ import { createBasemapRaster } from './drawing/basemap-source.js';
       return button;
     }
     function updateAvailability() {
+      if (sourceDefaultsHaveImage !== !!image) {
+        sourceDefaultsHaveImage = !!image;
+        for (const id of ['magneticSource', 'wandSource']) {
+          const select = document.getElementById(id);
+          select.value = image ? 'raster' : 'basemap';
+          select.dispatchEvent(new Event('change'));
+        }
+      }
       document.getElementById('enterDrawing').disabled = busy || !!capture;
       document.getElementById('cancelGeoreference').disabled = busy;
       bindText(document.getElementById('imageFilename'), () => imageName || t('Noch keine Pixelkarte geladen.'), false);
