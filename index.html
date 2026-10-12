@@ -114,15 +114,21 @@
       <div id="magneticRasterSettings">
       <div class="row"><label for="magneticRadius">Suchraum neben dem Abschnitt</label><output id="magneticRadiusValue">32 Originalpixel</output></div>
       <input id="magneticRadius" type="range" min="8" max="100" value="32" step="4" />
-      <div class="commands"><button id="magneticPick" aria-pressed="false">Farbpipette</button><button id="magneticClearColor" disabled>Farbe löschen</button></div>
-      <div class="row"><span id="magneticColor" class="hint">Ohne Farbvorgabe</span><span id="magneticSwatch" aria-hidden="true"></span></div>
-      <div class="commands"><button id="magneticPick2" aria-pressed="false">Zweite Farbpipette</button><button id="magneticClearColor2" disabled>Zweite Farbe löschen</button></div>
-      <div class="row"><span id="magneticColor2" class="hint">Optional: zweite Flächenfarbe</span><span id="magneticSwatch2" aria-hidden="true"></span></div>
-      <p id="magneticColorMode" class="hint">Suche nach einer abgesetzten Bildlinie.</p>
+      <select id="magneticColorMode" aria-label="Farbverlauf"><option value="line">Linienfarbe folgen</option><option value="boundary">Grenze zwischen Farbbereichen folgen</option></select>
+      <div class="magnetic-colors">
+        <div class="magnetic-color-field">
+          <button id="magneticPick" class="icon" title="Farbpipette" aria-label="Farbpipette" aria-pressed="false"><i data-lucide="pipette" aria-hidden="true"></i></button>
+          <span id="magneticSwatch" class="magnetic-swatch" aria-hidden="true"></span><span id="magneticColor" class="magnetic-color-value"></span>
+          <button id="magneticClearColor" class="magnetic-clear-color" title="Farbe löschen" aria-label="Farbe löschen" hidden><i data-lucide="circle-x" aria-hidden="true"></i></button>
+        </div>
+        <div id="magneticSecondColor" class="magnetic-color-field" hidden>
+          <button id="magneticPick2" class="icon" title="Zweite Farbpipette" aria-label="Zweite Farbpipette" aria-pressed="false"><i data-lucide="pipette" aria-hidden="true"></i></button>
+          <span id="magneticSwatch2" class="magnetic-swatch" aria-hidden="true"></span><span id="magneticColor2" class="magnetic-color-value"></span>
+          <button id="magneticClearColor2" class="magnetic-clear-color" title="Zweite Farbe löschen" aria-label="Zweite Farbe löschen" hidden><i data-lucide="circle-x" aria-hidden="true"></i></button>
+        </div>
+      </div>
       <div class="row"><label for="magneticTolerance">Farbtoleranz</label><output id="magneticToleranceValue">50</output></div>
       <input id="magneticTolerance" type="range" min="15" max="120" value="50" step="5" />
-      <canvas id="magneticLoupe" width="180" height="180" aria-label="Lupe der Originalpixel"></canvas>
-      <p id="magneticPixel" class="hint">Maus über die Vorlage bewegen: 8-fache Pixellupe.</p>
       </div>
       <div class="commands"><button id="magneticAccept" class="primary" disabled>Abschnitt übernehmen</button><button id="magneticReject" disabled>Vorschau verwerfen</button></div>
       <button id="magneticClose" disabled>Polygon schließen</button>

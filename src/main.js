@@ -12,7 +12,7 @@ import {
   Save,
   Scan,
   Trash2,
-  X, Check, Search, MousePointer2, MapPin, Slash, Pentagon, Spline, Circle, Magnet, WandSparkles, MapPinned, Undo2, Redo2, Settings
+  X, Check, Search, Pipette, CircleX, MousePointer2, MapPin, Slash, Pentagon, Spline, Circle, Magnet, WandSparkles, MapPinned, Undo2, Redo2, Settings
 } from 'lucide';
 import { GeoFit } from './geo/geo-fit.js';
 import { ProjectionSearch } from './geo/projection-search.js';
@@ -252,7 +252,7 @@ import { createBasemapRaster } from './drawing/basemap-source.js';
     }
     function showError(err) { bindText(ui.notice, () => t('Fehler: ') + t(err?.message || err)); }
 
-    const appIcons = { Crosshair, FolderOpen, MapPinPlus, Pencil, Save, Scan, Trash2, X, Check, Search, MousePointer2, MapPin, Slash, Pentagon, Spline, Circle, Magnet, WandSparkles, MapPinned, Undo2, Redo2, Settings };
+    const appIcons = { Pipette, CircleX, Crosshair, FolderOpen, MapPinPlus, Pencil, Save, Scan, Trash2, X, Check, Search, MousePointer2, MapPin, Slash, Pentagon, Spline, Circle, Magnet, WandSparkles, MapPinned, Undo2, Redo2, Settings };
     function icons() { createIcons({ icons: appIcons }); }
     function formatDistance(value) {
       if (!Number.isFinite(value)) return t('nicht berechenbar');

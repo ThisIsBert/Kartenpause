@@ -1,4 +1,4 @@
-import { bindAttribute, bindText, t, tr } from '../i18n.js';
+import { bindText, t, tr } from '../i18n.js';
 import L from 'leaflet';
 import { setBusy } from './busy.js';
 import { cropSearch } from './magnetic-path.js';
@@ -22,12 +22,23 @@ export function createMagneticTool({ map, renderer, getOriginalRaster, getBasema
   let enabled = false, source = null, anchors = [], segments = [], preview = null, worker = null, target = null;
   let picking = false, color = null, generation = 0, closing = false, moveFrame = 0, mouse = null;
   let color2 = null;
+  const boundaryMode = () => el('magneticColorMode').value === 'boundary';
+  const loupe = document.createElement('canvas');
+  loupe.id = 'magneticLoupe'; loupe.width = 104; loupe.height = 104; loupe.hidden = true;
+  loupe.setAttribute('aria-hidden', 'true');
+  document.body.appendChild(loupe);
+  function hideLoupe() {
+    cancelAnimationFrame(moveFrame); moveFrame = 0; mouse = null; loupe.hidden = true;
+  }
+  map.getContainer().addEventListener('mouseleave', hideLoupe);
+  window.addEventListener('blur', hideLoupe);
+  document.addEventListener('scroll', hideLoupe, true);
   let segmentHandler = null;
   let mapMoving = false, basemapRaster = null, basemapDirty = true;
   const basemapMode = () => el('magneticSource').value === 'basemap';
   const pixelUnit = () => basemapMode() ? t('Kartenpixel') : t('Originalpixel');
   const outsideMessage = () => basemapMode() ? t('Außerhalb des aktuellen Kartenausschnitts. Bitte die Karte verschieben oder herauszoomen.') : t('Außerhalb der Pixelkarte');
-  map.on('movestart zoomstart', () => { mapMoving = true; });
+  map.on('movestart zoomstart', () => { mapMoving = true; hideLoupe(); });
   map.on('moveend zoomend resize', () => {
     mapMoving = false;
     basemapDirty = true;
@@ -63,7 +74,6 @@ export function createMagneticTool({ map, renderer, getOriginalRaster, getBasema
     el('magneticRasterSettings').hidden = vectorMode();
     el('basemapFollowHelp').hidden = !basemapMode();
     bindText(el('magneticRadiusValue'), () => el('magneticRadius').value + ' ' + pixelUnit());
-    bindAttribute(el('magneticLoupe'), "aria-label", () => t('Lupe der ') + pixelUnit());
     el('polygonFollowHelp').hidden = !vectorMode();
     el('magneticSource').disabled = anchors.length > (segmentHandler ? 1 : 0) || !!preview || !!worker;
     el('magneticAccept').disabled = !preview || !!worker || picking;
@@ -71,13 +81,16 @@ export function createMagneticTool({ map, renderer, getOriginalRaster, getBasema
     el('magneticClose').disabled = !canClose();
     el('magneticPick').setAttribute('aria-pressed', String(picking === 1));
     el('magneticPick2').setAttribute('aria-pressed', String(picking === 2));
-    el('magneticClearColor2').disabled = !color2;
-    bindText(el('magneticColor2'), () => color2 ? tr`Zweite Farbe: #${color2.map(v => v.toString(16).padStart(2, '0')).join('')}` : t('Optional: zweite Flächenfarbe'));
-    el('magneticSwatch2').style.backgroundColor = color2 ? `rgb(${color2.join(',')})` : 'transparent';
-    bindText(el('magneticColorMode'), () => color && color2 ? t('Suche nach dem Übergang zwischen beiden Farben.') : t('Suche nach einer abgesetzten Bildlinie.'));
-    el('magneticClearColor').disabled = !color;
-    bindText(el('magneticColor'), () => color ? tr`Linienfarbe: #${color.map(v => v.toString(16).padStart(2, '0')).join('')}` : t('Ohne Farbvorgabe'));
-    el('magneticSwatch').style.backgroundColor = color ? `rgb(${color.join(',')})` : 'transparent';
+    el('magneticSecondColor').hidden = !boundaryMode();
+    for (const [sample, suffix] of [[color, ''], [color2, '2']]) {
+      const hex = sample ? '#' + sample.map(v => v.toString(16).padStart(2, '0')).join('') : '—';
+      el('magneticClearColor' + suffix).hidden = !sample;
+      bindText(el('magneticColor' + suffix), () => hex);
+      el('magneticSwatch' + suffix).style.backgroundColor = sample ? `rgb(${sample.join(',')})` : '';
+      el('magneticSwatch' + suffix).classList.toggle('empty', !sample);
+    }
+    map.getContainer().classList.toggle('magnetic-picking', enabled && !!picking);
+    if (!enabled || !picking || vectorMode()) hideLoupe();
     paint(); onState();
   }
   function stopSearch() { generation++; worker?.terminate(); worker = null; setBusy('magnetic', false); }
@@ -139,7 +152,7 @@ export function createMagneticTool({ map, renderer, getOriginalRaster, getBasema
       };
       worker.onerror = () => { if (requestId !== generation) return; stopSearch(); status(t('Die Suche konnte nicht ausgeführt werden. Bitte erneut versuchen.')); changed(); };
       worker.postMessage({ raster: crop.raster, start: crop.start, end: crop.end,
-        radius: Number(el('magneticRadius').value), color, color2, tolerance: Number(el('magneticTolerance').value) }, [crop.raster.data.buffer]);
+        radius: Number(el('magneticRadius').value), color, color2: boundaryMode() ? color2 : null, tolerance: Number(el('magneticTolerance').value) }, [crop.raster.data.buffer]);
       status(source.basemap ? tr`Suche in der Basiskarte (Zoom ${rasterSource.zoom}) …` : t('Suche in den Originalpixeln …'));
     } catch (error) { stopSearch(); status(error.message); }
     changed();
@@ -189,10 +202,14 @@ export function createMagneticTool({ map, renderer, getOriginalRaster, getBasema
   };
   el('magneticPick').onclick = () => {
     picking = picking === 1 ? false : 1;
-    status(picking ? t('Mit der Pixellupe auf ein typisches Pixel der gewünschten Linie klicken. Dies setzt keinen Anker.') : t('Farbaufnahme beendet.')); changed();
+    hideLoupe(); status(''); changed();
   };
   el('magneticClearColor').onclick = () => { color = null; picking = false; recompute(); };
-  el('magneticPick2').onclick = () => { picking = picking === 2 ? false : 2; status(t('Auf die andere Farbfläche neben der Grenze klicken. Dies setzt keinen Anker.')); changed(); };
+  el('magneticPick2').onclick = () => {
+    if (!boundaryMode()) return;
+    picking = picking === 2 ? false : 2; hideLoupe(); status(''); changed();
+  };
+  el('magneticColorMode').onchange = () => { picking = false; hideLoupe(); status(''); recompute(); };
   el('magneticClearColor2').onclick = () => { color2 = null; picking = false; recompute(); };
   for (const id of ['magneticRadius', 'magneticTolerance']) {
     el(id).oninput = () => { bindText(el(`${id}Value`), () => el(id).value + (id === 'magneticRadius' ? ' ' + pixelUnit() : '')); };
@@ -224,13 +241,9 @@ export function createMagneticTool({ map, renderer, getOriginalRaster, getBasema
       enabled = value;
       if (!enabled) { reset(); source = null; cancelAnimationFrame(moveFrame); moveFrame = 0; }
       else {
-        if (!vectorMode()) {
-          const ctx = el('magneticLoupe').getContext('2d');
-          ctx.imageSmoothingEnabled = false;
-          bindText(el('magneticPixel'), () => pixelUnit() + t('-Lupe: Maus über die Karte bewegen · 8-fach, ohne Glättung.'));
-        }
         status(vectorMode() ? t('Startpunkt setzen. Nahe Linien und Flächenränder werden erkannt.') : t('Startanker auf die Bildlinie setzen oder zuerst mit der Farbpipette eine Linienfarbe aufnehmen.'));
       }
+      changed();
     },
     click(ll, modifiers = {}) {
       try {
@@ -265,21 +278,33 @@ export function createMagneticTool({ map, renderer, getOriginalRaster, getBasema
         }
       } catch (error) { status(error.message); }
     },
-    move(ll) {
-      if (!enabled || vectorMode()) return;
-      mouse = ll;
+    move(ll, event) {
+      if (!enabled || !picking || vectorMode() || mapMoving) { hideLoupe(); return; }
+      const point = map.latLngToContainerPoint(ll), bounds = map.getContainer().getBoundingClientRect();
+      mouse = { ll, x: event?.clientX ?? bounds.left + point.x, y: event?.clientY ?? bounds.top + point.y };
       if (moveFrame) return;
       moveFrame = requestAnimationFrame(() => {
         moveFrame = 0;
+        if (!enabled || !picking || !mouse) return;
         try {
-          ensureSource(); const rasterSource = currentRaster(), pixel = rasterSource.latLngToPixel(mouse), canvas = el('magneticLoupe'), ctx = canvas.getContext('2d');
-          ctx.fillStyle = '#e9eceb'; ctx.fillRect(0, 0, 180, 180);
-          if (!pixel) { bindText(el('magneticPixel'), () => outsideMessage()); return; }
+          ensureSource();
+          const rasterSource = currentRaster(), pixel = rasterSource.latLngToPixel(mouse.ll), ctx = loupe.getContext('2d');
+          if (!pixel) { loupe.hidden = true; return; }
           const [x, y] = pixel.map(Math.round);
-          ctx.imageSmoothingEnabled = false; ctx.drawImage(rasterSource.canvas, x - 11, y - 11, 23, 23, -2, -2, 184, 184);
-          ctx.strokeStyle = '#e96e18'; ctx.lineWidth = 1; ctx.strokeRect(86.5, 86.5, 7, 7);
-          bindText(el('magneticPixel'), () => tr`${pixelUnit()} ${x}, ${y}${source.basemap ? tr` · Zoom ${rasterSource.zoom}` : ''} · 8-fach, ohne Glättung`);
-        } catch (error) { status(error.message); }
+          ctx.fillStyle = '#e9eceb'; ctx.fillRect(0, 0, loupe.width, loupe.height);
+          ctx.imageSmoothingEnabled = false;
+          ctx.drawImage(rasterSource.canvas, x - 6, y - 6, 13, 13, 0, 0, 104, 104);
+          // Outline the sample without covering the selected 8×8 pixel.
+          ctx.lineWidth = 2;
+          ctx.strokeStyle = '#17221f'; ctx.strokeRect(45, 45, 14, 14);
+          ctx.strokeStyle = '#fff'; ctx.strokeRect(46, 46, 12, 12);
+          ctx.strokeStyle = '#ff5a00'; ctx.strokeRect(47, 47, 10, 10);
+          // Prefer the right of the pointer; keep the loupe visible at viewport edges.
+          const left = mouse.x + 24 + 106 <= window.innerWidth - 8 ? mouse.x + 24 : mouse.x - 130;
+          loupe.style.left = Math.max(8, left) + 'px';
+          loupe.style.top = Math.max(8, Math.min(mouse.y + 16, window.innerHeight - 114)) + 'px';
+          loupe.hidden = false;
+        } catch (error) { loupe.hidden = true; status(error.message); }
       });
     },
     undo() {

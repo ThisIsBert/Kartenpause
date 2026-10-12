@@ -32,7 +32,7 @@ npm.cmd run test:trace
 npm.cmd run test:ui -- --grep "Magnetisch:"
 ```
 
-Die Tests prüfen die Wahl einer gebogenen roten Grenze gegenüber einem kreuzenden blauen Fluss, die Ablehnung leerer/zu großer Suchbereiche und die Rückrechnung in Originalpixel einschließlich echter TPS-Korrektur. Im Browser werden Pipette und unverglättete Lupe, Originalpixel-Suche bei Deckkraft null nach Zoom, Vorschauersetzung, Zwischenanker, Verwerfen/Bestätigen, Linienabschluss, direkter Polygonabschluss mit und ohne offene Vorschau (einschließlich des dritten Stützpunkts), Export, Rückgängig und Abbruch geprüft. Ein Screenshot der Vorschau wird unter `output/playwright/magnetic-preview-raster-4.png` gespeichert.
+Die Tests prüfen die Wahl einer gebogenen roten Grenze gegenüber einem kreuzenden blauen Fluss, die Ablehnung leerer/zu großer Suchbereiche und die Rückrechnung in Originalpixel einschließlich echter TPS-Korrektur. Im Browser werden die explizite Wahl zwischen Linienfarbe und Farbflächengrenze, ein beziehungsweise zwei Farbfelder, einzelnes Löschen und Farberhalt beim Moduswechsel sowie die nur bei aktiver Pipette sichtbare, unverglättete Lupe rechts am Mauszeiger geprüft (einschließlich Bewegung und Ausblenden beim Verlassen der Karte). Darüber hinaus werden Originalpixel-Suche bei Deckkraft null nach Zoom, Vorschauersetzung, Zwischenanker, Verwerfen/Bestätigen, Linienabschluss, direkter Polygonabschluss mit und ohne offene Vorschau (einschließlich des dritten Stützpunkts), Export, Rückgängig und Abbruch geprüft. Ein Screenshot der Vorschau wird unter `output/playwright/magnetic-preview-raster-4.png` gespeichert.
 
 ## Lokal ausprobieren
 

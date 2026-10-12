@@ -460,7 +460,7 @@ export function createDrawingEditor({ map, sourceMap, canEnter, onModeChange, on
       handles.clearLayers(); renderHandles(object);
     }
   });
-  map.on('mousemove', e => { if (active && (tool === 'magnetic' || section.magneticMode)) magnetic.move(e.latlng); });
+  map.on('mousemove', e => { if (active && (tool === 'magnetic' || section.magneticMode)) magnetic.move(e.latlng, e.originalEvent); });
 
   document.querySelectorAll('[data-tool]').forEach(button => {
     button.onclick = () => {

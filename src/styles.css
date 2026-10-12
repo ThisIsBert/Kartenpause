@@ -88,8 +88,17 @@
     #magneticSettings { margin-top: 12px; padding-top: 4px; border-top: 1px solid #ccd5d3; }
     #magneticSettings output { font-size: 12px; }
     #magneticStatus { font-size: 13px; line-height: 1.45; }
-    #magneticLoupe { display: block; width: 180px; height: 180px; margin: 12px auto 0; border: 1px solid #ccd5d3; background: #e9eceb; image-rendering: pixelated; }
-    #magneticSwatch, #magneticSwatch2 { width: 24px; height: 18px; border: 1px solid #89948f; }
+    #magneticLoupe { position: fixed; z-index: 2000; width: 104px; height: 104px; pointer-events: none; border: 1px solid #89948f; border-radius: 6px; box-shadow: 0 3px 12px #0003; background: #e9eceb; image-rendering: pixelated; }
+    #magneticColorMode { font-size: 13px; margin-top: 8px; }
+    .magnetic-colors { display: grid; gap: 6px; margin: 8px 0 12px; }
+    .magnetic-color-field { display: flex; align-items: center; gap: 8px; min-height: 38px; padding: 4px 6px; border: 1px solid #ccd5d3; border-radius: 6px; }
+    .magnetic-color-field .icon { border-color: transparent; }
+    .magnetic-color-value { flex: 1; color: #555; font: 12px ui-monospace, monospace; }
+    .magnetic-clear-color { display: inline-flex; align-items: center; justify-content: center; flex: 0 0 24px; width: 24px; height: 24px; padding: 3px; border: 0; border-radius: 50%; color: #68736f; }
+    .magnetic-clear-color:hover { color: #a23535; background: #faeeee; }
+    .magnetic-swatch.empty { background: repeating-conic-gradient(#e7ebe9 0% 25%, white 0% 50%) 0 / 8px 8px; }
+    .magnetic-picking { cursor: crosshair; }
+    #magneticSwatch, #magneticSwatch2 { flex: 0 0 28px; width: 28px; height: 28px; border: 1px solid #89948f; border-radius: 4px; }
     #wandSettings { border-top: 1px solid #ccd5d3; margin-top: 12px; }
     #wandSettings output, #wandStatus { font-size: 12px; line-height: 1.5; }
     @media (prefers-reduced-motion: reduce) { body, #sidebar, #workspace, #sourcePanel { transition: none; } }

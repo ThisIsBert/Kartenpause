@@ -1,4 +1,7 @@
 {
+  "Farbverlauf": "Color tracking",
+  "Linienfarbe folgen": "Follow line color",
+  "Grenze zwischen Farbbereichen folgen": "Follow boundary between colors",
   "&copy; OpenStreetMap-Mitwirkende": "&copy; OpenStreetMap contributors",
   "Geografisch / Plate Carrée (EPSG:4326)": "Geographic / Plate Carrée (EPSG:4326)",
   "DHDN / Gauß-Krüger Zone 3": "DHDN / Gauss–Krüger Zone 3",
