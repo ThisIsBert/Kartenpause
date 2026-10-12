@@ -57,6 +57,7 @@ export function createMagneticTool({ map, renderer, getOriginalRaster, getBasema
     for (const anchor of anchors) L.circleMarker(source.pixelToLatLng(anchor), { renderer, color: '#fff', fillColor: '#176c65', fillOpacity: 1, weight: 1, radius: 4, interactive: false }).addTo(group);
     if (target) L.circleMarker(source.pixelToLatLng(target), { renderer, color: '#df6e12', fillOpacity: .4, weight: 1, radius: 5, interactive: false }).addTo(group);
   }
+  const canClose = () => anchors.length + (preview ? 1 : 0) >= 3 && !worker && !picking;
   function changed() {
     el('magneticRasterSettings').hidden = vectorMode();
     el('basemapFollowHelp').hidden = !basemapMode();
@@ -66,7 +67,7 @@ export function createMagneticTool({ map, renderer, getOriginalRaster, getBasema
     el('magneticSource').disabled = anchors.length > (segmentHandler ? 1 : 0) || !!preview || !!worker;
     el('magneticAccept').disabled = !preview || !!worker || picking;
     el('magneticReject').disabled = !target && !preview && !worker;
-    el('magneticClose').disabled = anchors.length < 3 || !!preview || !!worker || picking;
+    el('magneticClose').disabled = !canClose();
     el('magneticPick').setAttribute('aria-pressed', String(picking === 1));
     el('magneticPick2').setAttribute('aria-pressed', String(picking === 2));
     el('magneticClearColor2').disabled = !color2;
@@ -106,7 +107,7 @@ export function createMagneticTool({ map, renderer, getOriginalRaster, getBasema
       ensureSource();
       if (source.vector) {
         preview = edgePath(getObjects(), anchors.at(-1), end, screen);
-        status(close ? 'Schließenden Abschnitt prüfen und übernehmen.' : 'Kantenverlauf als Vorschau. Weiterklicken setzt fort; Alt korrigiert. Ohne passende Kante wird gerade verbunden.');
+        status(close ? 'Schließstrecke ermittelt. Polygon wird übernommen.' : 'Kantenverlauf als Vorschau. Weiterklicken setzt fort; Alt korrigiert. Ohne passende Kante wird gerade verbunden.');
         if (autoAccept) accept();
         changed(); return;
       }
@@ -130,7 +131,7 @@ export function createMagneticTool({ map, renderer, getOriginalRaster, getBasema
           });
           // Keep shared anchor coordinates exact across independently searched segments.
           preview[0] = [...anchors.at(-1)]; preview[preview.length - 1] = [...end];
-          status(close ? 'Schließenden Abschnitt prüfen. „Abschnitt übernehmen“ erstellt das Polygon.' : 'Weiterklicken übernimmt diesen Abschnitt. Ein Klick zurück in den Abschnitt korrigiert ihn. Alt: immer korrigieren; Umschalt: immer fortsetzen.');
+          status(close ? 'Schließstrecke ermittelt. Polygon wird übernommen.' : 'Weiterklicken übernimmt diesen Abschnitt. Ein Klick zurück in den Abschnitt korrigiert ihn. Alt: immer korrigieren; Umschalt: immer fortsetzen.');
         }
         if (autoAccept && preview) accept();
         changed();
@@ -160,7 +161,7 @@ export function createMagneticTool({ map, renderer, getOriginalRaster, getBasema
     else { status('Abschnitt übernommen. Nächsten Anker setzen oder mit „Fertig“ die Linie abschließen.'); changed(); }
   }
   function reject() { stopSearch(); preview = null; target = null; closing = false; status('Vorschau verworfen. Einen neuen Endanker oder einen näheren Zwischenanker setzen.'); changed(); }
-  function recompute() { if (target && anchors.length) request(target, closing); else changed(); }
+  function recompute() { if (target && anchors.length) request(target, closing, closing); else changed(); }
   el('magneticSource').onchange = () => {
     const previousSource = source;
     const seedPoint = segmentHandler && anchors.length ? source.pixelToLatLng(anchors.at(-1)) : null;
@@ -180,7 +181,11 @@ export function createMagneticTool({ map, renderer, getOriginalRaster, getBasema
   };
   el('magneticAccept').onclick = accept;
   el('magneticReject').onclick = reject;
-  el('magneticClose').onclick = () => { if (anchors.length >= 3 && !worker && !preview) request(anchors[0], true); };
+  el('magneticClose').onclick = () => {
+    if (!canClose()) return;
+    if (preview) accept();
+    request(anchors[0], true, true);
+  };
   el('magneticPick').onclick = () => {
     picking = picking === 1 ? false : 1;
     status(picking ? 'Mit der Pixellupe auf ein typisches Pixel der gewünschten Linie klicken. Dies setzt keinen Anker.' : 'Farbaufnahme beendet.'); changed();

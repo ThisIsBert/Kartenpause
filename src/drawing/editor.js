@@ -172,7 +172,7 @@ export function createDrawingEditor({ map, sourceMap, canEnter, onModeChange, on
     el('undoDrawing').title = (draft ? 'Letzten Punkt zurück' : magnetic.hasDraft ? 'Letzten Abschnitt zurück' : wand.hasDraft ? 'Letzte Auswahländerung zurück' : 'Rückgängig') + ' (Strg+Z)';
     el('drawingHelp').textContent = tool === 'files' ? 'Lade vorhandene Objekte oder speichere deine Zeichnung für die Weiterarbeit.' : tool === 'select'
       ? 'Objekt anklicken; mit Strg/⌘ oder Umschalt weitere auswählen. Stützpunkte ziehen; + fügt einen Punkt hinzu. Stützpunkt anklicken und mit Entf löschen.'
-      : tool === 'magnetic' ? 'Enter übernimmt die Vorschau. Ohne Vorschau schließt „Fertig“ die Linie ab. Für Flächen „Polygon schließen“ wählen und die Schließkante bestätigen. Esc bricht die Zeichnung ab.'
+      : tool === 'magnetic' ? 'Enter übernimmt die Vorschau. Ohne Vorschau schließt „Fertig“ die Linie ab. „Polygon schließen“ übernimmt die Vorschau und schließt die Fläche automatisch. Esc bricht die Zeichnung ab.'
       : tool === 'wand' ? 'Farbfläche auswählen und bei Bedarf mit dem Pinsel korrigieren. Fertig übernimmt die Umrisse, Esc verwirft die Auswahl.'
       : tool === 'point' ? 'Auf die Karte klicken, um einen Punkt zu setzen.'
         : `Stützpunkte durch Klicken setzen. ${isClosed(tool) ? 'Mindestens drei' : 'Mindestens zwei'} Punkte. Mit Enter oder „Fertig“ abschließen, Esc bricht ab.`;
