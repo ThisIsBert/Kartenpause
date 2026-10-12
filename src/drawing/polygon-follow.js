@@ -1,3 +1,4 @@
+import { t } from '../i18n.js';
 import { isClosed, ringEntries } from './geometry.js';
 import { linearObject, nearestEdge, selectedArc, shorterArcIsOther } from './rework-geometry.js';
 
@@ -12,8 +13,8 @@ export function polygonHit(objects, point, screen, limit = 16) {
 }
 
 export function polygonPath(object, start, end) {
-  if (start.ringIndex !== end.ringIndex) throw new Error('Bitte auf demselben Polygonrand bleiben.');
-  if (Math.hypot(...start.point.map((v, i) => v - end.point[i])) < 1e-8) throw new Error('Bitte einen anderen Randpunkt wählen.');
+  if (start.ringIndex !== end.ringIndex) throw new Error(t('Bitte auf demselben Polygonrand bleiben.'));
+  if (Math.hypot(...start.point.map((v, i) => v - end.point[i])) < 1e-8) throw new Error(t('Bitte einen anderen Randpunkt wählen.'));
   return selectedArc(object, start, end, shorterArcIsOther(object, start, end)).map(p => [...p]);
 }
 

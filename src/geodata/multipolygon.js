@@ -1,9 +1,10 @@
+import { t, tr } from '../i18n.js';
 // Full-geometry Overpass multipolygons need no synthetic node database.
 // Join by endpoints and locate each hole using bounding boxes and one interior
 // test, instead of testing every hole vertex against every outer ring.
 export function fullMultipolygon(element, progress = () => {}) {
   if (element?.type !== 'relation' || !['multipolygon', 'boundary'].includes(element.tags?.type)) return null;
-  const invalid = () => { throw new Error('Die Relation enthält unvollständige oder nicht geschlossene Teilflächen. Sie kann nicht übernommen werden.'); };
+  const invalid = () => { throw new Error(t('Die Relation enthält unvollständige oder nicht geschlossene Teilflächen. Sie kann nicht übernommen werden.')); };
   const key = point => `${point[0]},${point[1]}`;
   const same = (a, b) => a[0] === b[0] && a[1] === b[1];
   const groups = { outer: [], inner: [] }, seen = new Set();
@@ -45,7 +46,7 @@ export function fullMultipolygon(element, progress = () => {}) {
     }
     return rings;
   }
-  progress('Teilwege werden zu Flächenrändern verbunden');
+  progress(t('Teilwege werden zu Flächenrändern verbunden'));
   const outers = join(groups.outer), inners = join(groups.inner);
   if (!outers || !inners) return null;
   if (!outers.length) invalid();
@@ -86,7 +87,7 @@ export function fullMultipolygon(element, progress = () => {}) {
     return inside ? 1 : -1;
   }
   const polygons = outers.map(ring => ({ rings: [ring], bounds: bounds(ring), area: Math.abs(area(ring)) }));
-  progress('Inseln und Löcher werden zugeordnet');
+  progress(t('Inseln und Löcher werden zugeordnet'));
   for (let index = 0; index < inners.length; index++) {
     const inner = inners[index], box = bounds(inner);
     const candidates = polygons.filter(p => box[0] >= p.bounds[0] && box[1] >= p.bounds[1] && box[2] <= p.bounds[2] && box[3] <= p.bounds[3]).sort((a, b) => a.area - b.area);
@@ -96,7 +97,7 @@ export function fullMultipolygon(element, progress = () => {}) {
     });
     if (!parent) invalid();
     parent.rings.push(inner);
-    if (index % 100 === 0) progress(`Inseln und Löcher werden zugeordnet (${index + 1}/${inners.length})`);
+    if (index % 100 === 0) progress(tr`Inseln und Löcher werden zugeordnet (${index + 1}/${inners.length})`);
   }
   for (const polygon of polygons) polygon.rings.forEach((ring, index) => { if ((area(ring) > 0) !== (index === 0)) ring.reverse(); });
   return { type: 'Feature', id: `relation/${element.id}`, properties: { type: 'relation', id: element.id, tags: { ...element.tags } },

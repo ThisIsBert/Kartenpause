@@ -1,3 +1,4 @@
+import { bindText, t, tr } from '../i18n.js';
 import L from 'leaflet';
 import { isClosed, geometryLeaves } from './geometry.js';
 import { linearObject, nearestEdge, replaceArc, selectedArc, shorterArcIsOther } from './rework-geometry.js';
@@ -12,7 +13,12 @@ export function createSectionEditor({ map, renderer, magnetic, project, unprojec
   let preview = null, issues = [], magneticChain = null, normalized = null, chosen = null, dragging = false, pathLayer = null;
   const screen = p => { const s = map.project(unproject(p)); return [s.x, s.y]; };
   const nearEnd = p => end && Math.hypot(...screen(p).map((v, i) => v - screen(end.point)[i])) < 12;
-  const status = text => { el('sectionStatus').textContent = text; };
+  const status = text => { bindText(el('sectionStatus'), () => text); };
+  const issueLabel = reason => {
+    const label = document.createElement('span');
+    bindText(label, () => t(reason));
+    return label;
+  };
   function stop() { generation++; worker?.terminate(); worker = null; setBusy('section', false); }
   function changed() {
     group.clearLayers();
@@ -27,7 +33,7 @@ export function createSectionEditor({ map, renderer, magnetic, project, unprojec
       for (const issue of issues) for (const edge of issue.segments || []) line(edge, '#c22', '3 5');
       for (const issue of issues) if (issue.point) L.circleMarker(unproject(issue.point), {
         renderer, radius: 10, color: '#c22', weight: 3, fillOpacity: .15, interactive: false
-      }).bindTooltip(issue.reason, { permanent: true, direction: 'right', className: 'section-issue' }).addTo(group);
+      }).bindTooltip(issueLabel(issue.reason), { permanent: true, direction: 'right', className: 'section-issue' }).addTo(group);
       for (const [anchor, label] of [[start, 'A'], [end, 'B']]) if (anchor) {
         L.circleMarker(unproject(anchor.point), { renderer, radius: 6, color: '#fff', fillColor: '#087fa6', fillOpacity: 1, weight: 2, interactive: false })
           .bindTooltip(label, { permanent: true, direction: 'top' }).addTo(group);
@@ -68,7 +74,7 @@ export function createSectionEditor({ map, renderer, magnetic, project, unprojec
     }).addTo(handles);
     for (let i = 1; i < path.length - 1; i++) {
       if (!visible(path[i], chosen === i)) continue;
-      const handle = marker(path[i], `drawing-vertex section-vertex${chosen === i ? ' chosen' : ''}`, `Ersatzstützpunkt ${i}`, true);
+      const handle = marker(path[i], `drawing-vertex section-vertex${chosen === i ? ' chosen' : ''}`, tr`Ersatzstützpunkt ${i}`, true);
       handle.on('click', () => { chosen = i; changed(); });
       handle.on('dragstart', () => { remember(); invalidate(); chosen = i; dragging = true; magneticChain = null; });
       handle.on('drag', () => { path[i] = project(handle.getLatLng()); pathLayer?.setLatLngs(path.map(unproject)); });
@@ -78,7 +84,7 @@ export function createSectionEditor({ map, renderer, magnetic, project, unprojec
       if (Math.hypot(...screen(path[i]).map((v, k) => v - screen(path[i + 1])[k])) < 26) continue;
       const point = path[i].map((v, k) => (v + path[i + 1][k]) / 2);
       if (!visible(point)) continue;
-      marker(point, 'drawing-midpoint section-midpoint', 'Ersatzstützpunkt hinzufügen', false).on('click', () => {
+      marker(point, 'drawing-midpoint section-midpoint', t('Ersatzstützpunkt hinzufügen'), false).on('click', () => {
         remember(); path.splice(i + 1, 0, point); chosen = i + 1; magneticChain = null; check();
       });
     }
@@ -98,7 +104,7 @@ export function createSectionEditor({ map, renderer, magnetic, project, unprojec
     preview = result;
     try {
       worker = new Worker(new URL('./rework-worker.js', import.meta.url), { type: 'module' });
-      setBusy('section', true); status('Ersatzverlauf wird geprüft …');
+      setBusy('section', true); status(t('Ersatzverlauf wird geprüft …'));
       worker.onmessage = ({ data }) => {
         if (token !== generation) return;
         stop();
@@ -107,15 +113,15 @@ export function createSectionEditor({ map, renderer, magnetic, project, unprojec
         normalized = data.valid ? null : data.normalized;
         if (data.valid) {
           candidate = data.result;
-          status(`${data.cleaned ? 'Flächenlose Rückläufe bereinigt. ' : ''}Vorschau fertig. Stützpunkte können verschoben werden. Fertig ersetzt den Randabschnitt.`);
+          status(tr`${data.cleaned ? t('Flächenlose Rückläufe bereinigt. ') : ''}Vorschau fertig. Stützpunkte können verschoben werden. Fertig ersetzt den Randabschnitt.`);
         } else {
           const parts = normalized ? geometryLeaves(normalized).filter(p => isClosed(p.kind)) : [];
-          const counts = normalized ? ` Bereinigter Flächenvorschlag: ${parts.length} Teilfläche(n), ${parts.reduce((n, p) => n + (p.holes?.length || 0), 0)} Loch/Löcher. Prüfen und bestätigen oder den Verlauf korrigieren.` : '';
-          status(data.error || `Die beteiligten Randabschnitte sind rot markiert. Blaue Stützpunkte verschieben oder über + ergänzen; der Verlauf bleibt erhalten.${counts}`);
+          const counts = normalized ? tr` Bereinigter Flächenvorschlag: ${parts.length} Teilfläche(n), ${parts.reduce((n, p) => n + (p.holes?.length || 0), 0)} Loch/Löcher. Prüfen und bestätigen oder den Verlauf korrigieren.` : '';
+          status(data.error || tr`Die beteiligten Randabschnitte sind rot markiert. Blaue Stützpunkte verschieben oder über + ergänzen; der Verlauf bleibt erhalten.${counts}`);
         }
         changed();
       };
-      worker.onerror = () => { if (token === generation) { stop(); status('Die Prüfung ist fehlgeschlagen. Der Verlauf bleibt erhalten und seine Stützpunkte sind bearbeitbar.'); changed(); } };
+      worker.onerror = () => { if (token === generation) { stop(); status(t('Die Prüfung ist fehlgeschlagen. Der Verlauf bleibt erhalten und seine Stützpunkte sind bearbeitbar.')); changed(); } };
       worker.postMessage({ result, original: object });
     } catch (error) { stop(); status(error.message); }
     changed();
@@ -125,7 +131,7 @@ export function createSectionEditor({ map, renderer, magnetic, project, unprojec
     remember();
     for (let i = 1; i < points.length; i++) path.push(points[i]);
     if (nearEnd(path.at(-1)) && (!exactEnd || Math.hypot(...path.at(-1).map((v, i) => v - end.point[i])) < 1e-6)) { path[path.length - 1] = [...end.point]; ready = true; check(); }
-    else { status('Weiterzeichnen oder „Mit Endpunkt B verbinden“ wählen.'); changed(); }
+    else { status(t('Weiterzeichnen oder „Mit Endpunkt B verbinden“ wählen.')); changed(); }
   }
   function seed() {
     magneticChain = null;
@@ -135,7 +141,7 @@ export function createSectionEditor({ map, renderer, magnetic, project, unprojec
   function resetAnchors() {
     stop(); magnetic.cancel(); start = null; end = null; path = []; steps = []; candidate = null; ready = false; other = false; method = 'manual';
     preview = null; issues = []; magneticChain = null; normalized = null; chosen = null; handles.clearLayers();
-    status('Anfang A auf dem Rand anklicken. Danach Ende B auf demselben Rand wählen.'); changed();
+    status(t('Anfang A auf dem Rand anklicken. Danach Ende B auf demselben Rand wählen.')); changed();
   }
   function undo() {
     if (!object) return;
@@ -146,7 +152,7 @@ export function createSectionEditor({ map, renderer, magnetic, project, unprojec
       if (ready) { magnetic.cancel(); magneticChain = previous.chain; check(); }
       else {
         if (method === 'magnetic') { seed(); magneticChain = previous.chain; }
-        status('Letzte Änderung zurückgenommen.'); changed();
+        status(t('Letzte Änderung zurückgenommen.')); changed();
       }
     }
 
@@ -157,7 +163,7 @@ export function createSectionEditor({ map, renderer, magnetic, project, unprojec
   }
   el('sectionMethod').onchange = () => {
     if (!end || ready) return;
-    if (magnetic.pendingSegment) { status('Bitte zuerst die magnetische Vorschau bestätigen oder verwerfen.'); changed(); return; }
+    if (magnetic.pendingSegment) { status(t('Bitte zuerst die magnetische Vorschau bestätigen oder verwerfen.')); changed(); return; }
     method = el('sectionMethod').value; changed();
     if (method === 'magnetic') seed();
   };
@@ -171,7 +177,7 @@ export function createSectionEditor({ map, renderer, magnetic, project, unprojec
   el('sectionUseRepair').onclick = () => {
     if (!normalized || worker) return;
     candidate = normalized; normalized = null; issues = [];
-    status('Bereinigte Flächenaufteilung bestätigt. Mit Fertig speichern oder Stützpunkte weiter korrigieren.'); changed();
+    status(t('Bereinigte Flächenaufteilung bestätigt. Mit Fertig speichern oder Stützpunkte weiter korrigieren.')); changed();
   };
   el('sectionUndo').onclick = undo;
   el('sectionReset').onclick = resetAnchors;
@@ -207,10 +213,10 @@ export function createSectionEditor({ map, renderer, magnetic, project, unprojec
       if (!object) return;
       if (!end) {
         const p = map.project(ll), hit = nearestEdge(object, [p.x, p.y], screen, start?.ringIndex ?? null);
-        if (!hit || hit.distance > 16) { status('Bitte nahe am gleichen Rand klicken (höchstens 16 Bildschirmpixel).'); return; }
-        if (!start) { start = hit; status('Jetzt Ende B auf demselben Rand wählen.'); }
-        else if (Math.hypot(...hit.point.map((v, i) => v - start.point[i])) < 1e-6) { status('Anfang und Ende müssen verschieden sein.'); return; }
-        else { end = hit; other = shorterArcIsOther(object, start, end); path = [start.point]; status('Der kürzere Randabschnitt wird ersetzt (rot gestrichelt). Von A nach B zeichnen; die fertige Vorschau zeigt die neue Fläche.'); }
+        if (!hit || hit.distance > 16) { status(t('Bitte nahe am gleichen Rand klicken (höchstens 16 Bildschirmpixel).')); return; }
+        if (!start) { start = hit; status(t('Jetzt Ende B auf demselben Rand wählen.')); }
+        else if (Math.hypot(...hit.point.map((v, i) => v - start.point[i])) < 1e-6) { status(t('Anfang und Ende müssen verschieden sein.')); return; }
+        else { end = hit; other = shorterArcIsOther(object, start, end); path = [start.point]; status(t('Der kürzere Randabschnitt wird ersetzt (rot gestrichelt). Von A nach B zeichnen; die fertige Vorschau zeigt die neue Fläche.')); }
         changed(); return;
       }
       if (ready) return;

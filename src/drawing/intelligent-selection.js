@@ -1,3 +1,4 @@
+import { t } from '../i18n.js';
 import { lab, colorDistance, median, medianColor } from './image-features.js';
 
 const directions = [[1, 0], [-1, 0], [0, 1], [0, -1]];
@@ -17,7 +18,7 @@ const competingColors = (prepared, reference, tolerance) => prepared.palette.fil
 function checkedSeed(raster, seed) {
   const point = seed.map(Math.round), [x, y] = point;
   if (!point.every(Number.isFinite) || x < 0 || y < 0 || x >= raster.width || y >= raster.height || raster.data[(y * raster.width + x) * 4 + 3] < 128) {
-    throw new Error('Bitte in eine sichtbare Farbfläche klicken.');
+    throw new Error(t('Bitte in eine sichtbare Farbfläche klicken.'));
   }
   return point;
 }
@@ -36,7 +37,7 @@ function learnAddition(prepared, point, tolerance, reference) {
     });
   };
   const clicked = lab(raster.data, (sy * raster.width + sx) * 4);
-  const mismatch = () => new Error('Der Klick passt nicht zur bisherigen Flächenfarbe. Bitte den Seitenarm genauer anklicken. Für eine andere Farbe „Auswahl ersetzen“ oder den klassischen Modus verwenden.');
+  const mismatch = () => new Error(t('Der Klick passt nicht zur bisherigen Flächenfarbe. Bitte den Seitenarm genauer anklicken. Für eine andere Farbe „Auswahl ersetzen“ oder den klassischen Modus verwenden.'));
   // Do not relocate an incompatible click into a larger nearby region.
   if (!compatible(clicked)) throw mismatch();
   const samples = [], clusterRadius = Math.max(3, Math.min(8, tolerance * .4 + 3));
@@ -48,7 +49,7 @@ function learnAddition(prepared, point, tolerance, reference) {
       if (compatible(p) && regionDistance(p, clicked) <= clusterRadius) samples.push(p);
     }
   }
-  if (samples.length < 3) throw new Error('Am Klick ist keine ausreichend zusammenhängende Farbstruktur erkennbar. Bitte etwas weiter im Seitenarm klicken.');
+  if (samples.length < 3) throw new Error(t('Am Klick ist keine ausreichend zusammenhängende Farbstruktur erkennbar. Bitte etwas weiter im Seitenarm klicken.'));
   const color = medianColor(samples);
   if (!compatible(color)) throw mismatch();
   const variants = (reference.variants || []).map(p => p.slice());
@@ -109,7 +110,7 @@ function growDetail(prepared, point, tolerance, reference, existingMask = null) 
     chunks[c][tail++ % chunkSize] = i;
   };
   const first = point[1] * width + point[0];
-  if (state(first) !== 1) throw new Error('Die Farbnuance am Klick ist zu unruhig. Bitte einen benachbarten Punkt in der Farbfläche wählen.');
+  if (state(first) !== 1) throw new Error(t('Die Farbnuance am Klick ist zu unruhig. Bitte einen benachbarten Punkt in der Farbfläche wählen.'));
   push(first);
   while (head < tail) {
     const i = chunks[Math.floor(head / chunkSize)][head++ % chunkSize], x = i % width, y = Math.floor(i / width);
@@ -336,7 +337,7 @@ export function growIntelligent(prepared, seed, tolerance) {
     const i = y * width + x, d = (x - cx) ** 2 + (y - cy) ** 2;
     if (strong[i] && d < best) { start = i; best = d; }
   }
-  if (start < 0) throw new Error('Keine eindeutige Flächenfarbe am Klick gefunden. Bitte neben die Beschriftung klicken oder die Empfindlichkeit erhöhen.');
+  if (start < 0) throw new Error(t('Keine eindeutige Flächenfarbe am Klick gefunden. Bitte neben die Beschriftung klicken oder die Empfindlichkeit erhöhen.'));
   const mask = new Uint8Array(n), queued = new Uint8Array(n), queue = new Int32Array(n);
   let head = 0, tail = 1; queue[0] = start; queued[start] = 1;
   // The box filter adds at most one coarse-cell halo on either side of ink.

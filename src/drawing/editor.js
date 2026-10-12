@@ -1,3 +1,4 @@
+import { bindAttribute, bindText, t, tr, untranslated } from '../i18n.js';
 import L from 'leaflet';
 import { createElement, Trash2 } from 'lucide';
 import { curveLayer } from './curve-layer.js';
@@ -37,7 +38,7 @@ export function createDrawingEditor({ map, sourceMap, canEnter, onModeChange, on
   const unproject = p => L.CRS.EPSG3857.unproject(L.point(p));
   const toLonLat = p => { const ll = unproject(p); return [ll.lng, ll.lat]; };
   const feature = object => toFeature(object, toLonLat);
-  const message = text => { el('drawingStatus').textContent = text; };
+  const message = text => { bindText(el('drawingStatus'), () => text); };
   const snapshot = () => JSON.stringify({ objects, selectedIds });
   const record = () => { clearPolygonIssues(); undo.push(snapshot()); if (undo.length > 100) undo.shift(); redo = []; };
   const magnetic = createMagneticTool({ map, renderer, getOriginalRaster, getBasemapRaster,
@@ -50,10 +51,10 @@ export function createDrawingEditor({ map, sourceMap, canEnter, onModeChange, on
     const tolerance = Math.max(.001, Math.hypot(neighbor[0] - origin[0], neighbor[1] - origin[1]) * .3 * (source.pixelScale ?? 1));
     let vertices = source.vector ? projected.map(p => [...p]) : simplify(projected, tolerance);
     if (closed) vertices = vertices.slice(0, -1);
-    if (vertices.length < (closed ? 3 : 2)) { message('Die Form ist zu klein. Bitte weiter auseinanderliegende Anker setzen.'); render(); return; }
-    const object = { id: crypto.randomUUID(), kind: closed ? 'polygon' : 'line', name: `Magnetische ${closed ? 'Fläche' : 'Linie'} ${objects.length + 1}`, vertices };
+    if (vertices.length < (closed ? 3 : 2)) { message(t('Die Form ist zu klein. Bitte weiter auseinanderliegende Anker setzen.')); render(); return; }
+    const object = { id: crypto.randomUUID(), kind: closed ? 'polygon' : 'line', name: tr`Magnetische ${closed ? t('Fläche') : t('Linie')} ${objects.length + 1}`, vertices };
     objects.push(object); selectedIds = [object.id]; vertexIndex = null; tool = 'select';
-    message('Magnetische Zeichnung übernommen. Alle Stützpunkte sind bearbeitbar.'); render();
+    message(t('Magnetische Zeichnung übernommen. Alle Stützpunkte sind bearbeitbar.')); render();
   } });
   const wand = createWand({ map, renderer, getOriginalRaster, getBasemapRaster, onState: updateUI, onComplete({ polygons, source }) {
     const ringToWorld = ring => {
@@ -62,25 +63,25 @@ export function createDrawingEditor({ map, sourceMap, canEnter, onModeChange, on
       return simplify(dense, Math.max(.001, Math.hypot(a[0] - b[0], a[1] - b[1]) * .15)).slice(0, -1);
     };
     const parts = polygons.map(polygon => ({ vertices: ringToWorld(polygon[0]), holes: polygon.slice(1).map(ringToWorld) }));
-    const object = { ...(areaEdit?.properties ? { properties: areaEdit.properties } : {}), id: areaEdit?.id || crypto.randomUUID(), name: areaEdit?.name || `Ausgewählte Fläche ${objects.length + 1}`,
+    const object = { ...(areaEdit?.properties ? { properties: areaEdit.properties } : {}), id: areaEdit?.id || crypto.randomUUID(), name: areaEdit?.name || tr`Ausgewählte Fläche ${objects.length + 1}`,
       ...(parts.length === 1 ? { kind: 'polygon', ...parts[0] } : { kind: 'multiPolygon', parts }) };
     record();
     if (areaEdit) objects = objects.map(existing => existing.id === areaEdit.id ? object : existing);
     else objects.push(object);
     areaEdit = null; selectedIds = [object.id]; vertexIndex = null; vertexRing = 0; tool = 'select';
-    message(`${parts.length} Teilfläche(n) einschließlich ihrer Löcher als ein Objekt übernommen.`); render();
+    message(tr`${parts.length} Teilfläche(n) einschließlich ihrer Löcher als ein Objekt übernommen.`); render();
   } });
 
   const section = createSectionEditor({ map, renderer, magnetic, project, unproject, onState: updateUI,
     onComplete(result) {
       record(); objects = objects.map(object => object.id === result.id ? result : object);
-      tool = 'select'; vertexIndex = null; message('Randabschnitt ersetzt. Mit Rückgängig wiederherstellen.'); render();
+      tool = 'select'; vertexIndex = null; message(t('Randabschnitt ersetzt. Mit Rückgängig wiederherstellen.')); render();
     },
-    onCancel() { tool = 'select'; message('Original unverändert.'); render(); }
+    onCancel() { tool = 'select'; message(t('Original unverändert.')); render(); }
   });
   const reworking = () => !!areaEdit || section.active || !!polygonWorker;
   function cancelArea() {
-    areaEdit = null; tool = 'select'; wand.cancel(); message('Original unverändert.'); render();
+    areaEdit = null; tool = 'select'; wand.cancel(); message(t('Original unverändert.')); render();
   }
   el('reworkArea').onclick = async () => {
     const original = selected();
@@ -122,7 +123,7 @@ export function createDrawingEditor({ map, sourceMap, canEnter, onModeChange, on
     const object = selected();
     const currentTool = areaEdit ? 'area' : tool;
     if (currentTool !== displayedTool) { el('drawingSidebar').scrollTop = 0; displayedTool = currentTool; }
-    el('toolTitle').textContent = areaEdit ? 'Fläche weiterbearbeiten' : toolLabels[tool];
+    bindText(el('toolTitle'), () => areaEdit ? t('Fläche weiterbearbeiten') : toolLabels[tool]);
     el('areaActions').hidden = !areaEdit;
     el('sectionActions').hidden = !section.active;
     el('objectPanel').hidden = tool !== 'select';
@@ -143,11 +144,11 @@ export function createDrawingEditor({ map, sourceMap, canEnter, onModeChange, on
     for (const id of ['drawingName', 'saveSelectedDrawing', 'copyDrawing', 'deleteDrawing']) el(id).disabled = !!simplification;
     el('simplifyDrawing').disabled = !object || geometryLeaves(object).every(part => part.kind === 'point');
     el('simplifyDrawing').value = simplifyAmount;
-    el('simplifyValue').textContent = `${simplifyAmount} %`;
-    el('simplifyStatus').textContent = !object ? 'Objekt auswählen.' : geometryLeaves(object).every(part => part.kind === 'point') ? 'Punkte lassen sich nicht vereinfachen.'
-      : simplifyBusy ? `Berechne ${simplifyAmount} % … Der Regler bleibt bedienbar; Abbrechen beendet die Berechnung.`
-      : simplification ? `Vorschau: ${vertexCount(object)} → ${vertexCount(simplification)} Stützpunkte.${isClosed(object.kind) ? ` ${geometryCounts(object).parts} → ${geometryCounts(simplification).parts} Teilflächen, ${geometryCounts(object).holes} → ${geometryCounts(simplification).holes} Löcher. Kleine Inseln und Löcher können entfallen.` : ''} Mit Fertig bestätigen oder abbrechen.`
-        : `${vertexCount(object)} Stützpunkte. Regler zeigt eine Vorschau; 0 stellt die Ausgangsform wieder her.${vertexCount(object) > 1000 ? ' Bei großen Formen werden Griffe ausgedünnt. Zum Bearbeiten einzelner Punkte hineinzoomen.' : ''}`;
+    bindText(el('simplifyValue'), () => `${simplifyAmount} %`);
+    bindText(el('simplifyStatus'), () => !object ? t('Objekt auswählen.') : geometryLeaves(object).every(part => part.kind === 'point') ? t('Punkte lassen sich nicht vereinfachen.')
+      : simplifyBusy ? tr`Berechne ${simplifyAmount} % … Der Regler bleibt bedienbar; Abbrechen beendet die Berechnung.`
+      : simplification ? tr`Vorschau: ${vertexCount(object)} → ${vertexCount(simplification)} Stützpunkte.${isClosed(object.kind) ? tr` ${geometryCounts(object).parts} → ${geometryCounts(simplification).parts} Teilflächen, ${geometryCounts(object).holes} → ${geometryCounts(simplification).holes} Löcher. Kleine Inseln und Löcher können entfallen.` : ''} Mit Fertig bestätigen oder abbrechen.`
+        : tr`${vertexCount(object)} Stützpunkte. Regler zeigt eine Vorschau; 0 stellt die Ausgangsform wieder her.${vertexCount(object) > 1000 ? t(' Bei großen Formen werden Griffe ausgedünnt. Zum Bearbeiten einzelner Punkte hineinzoomen.') : ''}`);
     el('applySimplification').disabled = !simplification || simplifyBusy;
     el('cancelSimplification').disabled = !simplification;
     el('finishDrawing').disabled = section.active || (tool === 'wand' ? !wand.canFinish : tool === 'magnetic' ? !magnetic.canFinish : !draft || draft.vertices.length < minimumPoints(draft.kind));
@@ -160,23 +161,23 @@ export function createDrawingEditor({ map, sourceMap, canEnter, onModeChange, on
     el('saveDrawing').disabled = !objects.length || pending;
     el('importDrawing').disabled = pending;
     el('pasteDrawing').disabled = pending;
-    el('drawingCount').textContent = `Objekte (${objects.length})`;
+    bindText(el('drawingCount'), () => tr`Objekte (${objects.length})`);
     const chosen = selection(), canCombine = chosen.length >= 2 && chosen.every(object => isClosed(object.kind)) && !pending;
     for(const id of ['unionDrawings','subtractDrawings','intersectDrawings','xorDrawings']) el(id).disabled=!canCombine;
     el('cancelPolygonOperation').hidden = !polygonWorker;
     el('showPolygonIssue').hidden = !active || tool !== 'select' || !polygonIssues.some(issue => issue.point);
-    el('polygonSelectionHelp').textContent = polygonWorker ? 'Berechne Ergebnisfläche … Esc bricht die Berechnung ab.'
-      : chosen.length >= 2 ? chosen.map((object,i)=>`${i+1}: ${object.name}`).join(' · ') + (chosen.every(object=>isClosed(object.kind)) ? '. Subtrahieren zieht alle weiteren Flächen von der ersten ab. Schnittmenge behält nur die gemeinsame Fläche; Exklusiv (XOR) behält Bereiche mit einer ungeraden Anzahl überlagerter Flächen.' : '. Flächenoperationen sind nur für Flächen möglich.') + ' Das Ergebnis wird als neues Objekt angelegt; die Ausgangsobjekte bleiben erhalten.'
-      : 'Weitere Objekte mit Strg/⌘ oder Umschalt anklicken. Das Ergebnis wird als neues Objekt angelegt; die Ausgangsobjekte bleiben erhalten.';
+    bindText(el('polygonSelectionHelp'), () => polygonWorker ? t('Berechne Ergebnisfläche … Esc bricht die Berechnung ab.')
+      : chosen.length >= 2 ? chosen.map((object,i)=>`${i+1}: ${object.name}`).join(' · ') + (chosen.every(object=>isClosed(object.kind)) ? t('. Subtrahieren zieht alle weiteren Flächen von der ersten ab. Schnittmenge behält nur die gemeinsame Fläche; Exklusiv (XOR) behält Bereiche mit einer ungeraden Anzahl überlagerter Flächen.') : t('. Flächenoperationen sind nur für Flächen möglich.')) + t(' Das Ergebnis wird als neues Objekt angelegt; die Ausgangsobjekte bleiben erhalten.')
+      : t('Weitere Objekte mit Strg/⌘ oder Umschalt anklicken. Das Ergebnis wird als neues Objekt angelegt; die Ausgangsobjekte bleiben erhalten.'));
     if (polygonWorker) el('undoDrawing').disabled = el('redoDrawing').disabled = true;
-    el('undoDrawing').title = (draft ? 'Letzten Punkt zurück' : magnetic.hasDraft ? 'Letzten Abschnitt zurück' : wand.hasDraft ? 'Letzte Auswahländerung zurück' : 'Rückgängig') + ' (Strg+Z)';
-    el('drawingHelp').textContent = tool === 'files' ? 'Lade vorhandene Objekte oder speichere deine Zeichnung für die Weiterarbeit.' : tool === 'select'
-      ? 'Objekt anklicken; mit Strg/⌘ oder Umschalt weitere auswählen. Stützpunkte ziehen; + fügt einen Punkt hinzu. Stützpunkt anklicken und mit Entf löschen.'
-      : tool === 'magnetic' ? 'Enter übernimmt die Vorschau. Ohne Vorschau schließt „Fertig“ die Linie ab. Für Flächen „Polygon schließen“ wählen und die Schließkante bestätigen. Esc bricht die Zeichnung ab.'
-      : tool === 'wand' ? 'Farbfläche auswählen und bei Bedarf mit dem Pinsel korrigieren. Fertig übernimmt die Umrisse, Esc verwirft die Auswahl.'
-      : tool === 'point' ? 'Auf die Karte klicken, um einen Punkt zu setzen.'
-        : `Stützpunkte durch Klicken setzen. ${isClosed(tool) ? 'Mindestens drei' : 'Mindestens zwei'} Punkte. Mit Enter oder „Fertig“ abschließen, Esc bricht ab.`;
-    if (section.active) el('drawingHelp').textContent = 'Wähle Anfang und Ende des Randabschnitts und zeichne den neuen Verlauf. Mit „Fertig“ speicherst du ihn; Esc verwirft die Änderungen.';
+    bindAttribute(el('undoDrawing'), 'title', () => (draft ? t('Letzten Punkt zurück') : magnetic.hasDraft ? t('Letzten Abschnitt zurück') : wand.hasDraft ? t('Letzte Auswahländerung zurück') : t('Rückgängig')) + t(' (Strg+Z)'));
+    bindText(el('drawingHelp'), () => tool === 'files' ? t('Lade vorhandene Objekte oder speichere deine Zeichnung für die Weiterarbeit.') : tool === 'select'
+      ? t('Objekt anklicken; mit Strg/⌘ oder Umschalt weitere auswählen. Stützpunkte ziehen; + fügt einen Punkt hinzu. Stützpunkt anklicken und mit Entf löschen.')
+      : tool === 'magnetic' ? t('Enter übernimmt die Vorschau. Ohne Vorschau schließt „Fertig“ die Linie ab. Für Flächen „Polygon schließen“ wählen und die Schließkante bestätigen. Esc bricht die Zeichnung ab.')
+      : tool === 'wand' ? t('Farbfläche auswählen und bei Bedarf mit dem Pinsel korrigieren. Fertig übernimmt die Umrisse, Esc verwirft die Auswahl.')
+      : tool === 'point' ? t('Auf die Karte klicken, um einen Punkt zu setzen.')
+        : tr`Stützpunkte durch Klicken setzen. ${isClosed(tool) ? t('Mindestens drei') : t('Mindestens zwei')} Punkte. Mit Enter oder „Fertig“ abschließen, Esc bricht ab.`);
+    if (section.active) bindText(el('drawingHelp'), () => t('Wähle Anfang und Ende des Randabschnitts und zeichne den neuen Verlauf. Mit „Fertig“ speicherst du ihn; Esc verwirft die Änderungen.'));
     document.querySelectorAll('[data-tool]').forEach(button => { button.setAttribute('aria-pressed', String(active && !geodata?.active && button.dataset.tool === tool)); button.disabled = reworking(); });
     map.getContainer().classList.toggle('drawing-crosshair', active && !['select', 'files'].includes(tool));
     el('magneticSettings').hidden = tool !== 'magnetic' && !section.active;
@@ -190,11 +191,11 @@ export function createDrawingEditor({ map, sourceMap, canEnter, onModeChange, on
       const row=document.createElement('div'); row.className='drawing-object-row';
       const button = document.createElement('button'); button.className='drawing-object-select';
       const index = chosen.findIndex(item => item.id === object.id);
-      button.textContent = `${chosen.length >= 2 && index !== -1 ? `${index + 1}. ` : ''}${object.name}`;
+      bindText(button, () => `${chosen.length >= 2 && index !== -1 ? `${index + 1}. ` : ''}${object.name}`, false);
       button.setAttribute('aria-pressed', String(index !== -1));
       button.onclick = event => select(object.id, event.ctrlKey || event.metaKey || event.shiftKey);
       const remove=document.createElement('button'); remove.className='drawing-object-delete';
-      remove.title=`„${object.name}“ löschen`; remove.setAttribute('aria-label',remove.title); remove.disabled=pending;
+      bindAttribute(remove, 'title', () => tr`„${untranslated(object.name)}“ löschen`); bindAttribute(remove, "aria-label", () => remove.title); remove.disabled=pending;
       const icon=createElement(Trash2); icon.setAttribute('aria-hidden','true'); remove.append(icon);
       remove.onclick=()=>deleteObject(object.id);
       row.append(button,remove); list.append(row);
@@ -202,7 +203,7 @@ export function createDrawingEditor({ map, sourceMap, canEnter, onModeChange, on
   }
 
   function select(id, additive = false) {
-    if (draft || magnetic.hasDraft || wand.hasDraft || simplification || reworking()) { message('Bitte zuerst die begonnene Form oder Vorschau übernehmen oder verwerfen.'); return; }
+    if (draft || magnetic.hasDraft || wand.hasDraft || simplification || reworking()) { message(t('Bitte zuerst die begonnene Form oder Vorschau übernehmen oder verwerfen.')); return; }
     if (!additive) selectedIds=[id];
     else if (selectedIds.includes(id)) selectedIds=selectedIds.filter(chosen=>chosen!==id);
     else selectedIds.push(id);
@@ -224,7 +225,7 @@ export function createDrawingEditor({ map, sourceMap, canEnter, onModeChange, on
       }).addTo(polygonIssueLayer);
       if (issue.point) {
         const label = document.createElement('span');
-        label.textContent = `${issue.objectName || 'Fläche'}: ${issue.reason}`;
+        bindText(label, () => `${issue.objectName || t('Fläche')}: ${t(issue.reason)}`, false);
         L.circleMarker(unproject(issue.point), { renderer, radius: 10, color: '#c22',
           weight: 3, fillOpacity: .15, interactive: false, className: 'polygon-issue'
         }).bindTooltip(label, { permanent: true, direction: 'right', className: 'section-issue' }).addTo(polygonIssueLayer);
@@ -236,7 +237,7 @@ export function createDrawingEditor({ map, sourceMap, canEnter, onModeChange, on
     if (points.length) map.fitBounds(L.latLngBounds(points.map(unproject)), { padding: [80, 80], maxZoom: 16, animate: false });
   };
   function cancelPolygonOperation() {
-    stopPolygonOperation(); message('Flächenberechnung abgebrochen. Ausgangsobjekte unverändert.'); render();
+    stopPolygonOperation(); message(t('Flächenberechnung abgebrochen. Ausgangsobjekte unverändert.')); render();
   }
   function operatePolygons(operation) {
     const chosen = selection();
@@ -245,7 +246,7 @@ export function createDrawingEditor({ map, sourceMap, canEnter, onModeChange, on
     const symbols={union: '+', difference: '−', intersection: '∩', xor: '⊕'};
     const fail = (error, issues = []) => {
       stopPolygonOperation(); polygonIssues = issues;
-      message(`Flächenberechnung fehlgeschlagen: ${error}${issues.some(issue => issue.point) ? ' Die Fehlerstelle ist rot markiert; „Fehlerstelle anzeigen“ zoomt dorthin.' : ''} Die Ausgangsobjekte bleiben erhalten.`); render();
+      message(tr`Flächenberechnung fehlgeschlagen: ${error}${issues.some(issue => issue.point) ? t(' Die Fehlerstelle ist rot markiert; „Fehlerstelle anzeigen“ zoomt dorthin.') : ''} Die Ausgangsobjekte bleiben erhalten.`); render();
     };
     try {
       const worker = new Worker(new URL('./polygon-operation-worker.js', import.meta.url), { type: 'module' });
@@ -254,13 +255,13 @@ export function createDrawingEditor({ map, sourceMap, canEnter, onModeChange, on
         if (polygonWorker !== worker) return;
         if (data.error) { fail(data.error, data.issues); return; }
         stopPolygonOperation();
-        if (!data.result) { message('Das Ergebnis ist leer oder enthält keine Fläche; kein neues Objekt angelegt.'); render(); return; }
+        if (!data.result) { message(t('Das Ergebnis ist leer oder enthält keine Fläche; kein neues Objekt angelegt.')); render(); return; }
         record();
         const result = { ...data.result, id: crypto.randomUUID(), name: operation==='difference' && chosen.length>2 ? `${chosen[0].name} − (${chosen.slice(1).map(object=>object.name).join(' + ')})` : chosen.map(object=>object.name).join(` ${symbols[operation]} `) };
         objects.push(result); selectedIds = [result.id]; vertexRing = 0;
-        message(data.result.curveFallback ? 'Ergebnis angelegt. An problematischen Schnittstellen musste der Rand in Stützpunkte umgewandelt werden; die Ausgangskurven bleiben erhalten.' : 'Ergebnis als neues Flächenobjekt angelegt. Kurven bleiben bearbeitbar; die Ausgangsobjekte bleiben erhalten. Mit Rückgängig entfernen.'); render();
+        message(data.result.curveFallback ? t('Ergebnis angelegt. An problematischen Schnittstellen musste der Rand in Stützpunkte umgewandelt werden; die Ausgangskurven bleiben erhalten.') : t('Ergebnis als neues Flächenobjekt angelegt. Kurven bleiben bearbeitbar; die Ausgangsobjekte bleiben erhalten. Mit Rückgängig entfernen.')); render();
       };
-      worker.onerror = () => { if (polygonWorker === worker) fail('Hintergrundberechnung nicht verfügbar.'); };
+      worker.onerror = () => { if (polygonWorker === worker) fail(t('Hintergrundberechnung nicht verfügbar.')); };
       worker.postMessage({ objects:chosen, operation });
     } catch (error) { fail(error.message); }
   }
@@ -286,7 +287,7 @@ export function createDrawingEditor({ map, sourceMap, canEnter, onModeChange, on
     if (!temporary) {
       layers.set(object.id, layer);
       layer.on('click', e => tool === 'select' ? select(object.id, e.originalEvent?.ctrlKey || e.originalEvent?.metaKey || e.originalEvent?.shiftKey) : mapClick(e));
-      layer.bindTooltip(() => { const span = document.createElement('span'); span.textContent = object.name; return span; });
+      layer.bindTooltip(() => { const span = document.createElement('span'); bindText(span, () => object.name, false); return span; });
     }
     return layer;
   }
@@ -327,7 +328,7 @@ export function createDrawingEditor({ map, sourceMap, canEnter, onModeChange, on
       cells.add(cell); shown++; return true;
     };
     ringEntries(object).forEach(({ vertices, kind, partIndex, holeIndex, shape }, index) => {
-      const prefix = `${object.kind === 'multiPolygon' ? `Teilfläche ${partIndex + 1}: ` : ''}${holeIndex ? `Loch ${holeIndex}: ` : ''}`;
+      const prefix = `${object.kind === 'multiPolygon' ? tr`Teilfläche ${partIndex + 1}: ` : ''}${holeIndex ? tr`Loch ${holeIndex}: ` : ''}`;
       renderRingHandles(object, vertices, index, prefix, visible, kind, shape);
     });
   }
@@ -335,7 +336,7 @@ export function createDrawingEditor({ map, sourceMap, canEnter, onModeChange, on
     const midpointMarkers = [];
     vertices.forEach((point, index) => {
       if (!visible(point, vertexIndex === index && vertexRing === ringIndex)) return;
-      const handle = marker(point, `drawing-vertex${vertexIndex === index && vertexRing === ringIndex ? ' chosen' : ''}`, `${prefix}Stützpunkt ${index + 1}`, true);
+      const handle = marker(point, `drawing-vertex${vertexIndex === index && vertexRing === ringIndex ? ' chosen' : ''}`, tr`${prefix}Stützpunkt ${index + 1}`, true);
       const choose = () => {
         vertexIndex = index; vertexRing = ringIndex;
         handles.eachLayer(layer => layer.getElement()?.classList.remove('chosen'));
@@ -345,7 +346,7 @@ export function createDrawingEditor({ map, sourceMap, canEnter, onModeChange, on
       handle.on('click', choose);
       handle.on('dragstart', () => { record(); vertexIndex = index; vertexRing = ringIndex; midpointMarkers.forEach(m => handles.removeLayer(m)); });
       handle.on('drag', () => { vertices[index] = project(handle.getLatLng()); updateShape(object); });
-      handle.on('dragend', () => { message('Stützpunkt verschoben.'); render(); });
+      handle.on('dragend', () => { message(t('Stützpunkt verschoben.')); render(); });
       handle.on('keydown', e => { if (e.originalEvent.key === 'Enter') { vertexIndex = index; vertexRing = ringIndex; render(); } });
     });
     if (kind === 'point') return;
@@ -353,7 +354,7 @@ export function createDrawingEditor({ map, sourceMap, canEnter, onModeChange, on
     for (let i = 0; i < count; i++) {
       const point = edgePoint(shape, i, .5);
       if (!visible(point)) continue;
-      const mid = marker(point, 'drawing-midpoint', `Stützpunkt zwischen ${i + 1} und ${(i + 1) % vertices.length + 1} hinzufügen`, true);
+      const mid = marker(point, 'drawing-midpoint', tr`Stützpunkt zwischen ${i + 1} und ${(i + 1) % vertices.length + 1} hinzufügen`, true);
       let inserted = false;
       const insert = () => {
         if (inserted) return;
@@ -363,12 +364,12 @@ export function createDrawingEditor({ map, sourceMap, canEnter, onModeChange, on
       mid.on('dragstart', () => {
         insert(); midpointMarkers.filter(m => m !== mid).forEach(m => handles.removeLayer(m));
         mid.getElement().className = 'leaflet-marker-icon drawing-vertex chosen leaflet-zoom-animated leaflet-interactive';
-        mid.getElement().firstElementChild.textContent = '';
+        bindText(mid.getElement().firstElementChild, () => '');
       });
       mid.on('drag', () => { vertices[i + 1] = project(mid.getLatLng()); updateShape(object); });
-      mid.on('dragend', () => { message('Stützpunkt eingefügt und verschoben.'); render(); });
+      mid.on('dragend', () => { message(t('Stützpunkt eingefügt und verschoben.')); render(); });
       mid.on('click', () => {
-        insert(); message('Stützpunkt hinzugefügt. Zum Verfeinern verschieben.'); render();
+        insert(); message(t('Stützpunkt hinzugefügt. Zum Verfeinern verschieben.')); render();
       });
       midpointMarkers.push(mid);
     }
@@ -380,7 +381,7 @@ export function createDrawingEditor({ map, sourceMap, canEnter, onModeChange, on
     if (active && selected() && !draft && !simplification && !reworking()) renderHandles(selected());
     if (active && draft) {
       drawShape(draft, true);
-      draft.vertices.forEach((point, i) => marker(point, 'drawing-vertex draft', `Neuer Stützpunkt ${i + 1}`));
+      draft.vertices.forEach((point, i) => marker(point, 'drawing-vertex draft', tr`Neuer Stützpunkt ${i + 1}`));
     }
     renderPolygonIssues(); updateUI();
   }
@@ -388,7 +389,7 @@ export function createDrawingEditor({ map, sourceMap, canEnter, onModeChange, on
   function setMode(value) {
     if (geodata?.active && !geodata.canLeave()) return;
     if (value && !canEnter()) return;
-    if (draft || magnetic.hasDraft || wand.hasDraft || simplification || reworking()) { message('Bitte zuerst die begonnene Form oder Vorschau übernehmen oder verwerfen.'); return; }
+    if (draft || magnetic.hasDraft || wand.hasDraft || simplification || reworking()) { message(t('Bitte zuerst die begonnene Form oder Vorschau übernehmen oder verwerfen.')); return; }
     if (active === value) return true;
     const previousView = { center: map.getCenter(), zoom: map.getZoom() };
     if (!value) drawingView = objects.length ? previousView : null;
@@ -417,26 +418,26 @@ export function createDrawingEditor({ map, sourceMap, canEnter, onModeChange, on
     if (tool === 'magnetic') { magnetic.finish(); return; }
     if (!draft || draft.vertices.length < minimumPoints(draft.kind)) return;
     record(); objects.push(draft); selectedIds = [draft.id]; draft = null; vertexIndex = null; tool = 'select';
-    message('Objekt angelegt. Die Stützpunkte sind jetzt bearbeitbar.'); render();
+    message(t('Objekt angelegt. Die Stützpunkte sind jetzt bearbeitbar.')); render();
   }
 
   function deleteObject(id=selected()?.id) {
     if (!objects.some(object=>object.id===id) || draft || magnetic.hasDraft || wand.hasDraft || simplification || reworking()) return;
     record(); objects=objects.filter(object=>object.id!==id); selectedIds=selectedIds.filter(chosen=>chosen!==id); vertexIndex=null;
-    message('Objekt gelöscht. Mit Rückgängig wiederherstellen.'); render();
+    message(t('Objekt gelöscht. Mit Rückgängig wiederherstellen.')); render();
   }
 
   function deleteVertex() {
     const object = selected();
     if (!object || vertexIndex === null || draft || simplification || reworking()) return;
     const vertices = objectRings(object)[vertexRing];
-    if (!vertices || vertices.length <= minimumPoints(ringEntries(object)[vertexRing].kind)) { message('Diese Form benötigt ihre verbleibenden Stützpunkte.'); return; }
+    if (!vertices || vertices.length <= minimumPoints(ringEntries(object)[vertexRing].kind)) { message(t('Diese Form benötigt ihre verbleibenden Stützpunkte.')); return; }
     record(); removeVertex(ringEntries(object)[vertexRing].shape,vertexIndex); vertexIndex = null; render();
   }
 
   function mapClick(e) {
     if (!active || geodata?.active || polygonWorker || tool === 'files') return;
-    if (simplification) { message('Bitte die Vereinfachung zuerst übernehmen oder verwerfen.'); return; }
+    if (simplification) { message(t('Bitte die Vereinfachung zuerst übernehmen oder verwerfen.')); return; }
     if (section.active) { section.click(e.latlng, e.originalEvent); return; }
     if (tool === 'magnetic') { magnetic.click(e.latlng, e.originalEvent); return; }
     if (tool === 'wand') { wand.click(e.latlng); return; }
@@ -446,11 +447,11 @@ export function createDrawingEditor({ map, sourceMap, canEnter, onModeChange, on
     const point = project(e.latlng);
     if (!draft) {
       selectedIds = []; vertexIndex = null;
-      draft = { id: crypto.randomUUID(), kind: tool, name: `${labels[tool]} ${objects.length + 1}`, vertices: [] };
+      draft = { id: crypto.randomUUID(), kind: tool, name: `${t(labels[tool])} ${objects.length + 1}`, vertices: [] };
     }
     if (draft.vertices.length && Math.hypot(...point.map((v, i) => v - draft.vertices.at(-1)[i])) < 1e-6) return;
     draft.vertices.push(point);
-    if (tool === 'point') finish(); else { message(`${draft.vertices.length} Stützpunkte gesetzt.`); render(); }
+    if (tool === 'point') finish(); else { message(tr`${draft.vertices.length} Stützpunkte gesetzt.`); render(); }
   }
   map.on('click', mapClick);
   map.on('moveend zoomend', () => {
@@ -464,7 +465,7 @@ export function createDrawingEditor({ map, sourceMap, canEnter, onModeChange, on
   document.querySelectorAll('[data-tool]').forEach(button => {
     button.onclick = () => {
       if (geodata?.active && !geodata.canLeave()) return;
-      if (draft || magnetic.hasDraft || wand.hasDraft || simplification || reworking()) { message('Bitte zuerst die begonnene Form oder Vorschau übernehmen oder verwerfen.'); return; }
+      if (draft || magnetic.hasDraft || wand.hasDraft || simplification || reworking()) { message(t('Bitte zuerst die begonnene Form oder Vorschau übernehmen oder verwerfen.')); return; }
       if (!active && !setMode(true)) return;
       tool = button.dataset.tool; selectedIds = []; vertexIndex = null; message(''); render();
     };
@@ -473,7 +474,7 @@ export function createDrawingEditor({ map, sourceMap, canEnter, onModeChange, on
   el('leaveDrawing').onclick = () => setMode(false);
   el('cancelGeoreference').onclick = () => { if (onCancelGeoreference()) setMode(true); };
   el('finishDrawing').onclick = finish;
-  el('cancelDrawing').onclick = () => { if (section.active) { section.cancel(); return; } if (areaEdit) { cancelArea(); return; } stopSimplification(); simplification = null; simplifyAmount = 0; magnetic.cancel(); wand.cancel(); draft = null; message('Zeichnen abgebrochen.'); render(); };
+  el('cancelDrawing').onclick = () => { if (section.active) { section.cancel(); return; } if (areaEdit) { cancelArea(); return; } stopSimplification(); simplification = null; simplifyAmount = 0; magnetic.cancel(); wand.cancel(); draft = null; message(t('Zeichnen abgebrochen.')); render(); };
   function stopSimplification() {
     simplifyGeneration++; clearTimeout(simplifyTimer); simplifyTimer = null;
     simplifyWorker?.terminate(); simplifyWorker = null;
@@ -481,7 +482,7 @@ export function createDrawingEditor({ map, sourceMap, canEnter, onModeChange, on
   }
   function cancelSimplification() {
     stopSimplification();
-    simplification = null; simplifyAmount = 0; message('Vereinfachung verworfen.'); render();
+    simplification = null; simplifyAmount = 0; message(t('Vereinfachung verworfen.')); render();
   }
   el('simplifyDrawing').oninput = () => {
     const object = selected();
@@ -497,7 +498,7 @@ export function createDrawingEditor({ map, sourceMap, canEnter, onModeChange, on
     simplifyTimer = setTimeout(() => {
       const fail = error => {
         if (generation !== simplifyGeneration) return;
-        cancelSimplification(); message(`Vereinfachung fehlgeschlagen: ${error}. Die Ausgangsform bleibt erhalten.`);
+        cancelSimplification(); message(tr`Vereinfachung fehlgeschlagen: ${error}. Die Ausgangsform bleibt erhalten.`);
       };
       try {
         simplifyWorker = new Worker(new URL('./simplification-worker.js', import.meta.url), { type: 'module' });
@@ -507,7 +508,7 @@ export function createDrawingEditor({ map, sourceMap, canEnter, onModeChange, on
           stopSimplification(); simplification = data.result;
           updateShape(simplification); updateUI();
         };
-        simplifyWorker.onerror = () => fail('Hintergrundberechnung nicht verfügbar');
+        simplifyWorker.onerror = () => fail(t('Hintergrundberechnung nicht verfügbar'));
         simplifyWorker.postMessage({ object, amount: simplifyAmount });
       } catch (error) { fail(error.message); }
     }, 120);
@@ -516,14 +517,14 @@ export function createDrawingEditor({ map, sourceMap, canEnter, onModeChange, on
   el('applySimplification').onclick = () => {
     if (!simplification || simplifyBusy) return;
     record(); objects = objects.map(object => object.id === simplification.id ? simplification : object);
-    simplification = null; simplifyAmount = 0; message('Objekt vereinfacht und geglättet. Mit Rückgängig wiederherstellen.'); render();
+    simplification = null; simplifyAmount = 0; message(t('Objekt vereinfacht und geglättet. Mit Rückgängig wiederherstellen.')); render();
   };
   el('undoDrawing').onclick = () => history(undo, redo);
   el('redoDrawing').onclick = () => history(redo, undo);
   el('deleteDrawing').onclick = () => deleteObject();
   el('drawingName').onchange = () => {
     if (!selected()) return;
-    record(); selected().name = el('drawingName').value.trim() || labels[selected().kind]; render();
+    record(); selected().name = el('drawingName').value.trim() || t(labels[selected().kind]); render();
   };
   el('zoomContent').onclick = () => {
     const bounds = L.latLngBounds([]);
@@ -532,7 +533,7 @@ export function createDrawingEditor({ map, sourceMap, canEnter, onModeChange, on
     else el('zoomImage').click();
   };
   function loadGeoJSON(text) {
-    if (draft || magnetic.hasDraft || wand.hasDraft || simplification || reworking()) { const error = 'Bitte zuerst die begonnene Bearbeitung abschließen oder verwerfen.'; message(error); return { error }; }
+    if (draft || magnetic.hasDraft || wand.hasDraft || simplification || reworking()) { const error = t('Bitte zuerst die begonnene Bearbeitung abschließen oder verwerfen.'); message(error); return { error }; }
     try {
       const imported = importGeoJSON(text, p => project(L.latLng(p[1], p[0])));
       record(); for (const object of imported) objects.push(object);
@@ -541,19 +542,19 @@ export function createDrawingEditor({ map, sourceMap, canEnter, onModeChange, on
       const bounds = L.latLngBounds([]);
       for (const object of imported) for (const ring of objectRings(object)) for (const p of ring) bounds.extend(unproject(p));
       map.fitBounds(bounds, { padding: [30, 30], maxZoom: 16 });
-      message(`${imported.length} Objekte importiert. Mit Rückgängig wieder entfernen.`);
+      message(tr`${imported.length} Objekte importiert. Mit Rückgängig wieder entfernen.`);
       return { count: imported.length };
-    } catch (error) { message(`Import fehlgeschlagen: ${error.message}`); return { error: error.message }; }
+    } catch (error) { message(tr`Import fehlgeschlagen: ${error.message}`); return { error: error.message }; }
   }
   el('importDrawing').onclick = () => el('importDrawingFile').click();
   el('importDrawingFile').onchange = async event => {
     const file = event.target.files[0]; event.target.value = '';
     if (!file) return;
-    try { loadGeoJSON(await file.text()); } catch (error) { message(`Datei konnte nicht gelesen werden: ${error.message}`); }
+    try { loadGeoJSON(await file.text()); } catch (error) { message(tr`Datei konnte nicht gelesen werden: ${error.message}`); }
   };
   el('pasteDrawing').onclick = async () => {
     try { loadGeoJSON(await navigator.clipboard.readText()); }
-    catch { message('Zwischenablage nicht freigegeben. Bitte auf die Karte klicken und Strg+V verwenden.'); }
+    catch { message(t('Zwischenablage nicht freigegeben. Bitte auf die Karte klicken und Strg+V verwenden.')); }
   };
   function saveObjects(exportedObjects) {
     const collection = { type: 'FeatureCollection', features: exportedObjects.map(feature) };
@@ -565,19 +566,19 @@ export function createDrawingEditor({ map, sourceMap, canEnter, onModeChange, on
     const object = selected();
     if (!object || draft || simplification || reworking()) return;
     saveObjects([object]);
-    message('Ausgewähltes Objekt als GeoJSON gespeichert.');
+    message(t('Ausgewähltes Objekt als GeoJSON gespeichert.'));
   };
   el('saveDrawing').onclick = () => {
     saveObjects(objects);
     savedObjects = JSON.stringify(objects);
-    message(`${objects.length} Objekte als GeoJSON gespeichert.`);
+    message(tr`${objects.length} Objekte als GeoJSON gespeichert.`);
   };
   el('copyDrawing').onclick = async () => {
     if (!selected() || draft || simplification || reworking()) return;
     try {
       await navigator.clipboard.writeText(JSON.stringify(feature(selected()), null, 2));
-      message('Ausgewähltes Objekt als GeoJSON kopiert.');
-    } catch { message('Zwischenablage nicht freigegeben. Bitte Strg+C verwenden.'); }
+      message(t('Ausgewähltes Objekt als GeoJSON kopiert.'));
+    } catch { message(t('Zwischenablage nicht freigegeben. Bitte Strg+C verwenden.')); }
   };
   const editingText = target => target instanceof Element && !!target.closest('input, textarea, select, [contenteditable="true"]');
   document.addEventListener('paste', e => {
@@ -587,7 +588,7 @@ export function createDrawingEditor({ map, sourceMap, canEnter, onModeChange, on
   document.addEventListener('copy', e => {
     if (!active || geodata?.active || !selected() || draft || simplification || reworking() || editingText(e.target) || window.getSelection()?.toString()) return;
     e.clipboardData.setData('text/plain', JSON.stringify(feature(selected()), null, 2));
-    e.preventDefault(); message('Ausgewähltes Objekt als GeoJSON kopiert.');
+    e.preventDefault(); message(t('Ausgewähltes Objekt als GeoJSON kopiert.'));
   });
   document.addEventListener('keydown', e => {
     if (!active || geodata?.active || editingText(e.target)) return;
@@ -611,13 +612,13 @@ export function createDrawingEditor({ map, sourceMap, canEnter, onModeChange, on
     onImport(features) {
       const known = sourceIds();
       const unique = features.filter(feature => { if (known.has(feature.id)) return false; known.add(feature.id); return true; });
-      if (!unique.length) return { error: 'Diese Objekte sind bereits in der Zeichnung vorhanden.' };
+      if (!unique.length) return { error: t('Diese Objekte sind bereits in der Zeichnung vorhanden.') };
       return loadGeoJSON(JSON.stringify({ type: 'FeatureCollection', features: unique }));
     },
     onClose() { render(); el('drawingSidebar').scrollTop = 0; document.querySelector(`[data-tool="${tool}"]`)?.focus(); }
   });
   el('openGeodata').onclick = () => {
-    if (draft || magnetic.hasDraft || wand.hasDraft || simplification || reworking()) { message('Bitte zuerst die begonnene Form oder Vorschau übernehmen oder verwerfen.'); return; }
+    if (draft || magnetic.hasDraft || wand.hasDraft || simplification || reworking()) { message(t('Bitte zuerst die begonnene Form oder Vorschau übernehmen oder verwerfen.')); return; }
     if (!active && !setMode(true)) return;
     geodata.open(); updateUI();
   };

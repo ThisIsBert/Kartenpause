@@ -15,6 +15,14 @@ npm.cmd run dev
 
 Vite zeigt anschließend die lokale Adresse an. Ein Produktions-Build entsteht mit `npm.cmd run build` im Verzeichnis `dist/`.
 
+## Sprache und Einstellungen
+
+Der Button **Einstellungen** oben rechts öffnet die Sprachauswahl **Deutsch / English**. Beim ersten Start gilt die erste unterstützte Sprache aus der Browser-Sprachliste; bei anderen Sprachen wird Englisch verwendet. Eine manuelle Wahl wird lokal in diesem Browser gespeichert und hat anschließend Vorrang. Der Wechsel wirkt sofort und erhält Zeichnungen, Namen, Kartenausschnitt und laufende Bearbeitungen. Falls der Browser lokalen Speicher sperrt, gilt die Auswahl bis zum nächsten Laden der Seite.
+
+Die englischen Texte stehen zentral in `src/i18n/en.json`. Die deutschen Originaltexte dienen als Schlüssel. Platzhalter wie `{0}` und `{1}` müssen bei Anpassungen erhalten bleiben. `src/i18n.js` bindet feste Beschriftungen sowie dynamische Meldungen an die Sprachwahl an. Die Ortssuche fragt Namen in der gewählten Sprache ab; eigene Objektnamen werden nicht übersetzt.
+
+`npm.cmd run test:i18n` prüft Spracherkennung, gespeicherte Auswahl, gesperrten Speicher, sofortige Textaktualisierung und vollständige Platzhalter.
+
 ## Geodaten suchen
 
 Das Lupensymbol in der Werkzeugleiste öffnet eine eigene Suchkarte im aktuellen Kartenausschnitt. Die Zeichnung und ihre Ansicht bleiben erhalten. Ab drei Zeichen erscheinen nach einer kurzen Tipp-Pause Ortsvorschläge; Pfeil ab führt zur Trefferliste, Enter wählt einen Treffer. Alternativ auf die Suchkarte klicken. Die Objektliste enthält Objekte in der Nähe und umgebende Gebiete, etwa Verwaltungsgrenzen.

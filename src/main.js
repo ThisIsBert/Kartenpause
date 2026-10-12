@@ -1,3 +1,5 @@
+import { bindAttribute, bindText, getLocale, localizeDocument, localizeMapControls, t, tr, untranslated } from './i18n.js';
+import { setupSettings } from './settings.js';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import proj4 from 'proj4';
@@ -10,7 +12,7 @@ import {
   Save,
   Scan,
   Trash2,
-  X, Check, Search, MousePointer2, MapPin, Slash, Pentagon, Spline, Circle, Magnet, WandSparkles, MapPinned, Undo2, Redo2
+  X, Check, Search, MousePointer2, MapPin, Slash, Pentagon, Spline, Circle, Magnet, WandSparkles, MapPinned, Undo2, Redo2, Settings
 } from 'lucide';
 import { GeoFit } from './geo/geo-fit.js';
 import { ProjectionSearch } from './geo/projection-search.js';
@@ -22,6 +24,8 @@ import { createRasterInverse } from './drawing/raster-source.js';
 import { createBasemapRaster } from './drawing/basemap-source.js';
 
 
+    localizeDocument();
+    setupSettings();
     const map = L.map('map', { preferCanvas: true }).setView([51.1, 10.3], 6);
 
     const basemaps = {
@@ -35,14 +39,14 @@ import { createBasemapRaster } from './drawing/basemap-source.js';
       }),
       osm: L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
         maxZoom: 19, crossOrigin: true,
-        attribution: '&copy; OpenStreetMap-Mitwirkende'
+        attribution: t('&copy; OpenStreetMap-Mitwirkende')
       })
     };
     let activeBasemap = basemaps.esriStreet.addTo(map);
 
     // CRS-Definitionen. 4326 und 3857 kennt Proj4js bereits.
     const candidates = [
-      { code: 'EPSG:4326', label: 'Geografisch / Plate Carrée (EPSG:4326)' },
+      { code: 'EPSG:4326', label: t('Geografisch / Plate Carrée (EPSG:4326)') },
       { code: 'EPSG:3857', label: 'Web Mercator (EPSG:3857)' },
       { code: 'EPSG:3395', label: 'World Mercator (EPSG:3395)', def: '+proj=merc +lon_0=0 +k=1 +x_0=0 +y_0=0 +datum=WGS84 +units=m +no_defs' },
       { code: 'EPSG:25832', label: 'ETRS89 / UTM 32N (EPSG:25832)', def: '+proj=utm +zone=32 +ellps=GRS80 +units=m +no_defs' },
@@ -51,8 +55,8 @@ import { createBasemapRaster } from './drawing/basemap-source.js';
       { code: 'EPSG:32633', label: 'WGS84 / UTM 33N (EPSG:32633)', def: '+proj=utm +zone=33 +datum=WGS84 +units=m +no_defs' },
       { code: 'EPSG:3035', label: 'ETRS89 / LAEA Europe (EPSG:3035)', def: '+proj=laea +lat_0=52 +lon_0=10 +x_0=4321000 +y_0=3210000 +ellps=GRS80 +units=m +no_defs' },
       { code: 'EPSG:3034', label: 'ETRS89 / LCC Europe (EPSG:3034)', def: '+proj=lcc +lat_0=52 +lon_0=10 +lat_1=35 +lat_2=65 +x_0=4000000 +y_0=2800000 +ellps=GRS80 +units=m +no_defs' },
-      { code: 'DHDN:GK3', label: 'DHDN / Gauß-Krüger Zone 3', def: '+proj=tmerc +lat_0=0 +lon_0=9 +k=1 +x_0=3500000 +y_0=0 +ellps=bessel +towgs84=598.1,73.7,418.2,0.202,0.045,-2.455,6.7 +units=m +no_defs' },
-      { code: 'DHDN:GK4', label: 'DHDN / Gauß-Krüger Zone 4', def: '+proj=tmerc +lat_0=0 +lon_0=12 +k=1 +x_0=4500000 +y_0=0 +ellps=bessel +towgs84=598.1,73.7,418.2,0.202,0.045,-2.455,6.7 +units=m +no_defs' },
+      { code: 'DHDN:GK3', label: t('DHDN / Gauß-Krüger Zone 3'), def: '+proj=tmerc +lat_0=0 +lon_0=9 +k=1 +x_0=3500000 +y_0=0 +ellps=bessel +towgs84=598.1,73.7,418.2,0.202,0.045,-2.455,6.7 +units=m +no_defs' },
+      { code: 'DHDN:GK4', label: t('DHDN / Gauß-Krüger Zone 4'), def: '+proj=tmerc +lat_0=0 +lon_0=12 +k=1 +x_0=4500000 +y_0=0 +ellps=bessel +towgs84=598.1,73.7,418.2,0.202,0.045,-2.455,6.7 +units=m +no_defs' },
       { code: 'WORLD:ROBIN', label: 'Robinson', def: '+proj=robin +lon_0=0 +datum=WGS84 +units=m +no_defs' },
       { code: 'WORLD:MOLL', label: 'Mollweide', def: '+proj=moll +lon_0=0 +datum=WGS84 +units=m +no_defs' },
       { code: 'WORLD:EQEARTH', label: 'Equal Earth', def: '+proj=eqearth +lon_0=0 +datum=WGS84 +units=m +no_defs' }
@@ -114,7 +118,7 @@ import { createBasemapRaster } from './drawing/basemap-source.js';
 
     function sourceToLatLng(x, y, code = currentCrs().code) {
       const ll = proj4(code, 'EPSG:4326', [x, y]);
-      if (!Number.isFinite(ll[0]) || !Number.isFinite(ll[1]) || Math.abs(ll[1]) > 90) throw new Error('Ungültige Rücktransformation');
+      if (!Number.isFinite(ll[0]) || !Number.isFinite(ll[1]) || Math.abs(ll[1]) > 90) throw new Error(t('Ungültige Rücktransformation'));
       return L.latLng(ll[1], ll[0]);
     }
 
@@ -198,7 +202,7 @@ import { createBasemapRaster } from './drawing/basemap-source.js';
             const u = i / n, v = j / n;
             try {
               const ll = uvToLatLng(u, v, g, crs.code);
-              if (Math.abs(ll.lat) > 85.05112878) throw new Error('Außerhalb Web Mercator');
+              if (Math.abs(ll.lat) > 85.05112878) throw new Error(t('Außerhalb Web Mercator'));
               const lp = map.latLngToLayerPoint(ll).subtract(topLeft);
               points[j][i] = { x: lp.x, y: lp.y, lon: ll.lng, sx: u * image.naturalWidth, sy: v * image.naturalHeight };
             } catch (e) { points[j][i] = null; }
@@ -215,7 +219,7 @@ import { createBasemapRaster } from './drawing/basemap-source.js';
           triangle(p00, p10, p11);
           triangle(p00, p11, p01);
         }
-        ui.renderNote.textContent = skipped ? `${skipped} von ${2*n*n} Bilddreiecken außerhalb des darstellbaren Bereichs ausgelassen.` : '';
+        bindText(ui.renderNote, () => skipped ? tr`${skipped} von ${2*n*n} Bilddreiecken außerhalb des darstellbaren Bereichs ausgelassen.` : '');
       }
     }
 
@@ -240,33 +244,33 @@ import { createBasemapRaster } from './drawing/basemap-source.js';
     const overlay = new WarpedImageLayer().addTo(map);
 
     function updateStatus(extra='') {
-      const imageText = image ? `Bild: ${imageName} (${image.naturalWidth}×${image.naturalHeight} px)` : 'Noch kein Bild geladen.';
-      const method = transformMode === 'projection+tps' ? 'Projektionsmodell mit TPS-Korrektur' : 'Projektionsmodell';
-      const fitText = fitted ? `\nMethode: ${method}\nAutomatisch angepasst.` : image ? '\nNoch nicht angepasst. Referenzpunkte setzen und die Projektion automatisch anpassen.' : '';
-      els.status.textContent = `${imageText}${fitText}${extra ? '\n' + extra : ''}`;
+      const imageText = image ? tr`Bild: ${untranslated(imageName)} (${image.naturalWidth}×${image.naturalHeight} px)` : t('Noch kein Bild geladen.');
+      const method = transformMode === 'projection+tps' ? t('Projektionsmodell mit TPS-Korrektur') : t('Projektionsmodell');
+      const fitText = fitted ? tr`\nMethode: ${method}\nAutomatisch angepasst.` : image ? t('\nNoch nicht angepasst. Referenzpunkte setzen und die Projektion automatisch anpassen.') : '';
+      bindText(els.status, () => `${imageText}${fitText}${extra ? '\n' + extra : ''}`);
     }
-    function showError(err) { ui.notice.textContent = 'Fehler: ' + (err?.message || err); }
+    function showError(err) { bindText(ui.notice, () => t('Fehler: ') + t(err?.message || err)); }
 
-    const appIcons = { Crosshair, FolderOpen, MapPinPlus, Pencil, Save, Scan, Trash2, X, Check, Search, MousePointer2, MapPin, Slash, Pentagon, Spline, Circle, Magnet, WandSparkles, MapPinned, Undo2, Redo2 };
+    const appIcons = { Crosshair, FolderOpen, MapPinPlus, Pencil, Save, Scan, Trash2, X, Check, Search, MousePointer2, MapPin, Slash, Pentagon, Spline, Circle, Magnet, WandSparkles, MapPinned, Undo2, Redo2, Settings };
     function icons() { createIcons({ icons: appIcons }); }
     function formatDistance(value) {
-      if (!Number.isFinite(value)) return 'nicht berechenbar';
-      return value >= 1000 ? (value / 1000).toLocaleString('de-DE', { maximumFractionDigits: 2 }) + ' km' : value.toLocaleString('de-DE', { maximumFractionDigits: 1 }) + ' m';
+      if (!Number.isFinite(value)) return t('nicht berechenbar');
+      return value >= 1000 ? (value / 1000).toLocaleString(getLocale(), { maximumFractionDigits: 2 }) + ' km' : value.toLocaleString(getLocale(), { maximumFractionDigits: 1 }) + ' m';
     }
     function markerIcon(point, extra = '') {
       return L.divIcon({ className: `point-marker ${point.fit ? '' : 'control'} ${extra}`, html: `<span>${point.id}</span>`, iconSize: [32,32] });
     }
     function actionButton(icon, label, action) {
-      const button = document.createElement('button'); button.className = 'icon'; button.type = 'button'; button.title = label; button.setAttribute('aria-label', label);
+      const button = document.createElement('button'); button.className = 'icon'; button.type = 'button'; bindAttribute(button, 'title', () => label); bindAttribute(button, "aria-label", () => label);
       const glyph = document.createElement('i'); glyph.setAttribute('data-lucide', icon); button.appendChild(glyph); button.onclick = action; button.disabled = busy;
       return button;
     }
     function updateAvailability() {
       document.getElementById('enterDrawing').disabled = busy || !!capture;
       document.getElementById('cancelGeoreference').disabled = busy;
-      document.getElementById('imageFilename').textContent = imageName || 'Noch keine Pixelkarte geladen.';
+      bindText(document.getElementById('imageFilename'), () => imageName || t('Noch keine Pixelkarte geladen.'), false);
       for (const id of ['opacity', 'showRaster', 'pixelView']) document.getElementById(id).disabled = !image || !fitted;
-      document.getElementById('rasterControls').title = fitted ? 'Darstellung der Pixelkarte' : 'Pixelkarte zuerst mit dem Werkzeug Georeferenzieren zuweisen';
+      bindAttribute(document.getElementById('rasterControls'), 'title', () => fitted ? t('Darstellung der Pixelkarte') : t('Pixelkarte zuerst mit dem Werkzeug Georeferenzieren zuweisen'));
       const enough = points.filter(p => p.fit).length >= 3;
       ui.addPoint.disabled = !image || busy || !!capture;
       ui.clearPoints.disabled = !points.length || busy;
@@ -276,16 +280,16 @@ import { createBasemapRaster } from './drawing/basemap-source.js';
       ui.sourceFit.disabled = !image || busy;
       document.getElementById('zoomImage').disabled = !image || !fitted || busy;
       ui.cancelPoint.hidden = !capture;
-      ui.alignmentLabel.textContent = fitted ? 'Automatisch angepasst' : 'Noch nicht angepasst';
+      bindText(ui.alignmentLabel, () => fitted ? t('Automatisch angepasst') : t('Noch nicht angepasst'));
     }
     function invalidateResults() {
       fitted = false; transformMode = 'projection'; tpsCorrection = null;
-      ui.automationInfo.textContent = points.length ? 'Referenzpunkte geändert. Anpassung neu berechnen.' : '';
+      bindText(ui.automationInfo, () => points.length ? t('Referenzpunkte geändert. Anpassung neu berechnen.') : '');
     }
     function refresh() {
       overlay.redraw(); renderPoints(); updateStatus(); updateAvailability();
     }
-    function pointsChanged() { invalidateResults(); ui.notice.textContent = ''; refresh(); }
+    function pointsChanged() { invalidateResults(); bindText(ui.notice, () => ''); refresh(); }
     function renderPoints() {
       sourceMarks.clearLayers(); targetMarks.clearLayers(); residualMarks.clearLayers(); ui.pointList.replaceChildren();
       let evaluation = null;
@@ -295,23 +299,23 @@ import { createBasemapRaster } from './drawing/basemap-source.js';
       }
       for (const point of points) {
         const row = document.createElement('tr'), number = document.createElement('td'), fitCell = document.createElement('td'), errorCell = document.createElement('td'), actions = document.createElement('td');
-        number.textContent = point.id;
+        bindText(number, () => point.id);
         const check = document.createElement('input'); check.type = 'checkbox'; check.checked = point.fit; check.disabled = busy || !!capture;
-        check.title = `Punkt ${point.id} für Anpassung verwenden`; check.setAttribute('aria-label', check.title);
+        bindAttribute(check, 'title', () => tr`Punkt ${point.id} für Anpassung verwenden`); bindAttribute(check, "aria-label", () => check.title);
         check.onchange = () => { point.fit = check.checked; pointsChanged(); }; fitCell.appendChild(check);
         const residual = evaluation?.rows.find(r => r.id === point.id);
-        errorCell.textContent = residual ? `${formatDistance(residual.error)}${Number.isFinite(residual.pixelError)?' · '+residual.pixelError.toFixed(1)+' px':''}` : '—';
-        errorCell.title = point.fit ? 'Fit-Punkt' : 'Unabhängiger Kontrollpunkt';
-        const edit = actionButton('pencil', `Punktpaar ${point.id} neu setzen`, () => startCapture(point.id));
-        const remove = actionButton('trash-2', `Punktpaar ${point.id} löschen`, () => { points = points.filter(p => p.id !== point.id); cancelCapture(); pointsChanged(); });
+        bindText(errorCell, () => residual ? `${formatDistance(residual.error)}${Number.isFinite(residual.pixelError)?' · '+residual.pixelError.toFixed(1)+' px':''}` : '—');
+        bindAttribute(errorCell, 'title', () => point.fit ? t('Fit-Punkt') : t('Unabhängiger Kontrollpunkt'));
+        const edit = actionButton('pencil', tr`Punktpaar ${point.id} neu setzen`, () => startCapture(point.id));
+        const remove = actionButton('trash-2', tr`Punktpaar ${point.id} löschen`, () => { points = points.filter(p => p.id !== point.id); cancelCapture(); pointsChanged(); });
         edit.disabled = busy || !!capture; remove.disabled = busy || !!capture;
         actions.append(edit, remove); row.append(number, fitCell, errorCell, actions); ui.pointList.appendChild(row);
         if (!image) continue;
-        const srcMarker = L.marker([(1-point.source.v)*image.naturalHeight, point.source.u*image.naturalWidth], { icon: markerIcon(point), interactive: !capture, draggable: !busy && !capture }).addTo(sourceMarks).bindTooltip(`Originalpunkt ${point.id}`);
+        const srcMarker = L.marker([(1-point.source.v)*image.naturalHeight, point.source.u*image.naturalWidth], { icon: markerIcon(point), interactive: !capture, draggable: !busy && !capture }).addTo(sourceMarks).bindTooltip(() => tr`Originalpunkt ${point.id}`);
         srcMarker.on('dragend', e => {
           const ll = e.target.getLatLng(); point.source = { u: Math.max(0, Math.min(1, ll.lng/image.naturalWidth)), v: Math.max(0, Math.min(1, 1-ll.lat/image.naturalHeight)) }; pointsChanged();
         });
-        const target = L.marker([point.target.lat, point.target.lon], { icon: markerIcon(point), interactive: !capture, draggable: !busy && !capture }).addTo(targetMarks).bindTooltip(`Zielpunkt ${point.id}${point.fit ? '' : ' · Kontrolle'}`);
+        const target = L.marker([point.target.lat, point.target.lon], { icon: markerIcon(point), interactive: !capture, draggable: !busy && !capture }).addTo(targetMarks).bindTooltip(() => tr`Zielpunkt ${point.id}${point.fit ? '' : t(' · Kontrolle')}`);
         target.on('dragend', e => {
           const ll = e.target.getLatLng().wrap();
           point.target = { lon: ll.lng, lat: Math.max(-85.05112878, Math.min(85.05112878, ll.lat)) }; pointsChanged();
@@ -325,14 +329,14 @@ import { createBasemapRaster } from './drawing/basemap-source.js';
       if (capture?.source && image) L.marker([(1-capture.source.v)*image.naturalHeight, capture.source.u*image.naturalWidth], { icon: markerIcon({ id: capture.id, fit: true }, 'pending'), interactive: false }).addTo(sourceMarks);
       const lines = [];
       if (transformMode === 'projection+tps' && evaluation?.fit) {
-        lines.push(`TPS (${evaluation.fit.count} Stützpunkte): an den Fit-Punkten passgenau\nGenauigkeit zwischen und außerhalb der Punkte hängt von deren Verteilung ab.`);
+        lines.push(tr`TPS (${evaluation.fit.count} Stützpunkte): an den Fit-Punkten passgenau\nGenauigkeit zwischen und außerhalb der Punkte hängt von deren Verteilung ab.`);
       } else if (evaluation?.fit) {
-        lines.push(`Fit (${evaluation.fit.count}): RMS ${formatDistance(evaluation.fit.rms)}\nMittel ${formatDistance(evaluation.fit.mean)} · Maximum ${formatDistance(evaluation.fit.max)}`);
+        lines.push(tr`Fit (${evaluation.fit.count}): RMS ${formatDistance(evaluation.fit.rms)}\nMittel ${formatDistance(evaluation.fit.mean)} · Maximum ${formatDistance(evaluation.fit.max)}`);
       }
-      if (Number.isFinite(evaluation?.pixel?.rms)) lines.push(`RMS im Originalbild: ${evaluation.pixel.rms.toFixed(2)} px`);
-      if (evaluation?.control) lines.push(`Kontrolle (${evaluation.control.count}): RMS ${formatDistance(evaluation.control.rms)}\nMittel ${formatDistance(evaluation.control.mean)} · Maximum ${formatDistance(evaluation.control.max)}`);
+      if (Number.isFinite(evaluation?.pixel?.rms)) lines.push(tr`RMS im Originalbild: ${evaluation.pixel.rms.toFixed(2)} px`);
+      if (evaluation?.control) lines.push(tr`Kontrolle (${evaluation.control.count}): RMS ${formatDistance(evaluation.control.rms)}\nMittel ${formatDistance(evaluation.control.mean)} · Maximum ${formatDistance(evaluation.control.max)}`);
       if (image && points.length) { const warning = GeoFit.distribution(points, image.naturalWidth, image.naturalHeight); if (warning) lines.push(warning); }
-      ui.metrics.textContent = lines.join('\n'); icons(); updateAvailability();
+      bindText(ui.metrics, () => lines.map(t).join('\n')); icons(); updateAvailability();
     }
     function setSourceVisible(visible) {
       ui.showSource.checked = visible; ui.workspace.classList.toggle('single', !visible);
@@ -344,15 +348,15 @@ import { createBasemapRaster } from './drawing/basemap-source.js';
     }
     function updateCapture() {
       document.body.classList.toggle('capture-source', capture?.phase === 'source'); document.body.classList.toggle('capture-target', capture?.phase === 'target');
-      ui.captureStatus.textContent = capture ? capture.phase === 'source' ? `Punkt ${capture.id}: Ort im Originalbild wählen.` : `Punkt ${capture.id}: Denselben Ort auf der Basiskarte wählen.` : '';
+      bindText(ui.captureStatus, () => capture ? capture.phase === 'source' ? tr`Punkt ${capture.id}: Ort im Originalbild wählen.` : tr`Punkt ${capture.id}: Denselben Ort auf der Basiskarte wählen.` : '');
       updateAvailability();
     }
     function cancelCapture() { capture = null; updateCapture(); renderPoints(); }
     sourceMap.on('click', e => {
       if (!capture || capture.phase !== 'source' || busy) return;
       const u = e.latlng.lng/image.naturalWidth, v = 1-e.latlng.lat/image.naturalHeight;
-      if (u < 0 || u > 1 || v < 0 || v > 1) { showError('Bitte einen Punkt innerhalb des Originalbildes wählen.'); return; }
-      ui.notice.textContent = ''; capture.source = { u, v }; capture.phase = 'target'; updateCapture(); renderPoints();
+      if (u < 0 || u > 1 || v < 0 || v > 1) { showError(t('Bitte einen Punkt innerhalb des Originalbildes wählen.')); return; }
+      bindText(ui.notice, () => ''); capture.source = { u, v }; capture.phase = 'target'; updateCapture(); renderPoints();
     });
     map.on('click', e => {
       if (!capture || capture.phase !== 'target' || busy) return;
@@ -368,7 +372,7 @@ import { createBasemapRaster } from './drawing/basemap-source.js';
       const ll = sourceToLatLng(result.g.cx, result.g.cy, result.code);
       currentCrsIndex = index; imageCenter = ll; halfWidthSource = result.g.hw;
       rotation = result.g.rot*180/Math.PI; fitted = true; transformMode = 'projection'; tpsCorrection = null;
-      ui.notice.textContent = result.warning || ''; refresh();
+      bindText(ui.notice, () => result.warning || ''); refresh();
     }
     function setBusy(value) {
       busy = value;
@@ -377,7 +381,7 @@ import { createBasemapRaster } from './drawing/basemap-source.js';
     }
     function registerModel(model) {
       const def=ProjectionSearch.definition(model),code='CUSTOM:'+model.family;
-      const entry={code,label:ProjectionSearch.names[model.family]+' · variabel',def,model:structuredClone(model)};
+      const entry={code,label:ProjectionSearch.names[model.family]+t(' · variabel'),def,model:structuredClone(model)};
       proj4.defs(code,def);
       const index=candidates.findIndex(c=>c.code===code);
       if(index>=0) candidates[index]=entry;
@@ -387,13 +391,13 @@ import { createBasemapRaster } from './drawing/basemap-source.js';
     async function automaticFit() {
       const fitCount = points.filter(point => point.fit).length;
       if (busy || capture || !image || fitCount < 3) return;
-      searchCancelled = false; cancellable = true; setBusy(true); ui.notice.textContent = '';
+      searchCancelled = false; cancellable = true; setBusy(true); bindText(ui.notice, () => '');
       const computed = [];
       try {
         for (let index = 0; index < fixedCodes.length; index++) {
           await new Promise(resolve => setTimeout(resolve, 0));
-          if (searchCancelled) throw new Error('Suche abgebrochen; bisherige Ausrichtung bleibt erhalten.');
-          ui.automationInfo.textContent = `Stufe 1/3: Projektionsmodelle prüfen (${index + 1}/${fixedCodes.length})`;
+          if (searchCancelled) throw new Error(t('Suche abgebrochen; bisherige Ausrichtung bleibt erhalten.'));
+          bindText(ui.automationInfo, () => tr`Stufe 1/3: Projektionsmodelle prüfen (${index + 1}/${fixedCodes.length})`);
           const code = fixedCodes[index];
           try { computed.push(GeoFit.solve(points, code, image.naturalWidth, image.naturalHeight)); }
           catch (error) { computed.push({ code, error: error.message }); }
@@ -403,9 +407,9 @@ import { createBasemapRaster } from './drawing/basemap-source.js';
           const families = Object.keys(ProjectionSearch.names);
           for (let index = 0; index < families.length; index++) {
             const family = families[index];
-            if (searchCancelled) throw new Error('Suche abgebrochen; bisherige Ausrichtung bleibt erhalten.');
+            if (searchCancelled) throw new Error(t('Suche abgebrochen; bisherige Ausrichtung bleibt erhalten.'));
             const progress = (start, total) => {
-              ui.automationInfo.textContent = `Stufe 2/3: Projektionsparameter optimieren (${index + 1}/${families.length}, Versuch ${start}/${total})`;
+              bindText(ui.automationInfo, () => tr`Stufe 2/3: Projektionsparameter optimieren (${index + 1}/${families.length}, Versuch ${start}/${total})`);
             };
             try {
               const result = await ProjectionSearch.search(points, family, image.naturalWidth, image.naturalHeight, { cancelled: () => searchCancelled, progress });
@@ -419,7 +423,7 @@ import { createBasemapRaster } from './drawing/basemap-source.js';
 
         computed.sort((left, right) => (left.error ? Infinity : left.fit.rms) - (right.error ? Infinity : right.fit.rms));
         const best = computed.find(result => !result.error);
-        if (!best) throw new Error('Keine Projektionsvariante konnte angepasst werden.');
+        if (!best) throw new Error(t('Keine Projektionsvariante konnte angepasst werden.'));
         for (const result of computed) if (result.model) registerModel(result.model);
         applyResult(best);
 
@@ -427,7 +431,7 @@ import { createBasemapRaster } from './drawing/basemap-source.js';
         const threshold = Math.max(3, Math.min(12, Math.hypot(image.naturalWidth, image.naturalHeight) * .004));
         const needsCorrection = Number.isFinite(pixelRms) && pixelRms > threshold;
         if (needsCorrection && fitCount >= ThinPlateSpline.minimumPoints) {
-          ui.automationInfo.textContent = 'Stufe 3/3: Lokale TPS-Korrektur berechnen';
+          bindText(ui.automationInfo, () => t('Stufe 3/3: Lokale TPS-Korrektur berechnen'));
           await new Promise(resolve => setTimeout(resolve, 0));
           try {
             const geometry = sourceGeometry();
@@ -438,31 +442,31 @@ import { createBasemapRaster } from './drawing/basemap-source.js';
             };
             tpsCorrection = ThinPlateSpline.fitResiduals(points, image.naturalWidth, image.naturalHeight, basePredict);
             transformMode = 'projection+tps';
-            ui.automationInfo.textContent = `TPS-Korrektur verwendet · ${fitCount} Fit-Punkte · vorheriger Restfehler ${pixelRms.toFixed(1)} px`;
-            ui.notice.textContent = 'Die Projektionsanpassung allein war nicht genau genug. Lokale Abweichungen werden deshalb geometrisch korrigiert.';
+            bindText(ui.automationInfo, () => tr`TPS-Korrektur verwendet · ${fitCount} Fit-Punkte · vorheriger Restfehler ${pixelRms.toFixed(1)} px`);
+            bindText(ui.notice, () => t('Die Projektionsanpassung allein war nicht genau genug. Lokale Abweichungen werden deshalb geometrisch korrigiert.'));
             refresh();
           } catch (error) {
             transformMode = 'projection'; tpsCorrection = null;
-            ui.automationInfo.textContent = `Projektionsmodell verwendet · Restfehler ${pixelRms.toFixed(1)} px`;
-            ui.notice.textContent = `TPS-Korrektur nicht stabil möglich: ${error.message}`;
+            bindText(ui.automationInfo, () => tr`Projektionsmodell verwendet · Restfehler ${pixelRms.toFixed(1)} px`);
+            bindText(ui.notice, () => tr`TPS-Korrektur nicht stabil möglich: ${error.message}`);
           }
         } else {
-          const stage = best.model ? 'Optimiertes Projektionsmodell' : 'Festes Projektionsmodell';
-          ui.automationInfo.textContent = `${stage} verwendet · Restfehler ${Number.isFinite(pixelRms) ? pixelRms.toFixed(1) + ' px' : 'nicht berechenbar'}`;
+          const stage = best.model ? t('Optimiertes Projektionsmodell') : t('Festes Projektionsmodell');
+          bindText(ui.automationInfo, () => tr`${stage} verwendet · Restfehler ${Number.isFinite(pixelRms) ? pixelRms.toFixed(1) + ' px' : t('nicht berechenbar')}`);
           if (needsCorrection) {
-            ui.notice.textContent = `Für eine automatische TPS-Korrektur werden mindestens ${ThinPlateSpline.minimumPoints} aktive, gut verteilte Referenzpunkte benötigt.`;
+            bindText(ui.notice, () => tr`Für eine automatische TPS-Korrektur werden mindestens ${ThinPlateSpline.minimumPoints} aktive, gut verteilte Referenzpunkte benötigt.`);
           }
         }
       } catch (error) {
         showError(error);
-        if (!fitted) ui.automationInfo.textContent = '';
+        if (!fitted) bindText(ui.automationInfo, () => '');
       } finally {
         cancellable = false; setBusy(false);
       }
     }
     function fitSource() { if (image) sourceMap.fitBounds([[0,0],[image.naturalHeight,image.naturalWidth]], { padding: [20,20], animate: false }); }
-    function readDataUrl(file) { return new Promise((resolve,reject) => { const reader = new FileReader(); reader.onload = () => resolve(reader.result); reader.onerror = () => reject(new Error('Datei konnte nicht gelesen werden.')); reader.readAsDataURL(file); }); }
-    function decodeImage(data) { return new Promise((resolve,reject) => { const img = new Image(); img.onload = () => img.naturalWidth && img.naturalHeight ? resolve(img) : reject(new Error('Leeres Bild.')); img.onerror = () => reject(new Error('Bild konnte nicht geladen werden.')); img.src = data; }); }
+    function readDataUrl(file) { return new Promise((resolve,reject) => { const reader = new FileReader(); reader.onload = () => resolve(reader.result); reader.onerror = () => reject(new Error(t('Datei konnte nicht gelesen werden.'))); reader.readAsDataURL(file); }); }
+    function decodeImage(data) { return new Promise((resolve,reject) => { const img = new Image(); img.onload = () => img.naturalWidth && img.naturalHeight ? resolve(img) : reject(new Error(t('Leeres Bild.'))); img.onerror = () => reject(new Error(t('Bild konnte nicht geladen werden.'))); img.src = data; }); }
     function installImage(img, data, name) {
       image = img; imageData = data; imageName = name;
       if (sourceLayer) sourceMap.removeLayer(sourceLayer);
@@ -479,24 +483,24 @@ import { createBasemapRaster } from './drawing/basemap-source.js';
     function validateProject(data) {
       const finite = Number.isFinite;
       const ll = p => p && finite(p.lat) && finite(p.lon) && Math.abs(p.lat) <= 85.05112878 && Math.abs(p.lon) <= 180;
-      if (!data || data.format !== 'pixelkarte-georeferenzierung' || ![1,2,3].includes(data.version)) throw new Error('Unbekanntes Projektformat oder unbekannte Version.');
-      if (typeof data.image?.name !== 'string' || typeof data.image?.data !== 'string' || !/^data:image\/(png|jpeg|webp|gif);base64,[A-Za-z0-9+/=\r\n]+$/.test(data.image.data)) throw new Error('Projekt enthält kein unterstütztes eingebettetes Bild.');
-      if (!Array.isArray(data.points)) throw new Error('Referenzpunktliste fehlt.');
+      if (!data || data.format !== 'pixelkarte-georeferenzierung' || ![1,2,3].includes(data.version)) throw new Error(t('Unbekanntes Projektformat oder unbekannte Version.'));
+      if (typeof data.image?.name !== 'string' || typeof data.image?.data !== 'string' || !/^data:image\/(png|jpeg|webp|gif);base64,[A-Za-z0-9+/=\r\n]+$/.test(data.image.data)) throw new Error(t('Projekt enthält kein unterstütztes eingebettetes Bild.'));
+      if (!Array.isArray(data.points)) throw new Error(t('Referenzpunktliste fehlt.'));
       const ids = new Set();
       for (const p of data.points) {
-        if (!p || !Number.isSafeInteger(p.id) || p.id < 1 || ids.has(p.id) || typeof p.fit !== 'boolean' || !ll(p.target) || !p.source || !finite(p.source.u) || !finite(p.source.v) || p.source.u < 0 || p.source.u > 1 || p.source.v < 0 || p.source.v > 1) throw new Error('Ungültiges Referenzpunktpaar.');
+        if (!p || !Number.isSafeInteger(p.id) || p.id < 1 || ids.has(p.id) || typeof p.fit !== 'boolean' || !ll(p.target) || !p.source || !finite(p.source.u) || !finite(p.source.v) || p.source.u < 0 || p.source.u > 1 || p.source.v < 0 || p.source.v > 1) throw new Error(t('Ungültiges Referenzpunktpaar.'));
         ids.add(p.id);
       }
       const a = data.alignment, v = data.view;
-      if (!a || !ll(a.center) || !finite(a.halfWidth) || a.halfWidth <= 0 || !finite(a.rotation) || Math.abs(a.rotation) > 180) throw new Error('Ungültige Ausrichtung.');
+      if (!a || !ll(a.center) || !finite(a.halfWidth) || a.halfWidth <= 0 || !finite(a.rotation) || Math.abs(a.rotation) > 180) throw new Error(t('Ungültige Ausrichtung.'));
       const method = data.version >= 3 ? a.method : 'projection';
-      if (!['projection','projection+tps'].includes(method)) throw new Error('Unbekannte Transformationsmethode.');
-      if (method === 'projection+tps' && data.points.filter(point => point.fit).length < ThinPlateSpline.minimumPoints) throw new Error('Zu wenige Fit-Punkte für die gespeicherte TPS-Korrektur.');
+      if (!['projection','projection+tps'].includes(method)) throw new Error(t('Unbekannte Transformationsmethode.'));
+      if (method === 'projection+tps' && data.points.filter(point => point.fit).length < ThinPlateSpline.minimumPoints) throw new Error(t('Zu wenige Fit-Punkte für die gespeicherte TPS-Korrektur.'));
       if(a.projection){
         ProjectionSearch.definition(a.projection);
-        if(a.code!=='CUSTOM:'+a.projection.family)throw new Error('Projektionscode und Parameter widersprechen sich.');
-      }else if(!fixedCodes.includes(a.code))throw new Error('Projektionsparameter fehlen.');
-      if (!v || !ll(v.center) || !finite(v.zoom) || v.zoom < 0 || v.zoom > 19 || !Object.hasOwn(basemaps,v.basemap) || !finite(v.opacity) || v.opacity < 0 || v.opacity > 100 || ![12,20,32,48].includes(v.mesh) || typeof v.showSource !== 'boolean' || typeof v.showResiduals !== 'boolean') throw new Error('Ungültige Kartenansicht.');
+        if(a.code!=='CUSTOM:'+a.projection.family)throw new Error(t('Projektionscode und Parameter widersprechen sich.'));
+      }else if(!fixedCodes.includes(a.code))throw new Error(t('Projektionsparameter fehlen.'));
+      if (!v || !ll(v.center) || !finite(v.zoom) || v.zoom < 0 || v.zoom > 19 || !Object.hasOwn(basemaps,v.basemap) || !finite(v.opacity) || v.opacity < 0 || v.opacity > 100 || ![12,20,32,48].includes(v.mesh) || typeof v.showSource !== 'boolean' || typeof v.showResiduals !== 'boolean') throw new Error(t('Ungültige Kartenansicht.'));
       return data;
     }
     async function loadProject(file) {
@@ -511,7 +515,7 @@ import { createBasemapRaster } from './drawing/basemap-source.js';
         points = data.points.map(p => ({ id: p.id, fit: p.fit, source: { u: p.source.u, v: p.source.v }, target: { lat: p.target.lat, lon: p.target.lon } })); nextPointId = points.reduce((m,p) => Math.max(m,p.id+1),1);
         currentCrsIndex = candidates.findIndex(c => c.code === a.code);
         imageCenter = L.latLng(a.center.lat,a.center.lon); halfWidthSource = a.halfWidth; rotation = a.rotation; renderMesh = v.mesh;
-        els.opacity.value = v.opacity; els.opacityValue.textContent = v.opacity+' %';
+        els.opacity.value = v.opacity; bindText(els.opacityValue, () => v.opacity+' %');
         map.removeLayer(activeBasemap); els.basemap.value = v.basemap; activeBasemap = basemaps[v.basemap].addTo(map);
         map.setView([v.center.lat,v.center.lon],v.zoom, { animate: false }); ui.showResiduals.checked = v.showResiduals; setSourceVisible(v.showSource);
         fitted = true; transformMode = 'projection'; tpsCorrection = null;
@@ -525,8 +529,8 @@ import { createBasemapRaster } from './drawing/basemap-source.js';
           tpsCorrection = ThinPlateSpline.fitResiduals(points, image.naturalWidth, image.naturalHeight, basePredict, a.tpsRegularization || 1e-8);
           transformMode = 'projection+tps';
         }
-        updateCapture(); ui.notice.textContent = 'Projekt geladen.';
-        ui.automationInfo.textContent = transformMode === 'projection+tps' ? 'Gespeichertes Projektionsmodell mit TPS-Korrektur' : 'Gespeichertes Projektionsmodell';
+        updateCapture(); bindText(ui.notice, () => t('Projekt geladen.'));
+        bindText(ui.automationInfo, () => transformMode === 'projection+tps' ? t('Gespeichertes Projektionsmodell mit TPS-Korrektur') : t('Gespeichertes Projektionsmodell'));
         refresh();
       } catch (err) { showError(err); }
       finally { ui.projectFile.value = ''; setBusy(false); }
@@ -537,7 +541,7 @@ import { createBasemapRaster } from './drawing/basemap-source.js';
       if (activeBasemap) map.removeLayer(activeBasemap);
       activeBasemap = basemaps[els.basemap.value].addTo(map);
       if (els.basemap.value === 'osm' && location.protocol === 'file:') {
-        updateStatus('Hinweis: Der OSM-Standardserver kann beim direkten Öffnen dieser Datei HTTP 403 liefern. Nimm dann eine der Esri-Basiskarten.');
+        updateStatus(t('Hinweis: Der OSM-Standardserver kann beim direkten Öffnen dieser Datei HTTP 403 liefern. Nimm dann eine der Esri-Basiskarten.'));
       } else {
         updateStatus();
       }
@@ -547,17 +551,17 @@ import { createBasemapRaster } from './drawing/basemap-source.js';
       const file = els.file.files[0]; if (!file) return;
       const version = ++imageLoadVersion; setBusy(true);
       try {
-        if (!/^image\/(png|jpeg|webp|gif)$/.test(file.type)) throw new Error('Bitte PNG, JPEG, WebP oder GIF auswählen.');
+        if (!/^image\/(png|jpeg|webp|gif)$/.test(file.type)) throw new Error(t('Bitte PNG, JPEG, WebP oder GIF auswählen.'));
         const data = await readDataUrl(file), img = await decodeImage(data);
         if (version !== imageLoadVersion) return;
         capture = null; points = []; nextPointId = 1; installImage(img,data,file.name);
         imageCenter = map.getCenter(); halfWidthSource = null; rotation = 0; currentCrsIndex = 3;
-        invalidateResults(); updateCapture(); ui.notice.textContent = ''; refresh();
+        invalidateResults(); updateCapture(); bindText(ui.notice, () => ''); refresh();
       } catch (err) { showError(err); }
       finally { els.file.value = ''; setBusy(false); }
     });
 
-    els.opacity.addEventListener('input', () => { els.opacityValue.textContent = els.opacity.value + ' %'; overlay.redraw(); });
+    els.opacity.addEventListener('input', () => { bindText(els.opacityValue, () => els.opacity.value + ' %'); overlay.redraw(); });
 
     ui.addPoint.onclick = () => startCapture();
     ui.cancelPoint.onclick = cancelCapture;
@@ -576,7 +580,7 @@ import { createBasemapRaster } from './drawing/basemap-source.js';
       }catch(err){showError(err);}
     };
     ui.fitCrs.onclick = automaticFit;
-    ui.cancelSearch.onclick = () => {searchCancelled=true;ui.cancelSearch.disabled=true;ui.automationInfo.textContent='Wird abgebrochen …';};
+    ui.cancelSearch.onclick = () => {searchCancelled=true;ui.cancelSearch.disabled=true;bindText(ui.automationInfo, () => t('Wird abgebrochen …'));};
     ui.saveProject.onclick = saveProject;
     ui.loadProject.onclick = () => ui.projectFile.click();
     ui.projectFile.onchange = () => loadProject(ui.projectFile.files[0]);
@@ -606,7 +610,7 @@ import { createBasemapRaster } from './drawing/basemap-source.js';
         sourceLayer = null;
         if (image) installImage(image, imageData, imageName);
         els.opacity.value = previous.opacity;
-        els.opacityValue.textContent = previous.opacity + ' %';
+        bindText(els.opacityValue, () => previous.opacity + ' %');
         map.removeLayer(activeBasemap);
         els.basemap.value = previous.basemap;
         activeBasemap = basemaps[previous.basemap].addTo(map);
@@ -615,14 +619,14 @@ import { createBasemapRaster } from './drawing/basemap-source.js';
         ui.showResiduals.checked = previous.showResiduals;
         setSourceVisible(previous.showSource);
         map.setView(previous.center, previous.zoom, { animate: false });
-        ui.automationInfo.textContent = previous.automationInfo;
-        ui.notice.textContent = '';
+        bindText(ui.automationInfo, () => previous.automationInfo);
+        bindText(ui.notice, () => '');
         updateCapture(); refresh();
         return true;
       },
       getBasemapRaster: () => createBasemapRaster(map, activeBasemap),
       getOriginalRaster() {
-        if (!image || !fitted) throw new Error('Bitte zuerst eine Pixelkarte einpassen.');
+        if (!image || !fitted) throw new Error(t('Bitte zuerst eine Pixelkarte einpassen.'));
         if (originalRasterImage !== image) {
           const canvas = document.createElement('canvas');
           canvas.width = image.naturalWidth; canvas.height = image.naturalHeight;
@@ -652,6 +656,18 @@ import { createBasemapRaster } from './drawing/basemap-source.js';
         for (const layer of [targetMarks, residualMarks]) {
           if (active) map.removeLayer(layer);
           else if (!map.hasLayer(layer)) layer.addTo(map);
+        }
+      }
+    });
+    localizeMapControls(map); localizeMapControls(sourceMap);
+    document.addEventListener('languagechange', () => {
+      updateStatus();
+      for (const layer of Object.values(basemaps)) {
+        const previous = layer.options.attribution;
+        layer.options.attribution = t(previous);
+        if (map.hasLayer(layer) && previous !== layer.options.attribution) {
+          map.attributionControl.removeAttribution(previous);
+          map.attributionControl.addAttribution(layer.options.attribution);
         }
       }
     });

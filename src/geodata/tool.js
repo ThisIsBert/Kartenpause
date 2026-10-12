@@ -1,3 +1,4 @@
+import { bindAttribute, bindText, getLanguage, localizeMapControls, t, tr, untranslated } from '../i18n.js';
 import L from 'leaflet';
 import { searchPlaces, overpass, osmTarget, objectName } from './api.js';
 import { setBusy } from '../drawing/busy.js';
@@ -9,10 +10,10 @@ export function createGeodataTool({ drawingMap, getSourceIds, onImport, onClose 
   const loaded = new Map(), extents = new Map(), chosenLayers = new Map();
   let active = false, map, previewLayer, chosenLayer, marker, preview = null, worker = null;
   let timer, lastSearchAt = 0, largeTarget = null, previewId = null, existing = new Set();
-  const status = text => { el('geoStatus').textContent = text; };
-  const error = text => { el('geoError').textContent = text; };
+  const status = text => { bindText(el('geoStatus'), () => text); };
+  const error = text => { bindText(el('geoError'), () => text); };
   const button = (text, action, className = '') => {
-    const node = document.createElement('button'); node.type = 'button'; node.textContent = text;
+    const node = document.createElement('button'); node.type = 'button'; bindText(node, () => text, false);
     node.className = className; node.onclick = action; return node;
   };
   function syncRequests() {
@@ -37,7 +38,7 @@ export function createGeodataTool({ drawingMap, getSourceIds, onImport, onClose 
     stop('geometry'); preview = null; largeTarget = null; previewId = null;
     document.querySelectorAll('#geoObjects .geo-result').forEach(b => b.setAttribute('aria-pressed', 'false'));
     previewLayer?.clearLayers(); el('geoLarge').hidden = true;
-    el('geoPreviewName').textContent = 'Noch kein Objekt in der Vorschau.';
+    bindText(el('geoPreviewName'), () => t('Noch kein Objekt in der Vorschau.'));
     el('geoPreviewDetails').replaceChildren();
     updateObjectActions();
   }
@@ -50,7 +51,7 @@ export function createGeodataTool({ drawingMap, getSourceIds, onImport, onClose 
     if (bounds.isValid()) map.fitBounds(bounds, { padding: [35, 35], maxZoom: 16 });
   }
   function updateBasket() {
-    el('geoChosenCount').textContent = `Zur Übernahme ausgewählt (${basket.size})`;
+    bindText(el('geoChosenCount'), () => tr`Zur Übernahme ausgewählt (${basket.size})`);
     el('geoFinish').disabled = !basket.size;
     const list = el('geoChosen'); list.replaceChildren();
     for (const [id, layer] of chosenLayers) if (!basket.has(id)) { chosenLayer.removeLayer(layer); chosenLayers.delete(id); }
@@ -61,11 +62,11 @@ export function createGeodataTool({ drawingMap, getSourceIds, onImport, onClose 
       const layer = chosenLayers.get(id);
       row.append(button(feature.properties.name, () => fit(layer), 'geo-chosen-name'));
       const remove = button('×', () => { basket.delete(id); updateBasket(); }, 'icon');
-      remove.setAttribute('aria-label', `${feature.properties.name} aus Auswahl entfernen`); remove.title = 'Aus Auswahl entfernen';
+      bindAttribute(remove, "aria-label", () => tr`${untranslated(feature.properties.name)} aus Auswahl entfernen`); bindAttribute(remove, 'title', () => t('Aus Auswahl entfernen'));
       row.append(remove); list.append(row);
     }
     previewLayer?.bringToFront();
-    if (!basket.size) list.textContent = 'Klicke neben einer geladenen Form auf „Auswählen“. Du kannst dafür an mehreren Orten suchen.';
+    if (!basket.size) bindText(list, () => t('Klicke neben einer geladenen Form auf „Auswählen“. Du kannst dafür an mehreren Orten suchen.'));
     updateObjectActions();
   }
   function updateObjectActions() {
@@ -73,27 +74,27 @@ export function createGeodataTool({ drawingMap, getSourceIds, onImport, onClose 
       const id = action.dataset.osmId, loading = id === previewId && requests.has('geometry');
       action.hidden = !loading && !loaded.has(id) && !extents.has(id) && !existing.has(id);
       action.disabled = loading || basket.has(id) || existing.has(id);
-      action.textContent = loading ? 'Lädt …' : existing.has(id) ? 'Vorhanden' : basket.has(id) ? 'Ausgewählt' : loaded.has(id) ? 'Auswählen' : 'Jetzt laden';
+      bindText(action, () => loading ? t('Lädt …') : existing.has(id) ? t('Vorhanden') : basket.has(id) ? t('Ausgewählt') : loaded.has(id) ? t('Auswählen') : t('Jetzt laden'));
     }
   }
   function chooseObject(id) {
     const feature = loaded.get(id);
     if (!feature || existing.has(id) || basket.has(id)) return;
-    basket.set(id, feature); updateBasket(); status('Objekt zur Auswahl hinzugefügt. Mit „Fertig“ in die Zeichnung übernehmen.');
+    basket.set(id, feature); updateBasket(); status(t('Objekt zur Auswahl hinzugefügt. Mit „Fertig“ in die Zeichnung übernehmen.'));
   }
   function showPreview(feature) {
     preview = feature; previewLayer.clearLayers(); fit(paint(feature, previewLayer, '#ce4b13'));
-    el('geoPreviewName').textContent = feature.properties.name;
+    bindText(el('geoPreviewName'), () => feature.properties.name, false);
     el('geoPreviewDetails').replaceChildren(tagsDetail(feature.properties.tags));
-    updateObjectActions(); status('Orange: Vorschau. Grün: zur Übernahme ausgewählt.');
+    updateObjectActions(); status(t('Orange: Vorschau. Grün: zur Übernahme ausgewählt.'));
   }
   function tagsDetail(tags = {}) {
     const details = document.createElement('details');
-    const summary = document.createElement('summary'); summary.textContent = 'Eigenschaften'; details.append(summary);
+    const summary = document.createElement('summary'); bindText(summary, () => t('Eigenschaften')); details.append(summary);
     const dl = document.createElement('dl');
     for (const [key, value] of Object.entries(tags)) {
       const dt = document.createElement('dt'), dd = document.createElement('dd');
-      dt.textContent = key; dd.textContent = String(value); dl.append(dt, dd);
+      bindText(dt, () => key, false); bindText(dd, () => String(value), false); dl.append(dt, dd);
     }
     details.append(dl); return details;
   }
@@ -106,7 +107,7 @@ export function createGeodataTool({ drawingMap, getSourceIds, onImport, onClose 
     const operation = start('geometry');
     const progress = text => { if (operation.current()) status(text); };
     const options = { signal: operation.signal, progress, geometry: true };
-    el('geoPreviewName').textContent = objectName(target.tags, id);
+    bindText(el('geoPreviewName'), () => objectName(target.tags, id), false);
     document.querySelectorAll('#geoObjects .geo-result').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.osmId === id)));
     try {
       if (target.type === 'relation' && !full) {
@@ -119,41 +120,41 @@ export function createGeodataTool({ drawingMap, getSourceIds, onImport, onClose 
           fit(box);
           if ((bounds.maxlat - bounds.minlat) * (bounds.maxlon - bounds.minlon) >= 1) {
             largeTarget = target; el('geoLarge').hidden = false;
-            status('Die gestrichelte Umrandung zeigt nur die Ausdehnung. Lade die vollständige Form, um das Objekt auszuwählen.');
+            status(t('Die gestrichelte Umrandung zeigt nur die Ausdehnung. Lade die vollständige Form, um das Objekt auszuwählen.'));
             return;
           }
         }
       }
       const data = await overpass(`[out:json][timeout:180][maxsize:268435456];${target.type}(${target.id});out geom;`, options);
       if (!operation.current()) return;
-      progress('Geometrie-Verarbeitung wird gestartet …');
+      progress(t('Geometrie-Verarbeitung wird gestartet …'));
       worker = new Worker(new URL('./geometry-worker.js', import.meta.url), { type: 'module' });
       const feature = await new Promise((resolve, reject) => {
-        let phase = 'Geometrie-Verarbeitung wird gestartet', phaseAt = performance.now();
+        let phase = t('Geometrie-Verarbeitung wird gestartet'), phaseAt = performance.now();
         const ticker = setInterval(() => progress(`${phase} … ${Math.floor((performance.now() - phaseAt) / 1000)} s`), 1000);
-        const timeout = setTimeout(() => finish(new Error('Die Geometrie-Verarbeitung dauert zu lange. Bitte erneut laden.')), 120000);
-        const abort = () => finish(new DOMException('Abgebrochen', 'AbortError'));
+        const timeout = setTimeout(() => finish(new Error(t('Die Geometrie-Verarbeitung dauert zu lange. Bitte erneut laden.'))), 120000);
+        const abort = () => finish(new DOMException(t('Abgebrochen'), 'AbortError'));
         operation.signal.addEventListener('abort', abort, { once: true });
         const finish = (error, value) => { clearInterval(ticker); clearTimeout(timeout); operation.signal.removeEventListener('abort', abort); error ? reject(error) : resolve(value); };
         worker.onmessage = ({ data }) => {
           if (data.phase) { phase = data.phase; phaseAt = performance.now(); progress(`${phase} …`); return; }
           finish(data.error ? new Error(data.error) : null, data.feature);
         };
-        worker.onerror = () => finish(new Error('Die Geometrie konnte nicht verarbeitet werden.'));
-        worker.onmessageerror = () => finish(new Error('Die vorbereitete Geometrie konnte nicht übertragen werden.'));
-        worker.postMessage({ data, id });
+        worker.onerror = () => finish(new Error(t('Die Geometrie konnte nicht verarbeitet werden.')));
+        worker.onmessageerror = () => finish(new Error(t('Die vorbereitete Geometrie konnte nicht übertragen werden.')));
+        worker.postMessage({ data, id, language: getLanguage() });
       });
       if (!operation.current()) return;
-      progress('Form wird auf der Karte angezeigt …');
+      progress(t('Form wird auf der Karte angezeigt …'));
       await new Promise(resolve => requestAnimationFrame(() => setTimeout(resolve, 0)));
       if (!operation.current()) return;
       showPreview(feature); loaded.set(id, feature); updateObjectActions();
     } catch (e) {
-      if (operation.current()) { status(''); error(e.message || 'Geometrie konnte nicht geladen werden.'); }
+      if (operation.current()) { status(''); error(e.message || t('Geometrie konnte nicht geladen werden.')); }
     } finally { operation.end(); }
   }
   async function loadObjects(latlng, preferred = null) {
-    stop('search'); clearTimeout(timer); el('geoSuggestions').replaceChildren(); el('geoSearchStatus').textContent = '';
+    stop('search'); clearTimeout(timer); el('geoSuggestions').replaceChildren(); bindText(el('geoSearchStatus'), () => '');
     clearPreview(); error('');
     const operation = start('objects');
     const ll = latlng.wrap();
@@ -169,8 +170,8 @@ export function createGeodataTool({ drawingMap, getSourceIds, onImport, onClose 
         const b = button('', () => loadGeometry({ ...target, tags: element.tags }), 'geo-result');
         b.dataset.osmId = id; b.setAttribute('aria-pressed', String(id === previewId));
         const title = document.createElement('strong'), detail = document.createElement('span');
-        title.textContent = objectName(element.tags, id);
-        detail.textContent = `${({ node: 'Punkt', way: 'Weg / Fläche', relation: 'Relation' })[target.type]} · ${id}${existing.has(id) ? ' · bereits in der Zeichnung' : ''}`;
+        bindText(title, () => objectName(element.tags, id), false);
+        bindText(detail, () => `${({ node: t('Punkt'), way: t('Weg / Fläche'), relation: t('Relation') })[target.type]} · ${id}${existing.has(id) ? t(' · bereits in der Zeichnung') : ''}`);
         const action = button('', () => loaded.has(id) ? chooseObject(id) : loadGeometry({ ...target, tags: element.tags }, true), 'geo-object-action');
         action.dataset.osmId = id;
         b.append(title, detail); row.append(b, action); el('geoObjects').append(row);
@@ -187,9 +188,9 @@ export function createGeodataTool({ drawingMap, getSourceIds, onImport, onClose 
       if (preferred) elements.set(`${preferred.type}/${preferred.id}`, preferred);
       for (const item of data.elements) if (item.tags) elements.set(`${item.type}/${item.id}`, item);
       renderObjects([...elements.values()]);
-      if (!requests.has('geometry') && !preview && !largeTarget) status(elements.size ? `${elements.size} Objekte gefunden. Wähle eines für die Vorschau.` : 'Hier wurden keine Objekte gefunden. Versuche einen anderen Punkt auf der Karte.');
+      if (!requests.has('geometry') && !preview && !largeTarget) status(elements.size ? tr`${elements.size} Objekte gefunden. Wähle eines für die Vorschau.` : t('Hier wurden keine Objekte gefunden. Versuche einen anderen Punkt auf der Karte.'));
     } catch (e) {
-      if (operation.current()) { status(''); error(`Objekte konnten nicht geladen werden. ${e.message}`); }
+      if (operation.current()) { status(''); error(tr`Objekte konnten nicht geladen werden. ${e.message}`); }
     } finally { operation.end(); }
   }
   function choosePlace(feature) {
@@ -197,15 +198,15 @@ export function createGeodataTool({ drawingMap, getSourceIds, onImport, onClose 
     el('geoQuery').value = p.name || p.street || '';
     const ll = L.latLng(lat, lon); map.setView(ll, 15);
     const target = osmTarget(p.osm_type, p.osm_id);
-    loadObjects(ll, target ? { ...target, tags: { name: p.name || p.street || 'Suchtreffer' } } : null);
+    loadObjects(ll, target ? { ...target, tags: { name: p.name || p.street || t('Suchtreffer') } } : null);
   }
   async function runSearch() {
     clearTimeout(timer);
     const query = el('geoQuery').value.trim();
     stop('search'); el('geoSuggestions').replaceChildren();
-    if (query.length < 3) { el('geoSearchStatus').textContent = query ? 'Mindestens drei Zeichen eingeben.' : ''; return; }
+    if (query.length < 3) { bindText(el('geoSearchStatus'), () => query ? t('Mindestens drei Zeichen eingeben.') : ''); return; }
     const operation = start('search'); lastSearchAt = Date.now();
-    el('geoSearchStatus').textContent = 'Orte werden gesucht …';
+    bindText(el('geoSearchStatus'), () => t('Orte werden gesucht …'));
     try {
       const results = await searchPlaces(query, operation.signal);
       if (!operation.current()) return;
@@ -213,19 +214,19 @@ export function createGeodataTool({ drawingMap, getSourceIds, onImport, onClose 
         const p = feature.properties || {};
         const b = button('', () => choosePlace(feature), 'geo-result');
         const title = document.createElement('strong'), subtitle = document.createElement('span');
-        title.textContent = p.name || p.street || 'Ort';
-        subtitle.textContent = [...new Set([p.street, p.housenumber, p.postcode, p.city, p.state, p.country].filter(Boolean))].join(', ');
+        bindText(title, () => p.name || p.street || t('Ort'), false);
+        bindText(subtitle, () => [...new Set([p.street, p.housenumber, p.postcode, p.city, p.state, p.country].filter(Boolean))].join(', '));
         b.append(title, subtitle); el('geoSuggestions').append(b);
       }
-      el('geoSearchStatus').textContent = results.length ? `${results.length} Orte gefunden. Wähle einen Treffer.` : 'Kein Ort gefunden. Versuche einen anderen Namen oder klicke auf die Karte.';
+      bindText(el('geoSearchStatus'), () => results.length ? tr`${results.length} Orte gefunden. Wähle einen Treffer.` : t('Kein Ort gefunden. Versuche einen anderen Namen oder klicke auf die Karte.'));
     } catch (e) {
-      if (operation.current()) el('geoSearchStatus').textContent = e.name === 'TimeoutError' ? 'Die Ortssuche antwortet nicht. Bitte erneut versuchen.' : e.message;
+      if (operation.current()) bindText(el('geoSearchStatus'), () => e.name === 'TimeoutError' ? t('Die Ortssuche antwortet nicht. Bitte erneut versuchen.') : e.message);
     } finally { operation.end(); }
   }
   function scheduleSearch() {
     clearTimeout(timer); stop('search'); el('geoSuggestions').replaceChildren();
-    if (el('geoQuery').value.trim().length < 3) { el('geoSearchStatus').textContent = 'Mindestens drei Zeichen eingeben.'; return; }
-    el('geoSearchStatus').textContent = 'Suche nach der Tipp-Pause …';
+    if (el('geoQuery').value.trim().length < 3) { bindText(el('geoSearchStatus'), () => t('Mindestens drei Zeichen eingeben.')); return; }
+    bindText(el('geoSearchStatus'), () => t('Suche nach der Tipp-Pause …'));
     timer = setTimeout(runSearch, Math.max(450, 1000 - (Date.now() - lastSearchAt)));
   }
   el('geoQuery').addEventListener('input', e => { if (!e.isComposing) scheduleSearch(); });
@@ -234,7 +235,7 @@ export function createGeodataTool({ drawingMap, getSourceIds, onImport, onClose 
   el('geoSearchForm').onsubmit = e => { e.preventDefault(); scheduleSearch(); };
   el('geoQuery').addEventListener('keydown', e => {
     if (e.key === 'ArrowDown') { e.preventDefault(); el('geoSuggestions').querySelector('button')?.focus(); }
-    if (e.key === 'Escape') { clearTimeout(timer); stop('search'); el('geoSuggestions').replaceChildren(); el('geoSearchStatus').textContent = ''; }
+    if (e.key === 'Escape') { clearTimeout(timer); stop('search'); el('geoSuggestions').replaceChildren(); bindText(el('geoSearchStatus'), () => ''); }
   });
   el('geoSuggestions').addEventListener('keydown', e => {
     if (!['ArrowDown', 'ArrowUp', 'Escape'].includes(e.key)) return;
@@ -243,7 +244,7 @@ export function createGeodataTool({ drawingMap, getSourceIds, onImport, onClose 
     if (e.key === 'Escape' || (e.key === 'ArrowUp' && index <= 0)) el('geoQuery').focus();
     else items[Math.min(items.length - 1, index + (e.key === 'ArrowDown' ? 1 : -1))]?.focus();
   });
-  el('geoStop').onclick = () => { stop('objects'); clearPreview(); status('Laden abgebrochen. Deine Auswahl bleibt erhalten.'); };
+  el('geoStop').onclick = () => { stop('objects'); clearPreview(); status(t('Laden abgebrochen. Deine Auswahl bleibt erhalten.')); };
   function close() {
     active = false; clearTimeout(timer);
     for (const name of [...requests.keys()]) stop(name);
@@ -258,7 +259,7 @@ export function createGeodataTool({ drawingMap, getSourceIds, onImport, onClose 
   el('geoFinish').onclick = async () => {
     if (!basket.size || requests.has('import')) return;
     const operation = start('import');
-    el('geoFinish').disabled = true; status('Auswahl wird in die Zeichnung übernommen …');
+    el('geoFinish').disabled = true; status(t('Auswahl wird in die Zeichnung übernommen …'));
     try {
       // Let the busy cursor paint before validating and drawing a large batch.
       await new Promise(resolve => requestAnimationFrame(() => setTimeout(resolve, 0)));
@@ -273,7 +274,7 @@ export function createGeodataTool({ drawingMap, getSourceIds, onImport, onClose 
     get hasSelection() { return !!basket.size; },
     canLeave() {
       if (!active) return true;
-      if (basket.size) { status('Bitte deine Auswahl mit „Fertig“ übernehmen oder mit „Abbrechen“ verwerfen.'); el('geoFinish').focus(); return false; }
+      if (basket.size) { status(t('Bitte deine Auswahl mit „Fertig“ übernehmen oder mit „Abbrechen“ verwerfen.')); el('geoFinish').focus(); return false; }
       close(); return true;
     },
     open() {
@@ -286,6 +287,7 @@ export function createGeodataTool({ drawingMap, getSourceIds, onImport, onClose 
       document.querySelectorAll('[data-tool]').forEach(b => b.setAttribute('aria-pressed', 'false'));
       if (!map) {
         map = L.map(el('geoMap'), { preferCanvas: true });
+        localizeMapControls(map);
         L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19, attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>' }).addTo(map);
         chosenLayer = L.featureGroup().addTo(map); previewLayer = L.featureGroup().addTo(map);
         map.on('click', e => loadObjects(e.latlng));
@@ -293,9 +295,9 @@ export function createGeodataTool({ drawingMap, getSourceIds, onImport, onClose 
       }
       map.invalidateSize({ pan: false }); map.setView(drawingMap.getCenter(), drawingMap.getZoom(), { animate: false });
       if (marker) { marker.remove(); marker = null; }
-      clearPreview(); updateBasket(); error(''); status('Suche einen Ort oder klicke auf die Karte.');
+      clearPreview(); updateBasket(); error(''); status(t('Suche einen Ort oder klicke auf die Karte.'));
       el('geoQuery').value = ''; el('geoSuggestions').replaceChildren(); el('geoObjects').replaceChildren();
-      el('geoSearchStatus').textContent = ''; el('geoSidebar').scrollTop = 0; el('geoQuery').focus();
+      bindText(el('geoSearchStatus'), () => ''); el('geoSidebar').scrollTop = 0; el('geoQuery').focus();
     }
   };
 }

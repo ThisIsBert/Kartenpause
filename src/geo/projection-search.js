@@ -1,20 +1,21 @@
+import { t, tr } from '../i18n.js';
 import numeric from 'numeric';
 import { GeoFit } from './geo-fit.js';
 
 export const ProjectionSearch = (() => {
     const minimumPoints = 4;
-    const names = { eqc: 'Längentreue Zylinderprojektion', lcc: 'Lambert konisch', aea: 'Albers flächentreu', eqdc: 'Längentreue Kegelprojektion', laea: 'Lambert azimutal', aeqd: 'Azimutal längentreu', stere: 'Stereografisch', ortho: 'Orthografisch', gnom: 'Gnomonisch', tmerc: 'Transversale Mercatorprojektion', robin: 'Robinson', moll: 'Mollweide', eqearth: 'Equal Earth', sinu: 'Sinusoidal', poly: 'Polykonisch' };
+    const names = { eqc: t('Längentreue Zylinderprojektion'), lcc: t('Lambert konisch'), aea: t('Albers flächentreu'), eqdc: t('Längentreue Kegelprojektion'), laea: t('Lambert azimutal'), aeqd: t('Azimutal längentreu'), stere: t('Stereografisch'), ortho: t('Orthografisch'), gnom: t('Gnomonisch'), tmerc: t('Transversale Mercatorprojektion'), robin: 'Robinson', moll: 'Mollweide', eqearth: 'Equal Earth', sinu: t('Sinusoidal'), poly: t('Polykonisch') };
     const keys = family => family === 'eqc' ? ['lat_ts'] : family === 'lcc' ? ['lat_1'] : ['aea','eqdc'].includes(family) ? ['lat_1','lat_2'] : ['laea','aeqd','stere','ortho','gnom'].includes(family) ? ['lon_0','lat_0'] : ['lon_0'];
     const wrap = lon => ((lon+180)%360+360)%360-180;
     const clamp = lat => Math.max(-80,Math.min(80,lat));
     function definition(model) {
-      if (!model || !Object.hasOwn(names,model.family) || !model.parameters) throw new Error('Unbekannte Projektionsfamilie.');
+      if (!model || !Object.hasOwn(names,model.family) || !model.parameters) throw new Error(t('Unbekannte Projektionsfamilie.'));
       const p=model.parameters, required=[...new Set(['lon_0',...keys(model.family)])];
-      if (Object.keys(p).some(k=>!required.includes(k)) || required.some(k=>!Number.isFinite(p[k]))) throw new Error('Ungültige Projektionsparameter.');
-      if (Math.abs(p.lon_0)>180 || required.some(k=>k!=='lon_0'&&Math.abs(p[k])>85)) throw new Error('Projektionsparameter außerhalb der Suchgrenzen.');
-      if (model.family==='eqc'&&(p.lat_ts<0||p.lat_ts>80)) throw new Error('Ungültiger Standardbreitenkreis.');
-      if (model.family==='lcc'&&Math.abs(p.lat_1)<.05) throw new Error('Lambert-Kegel degeneriert am Äquator.');
-      if (['aea','eqdc'].includes(model.family)&&Math.abs(p.lat_1+p.lat_2)<.1) throw new Error('Kegelparameter degeneriert.');
+      if (Object.keys(p).some(k=>!required.includes(k)) || required.some(k=>!Number.isFinite(p[k]))) throw new Error(t('Ungültige Projektionsparameter.'));
+      if (Math.abs(p.lon_0)>180 || required.some(k=>k!=='lon_0'&&Math.abs(p[k])>85)) throw new Error(t('Projektionsparameter außerhalb der Suchgrenzen.'));
+      if (model.family==='eqc'&&(p.lat_ts<0||p.lat_ts>80)) throw new Error(t('Ungültiger Standardbreitenkreis.'));
+      if (model.family==='lcc'&&Math.abs(p.lat_1)<.05) throw new Error(t('Lambert-Kegel degeneriert am Äquator.'));
+      if (['aea','eqdc'].includes(model.family)&&Math.abs(p.lat_1+p.lat_2)<.1) throw new Error(t('Kegelparameter degeneriert.'));
       const parameters={...p};
       if (model.family==='lcc') parameters.lat_2=p.lat_1;
       if (!Object.hasOwn(parameters,'lat_0')) parameters.lat_0=0;
@@ -33,15 +34,15 @@ export const ProjectionSearch = (() => {
       return {lon,starts};
     }
     async function search(points,family,width,height,options={}) {
-      if (points.filter(p=>p.fit).length<minimumPoints) throw new Error('Mindestens vier Fit-Punkte für die Parametersuche erforderlich.');
-      if (!numeric?.uncmin) throw new Error('Optimierungsbibliothek fehlt.');
+      if (points.filter(p=>p.fit).length<minimumPoints) throw new Error(t('Mindestens vier Fit-Punkte für die Parametersuche erforderlich.'));
+      if (!numeric?.uncmin) throw new Error(t('Optimierungsbibliothek fehlt.'));
       const fit=points.filter(p=>p.fit),{lon,starts}=seeds(family,fit),parameterKeys=keys(family);
       const reference=Math.max(1,fit.reduce((s,p)=>s+GeoFit.distance(p.target,fit[0].target)**2,0)/fit.length);
       let best=null, attempted=0, failures=0;
       const makeModel=values=>({family,parameters:{lon_0:lon,...Object.fromEntries(parameterKeys.map((k,i)=>[k,values[i]]))}});
       for(let seedIndex=0;seedIndex<starts.length;seedIndex++) {
         await new Promise(resolve=>setTimeout(resolve,0));
-        if(options.cancelled?.()) throw new Error('Suche abgebrochen.');
+        if(options.cancelled?.()) throw new Error(t('Suche abgebrochen.'));
         options.progress?.(seedIndex+1,starts.length);
         const values=starts[seedIndex];
         try {
@@ -61,12 +62,12 @@ export const ProjectionSearch = (() => {
           numeric.uncmin(loss,start,1e-9,undefined,220);
         } catch(_) {failures++;}
       }
-      if(!best) throw new Error('Keine gültige Anpassung innerhalb der Suchgrenzen.');
+      if(!best) throw new Error(t('Keine gültige Anpassung innerhalb der Suchgrenzen.'));
       // Refine the alignment at the best parameters before publishing this candidate.
       const refined=GeoFit.solve(points,best.def,width,height);
       if(refined.fit.rms<=best.fit.rms) best.g=refined.g;
       best.g.rot=((best.g.rot+Math.PI)%(2*Math.PI)+2*Math.PI)%(2*Math.PI)-Math.PI;
-      return { code:'CUSTOM:'+family, model:best.model, g:best.g, ...GeoFit.evaluate(points,best.g,best.def,width,height), warning:failures ? `${failures} Startversuch(e) ohne vollständige Optimierung; beste gefundene Lösung.` : '', starts:attempted };
+      return { code:'CUSTOM:'+family, model:best.model, g:best.g, ...GeoFit.evaluate(points,best.g,best.def,width,height), warning:failures ? tr`${failures} Startversuch(e) ohne vollständige Optimierung; beste gefundene Lösung.` : '', starts:attempted };
     }
     return { names, keys, definition, search, minimumPoints };
   })();

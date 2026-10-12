@@ -1,3 +1,4 @@
+import { t, tr, untranslated } from '../i18n.js';
 import GeoJSONReader from 'jsts/org/locationtech/jts/io/GeoJSONReader.js';
 import GeoJSONWriter from 'jsts/org/locationtech/jts/io/GeoJSONWriter.js';
 import OverlayOp from 'jsts/org/locationtech/jts/operation/overlay/OverlayOp.js';
@@ -8,10 +9,10 @@ import { linearObject } from './rework-geometry.js';
 import { normalizePolygonContacts, sectionIntersections } from './section-geometry.js';
 
 const validationReasons = [
-  'Ungültige Flächengeometrie', 'Wiederholter Randpunkt', 'Loch liegt außerhalb des Außenrands',
-  'Ineinanderliegende Löcher', 'Flächeninneres ist getrennt', 'Randabschnitte kreuzen sich oder überlagern sich',
-  'Rand berührt oder kreuzt sich selbst', 'Ineinanderliegende Teilflächen', 'Doppelter Rand',
-  'Zu wenige unterschiedliche Randpunkte', 'Ungültige Koordinate', 'Rand ist nicht geschlossen'
+  t('Ungültige Flächengeometrie'), t('Wiederholter Randpunkt'), t('Loch liegt außerhalb des Außenrands'),
+  t('Ineinanderliegende Löcher'), t('Flächeninneres ist getrennt'), t('Randabschnitte kreuzen sich oder überlagern sich'),
+  t('Rand berührt oder kreuzt sich selbst'), t('Ineinanderliegende Teilflächen'), t('Doppelter Rand'),
+  t('Zu wenige unterschiedliche Randpunkte'), t('Ungültige Koordinate'), t('Rand ist nicht geschlossen')
 ];
 
 function invalidBoundary(object, validation, linear) {
@@ -22,7 +23,7 @@ function invalidBoundary(object, validation, linear) {
     Math.hypot(issue.point[0] - point[0], issue.point[1] - point[1]) < 1e-7) : [];
   const issue = { point, reason, objectId: object.id, objectName: object.name,
     segments: nearby.flatMap(issue => issue.segments || []) };
-  const error = new Error(`Die Fläche „${object.name || 'Unbenannt'}“ hat einen ungültigen Rand: ${reason}. Bitte zuerst korrigieren.`);
+  const error = new Error(tr`Die Fläche „${object.name ? untranslated(object.name) : t('Unbenannt')}“ hat einen ungültigen Rand: ${reason}. Bitte zuerst korrigieren.`);
   error.issues = [issue];
   return error;
 }
@@ -34,8 +35,8 @@ export function combinePolygons(first, second, operation) {
 }
 
 export function operatePolygons(objects, operation) {
-  if (!['union','difference','intersection','xor'].includes(operation)) throw new Error('Unbekannte Flächenoperation.');
-  if (objects.length<2 || objects.some(object=>!object || !isClosed(object.kind))) throw new Error('Bitte mindestens zwei Flächen auswählen.');
+  if (!['union','difference','intersection','xor'].includes(operation)) throw new Error(t('Unbekannte Flächenoperation.'));
+  if (objects.length<2 || objects.some(object=>!object || !isClosed(object.kind))) throw new Error(t('Bitte mindestens zwei Flächen auswählen.'));
   const reader=new GeoJSONReader(),writer=new GeoJSONWriter();
   const inputs=objects.map(object=>{
     let geometry=reader.read(toFeature(object,p=>p).geometry);
@@ -54,7 +55,7 @@ export function operatePolygons(objects, operation) {
   } else for(const next of inputs.slice(1)) geometry=operation==='union'?OverlayOp.union(geometry,next):operation==='intersection'?OverlayOp.intersection(geometry,next):OverlayOp.symDifference(geometry,next);
   // A point/line contact has no area and cannot become a polygon object.
   if(geometry.isEmpty() || geometry.getArea()===0)return null;
-  if(!new IsValidOp(geometry).isValid())throw new Error('Es konnte keine gültige Ergebnisfläche berechnet werden.');
+  if(!new IsValidOp(geometry).isValid())throw new Error(t('Es konnte keine gültige Ergebnisfläche berechnet werden.'));
   const polygons=[];
   const collect=g=>{if(g.getGeometryType()==='Polygon')polygons.push(writer.write(g).coordinates); else if(g.getNumGeometries()>1 || g.getGeometryType()==='GeometryCollection')for(let i=0;i<g.getNumGeometries();i++){const child=g.getGeometryN(i);if(child!==g)collect(child);}};
   collect(geometry);

@@ -1,14 +1,15 @@
+import { t } from '../i18n.js';
 import { simplify } from './simplify-path.js';
 import { pixelContrast } from './image-features.js';
 
 export function cropSearch(raster, start, end, radius) {
-  if (![...start, ...end, radius].every(Number.isFinite)) throw new Error('Ungültiger Suchbereich.');
+  if (![...start, ...end, radius].every(Number.isFinite)) throw new Error(t('Ungültiger Suchbereich.'));
   const left = Math.max(0, Math.floor(Math.min(start[0], end[0]) - radius - 8));
   const top = Math.max(0, Math.floor(Math.min(start[1], end[1]) - radius - 8));
   const right = Math.min(raster.width - 1, Math.ceil(Math.max(start[0], end[0]) + radius + 8));
   const bottom = Math.min(raster.height - 1, Math.ceil(Math.max(start[1], end[1]) + radius + 8));
   const width = right - left + 1, height = bottom - top + 1;
-  if (width * height > 400000) throw new Error('Der Abschnitt ist zu groß. Bitte einen näheren Zwischenanker setzen oder den Suchraum verkleinern.');
+  if (width * height > 400000) throw new Error(t('Der Abschnitt ist zu groß. Bitte einen näheren Zwischenanker setzen oder den Suchraum verkleinern.'));
   const data = new Uint8ClampedArray(width * height * 4);
   for (let y = 0; y < height; y++) data.set(raster.data.subarray(((top + y) * raster.width + left) * 4, ((top + y) * raster.width + left + width) * 4), y * width * 4);
   return { raster: { width, height, data }, start: [start[0] - left, start[1] - top], end: [end[0] - left, end[1] - top], offset: [left, top] };
@@ -42,13 +43,13 @@ class MinHeap {
 export function findMagneticPath({ raster, start, end, radius = 32, color = null, color2 = null, tolerance = 50 }) {
   const { width, height, data } = raster, n = width * height;
   const a = start.map(Math.round), b = end.map(Math.round);
-  if ([a, b].some(p => p[0] < 0 || p[1] < 0 || p[0] >= width || p[1] >= height)) throw new Error('Anker liegt außerhalb der Pixelkarte.');
-  if (Math.hypot(a[0] - b[0], a[1] - b[1]) < 2) throw new Error('Bitte den nächsten Anker etwas weiter entfernt setzen.');
+  if ([a, b].some(p => p[0] < 0 || p[1] < 0 || p[0] >= width || p[1] >= height)) throw new Error(t('Anker liegt außerhalb der Pixelkarte.'));
+  if (Math.hypot(a[0] - b[0], a[1] - b[1]) < 2) throw new Error(t('Bitte den nächsten Anker etwas weiter entfernt setzen.'));
   const dx = b[0] - a[0], dy = b[1] - a[1], lengthSquared = dx * dx + dy * dy;
   const evidence = new Float32Array(n).fill(-1), costs = new Float32Array(n).fill(-1);
   const boundary = color && color2;
   const colorGap = boundary ? Math.hypot(...color.map((v, i) => v - color2[i])) : 0;
-  if (boundary && colorGap < 12) throw new Error('Die beiden Farben sind zu ähnlich. Bitte unterschiedliche Flächenfarben aufnehmen.');
+  if (boundary && colorGap < 12) throw new Error(t('Die beiden Farben sind zu ähnlich. Bitte unterschiedliche Flächenfarben aufnehmen.'));
   const matchColor = (offset, sample) => {
     let delta = 0;
     for (let c = 0; c < 3; c++) delta += (data[offset + c] - sample[c]) ** 2;
@@ -112,14 +113,14 @@ export function findMagneticPath({ raster, start, end, radius = 32, color = null
       }
     }
   }
-  if (!Number.isFinite(distances[last])) throw new Error('Kein Verlauf zwischen den Ankern gefunden. Bitte einen Zwischenanker setzen.');
+  if (!Number.isFinite(distances[last])) throw new Error(t('Kein Verlauf zwischen den Ankern gefunden. Bitte einen Zwischenanker setzen.'));
   const pixels = [];
   let supported = 0;
   for (let index = last; index !== -1; index = parents[index]) {
     pixels.push([index % width, Math.floor(index / width)]);
     cost(index); if (evidence[index] > .09) supported++;
   }
-  if (supported / pixels.length < .4) throw new Error('Keine ausreichend passende Bildlinie gefunden. Bitte Anker, Farbvorgabe oder Suchraum anpassen.');
+  if (supported / pixels.length < .4) throw new Error(t('Keine ausreichend passende Bildlinie gefunden. Bitte Anker, Farbvorgabe oder Suchraum anpassen.'));
   pixels.reverse();
   return { pixels: simplify(pixels, .65), support: supported / pixels.length };
 }

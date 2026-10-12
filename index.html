@@ -39,6 +39,7 @@
     <button id="undoDrawing" class="icon" title="Rückgängig (Strg+Z)" aria-label="Rückgängig" disabled><i data-lucide="undo-2"></i></button>
     <button id="redoDrawing" class="icon" title="Wiederholen (Strg+Umschalt+Z)" aria-label="Wiederholen" disabled><i data-lucide="redo-2"></i></button>
   </div>
+  <button id="openSettings" class="settings-button" aria-haspopup="dialog" aria-controls="settingsDialog" title="Einstellungen"><i data-lucide="settings"></i><span>Einstellungen</span></button>
 </header>
 <div id="sidebarResize" role="separator" tabindex="0" aria-label="Breite der Werkzeugspalte" aria-orientation="vertical" aria-valuemin="280" aria-valuemax="600" aria-valuenow="360" title="Ziehen oder mit Pfeiltasten Breite ändern"></div>
 
@@ -154,7 +155,7 @@
     <button id="showPolygonIssue" hidden>Fehlerstelle anzeigen</button>
     <p id="polygonSelectionHelp" class="hint" aria-live="polite">Weitere Objekte mit Strg/⌘ oder Umschalt anklicken. Das Ergebnis wird als neues Objekt angelegt; die Ausgangsobjekte bleiben erhalten.</p>
     <h2 id="drawingCount">Objekte (0)</h2>
-    <div id="drawingObjects" class="stack" aria-label="Gezeichnete Objekte"></div>
+    <div data-empty-message="Noch keine Objekte. Wähle links ein Zeichenwerkzeug oder lade eine Zeichnung über Import / Export." id="drawingObjects" class="stack" aria-label="Gezeichnete Objekte"></div>
     <fieldset id="drawingSelection" disabled>
       <legend>Ausgewähltes Objekt</legend>
       <label for="drawingName">Name</label><input id="drawingName" type="text" maxlength="200" />
@@ -197,7 +198,7 @@
     <p id="geoSearchStatus" class="hint" role="status"></p>
     <div id="geoSuggestions" class="geo-list" aria-label="Ortsvorschläge"></div>
     <h2>Objekte am Ort</h2>
-    <div id="geoObjects" class="geo-list" aria-label="Gefundene Geodaten"></div>
+    <div data-empty-message="Wähle einen Ortsvorschlag oder klicke auf die Karte." id="geoObjects" class="geo-list" aria-label="Gefundene Geodaten"></div>
     <p id="geoStatus" role="status"></p>
     <p id="geoError" role="alert"></p>
     <button id="geoStop" hidden>Laden abbrechen</button>
@@ -213,6 +214,17 @@
     <p class="hint geo-attribution">Daten: <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">© OpenStreetMap-Mitwirkende · ODbL</a>. Ortssuche: <a href="https://photon.komoot.io" target="_blank" rel="noopener">Photon</a>.</p>
     <div class="commands tool-actions"><button id="geoFinish" class="primary" disabled><i data-lucide="check"></i> Fertig</button><button id="geoCancel"><i data-lucide="x"></i> Abbrechen</button></div>
   </aside>
+  <dialog id="settingsDialog" aria-labelledby="settingsTitle">
+    <form method="dialog">
+      <div class="settings-heading"><h1 id="settingsTitle">Einstellungen</h1><button class="icon" value="close" title="Schließen" aria-label="Schließen"><i data-lucide="x"></i></button></div>
+      <section class="settings-section" aria-labelledby="languageLabel">
+        <label id="languageLabel" for="languageSelect">Sprache</label>
+        <select id="languageSelect" autofocus><option value="de" lang="de">Deutsch</option><option value="en" lang="en">English</option></select>
+        <p class="hint">Die Sprache wird in diesem Browser gespeichert.</p>
+        <p class="hint">Beim ersten Start wird die Browsersprache verwendet.</p>
+      </section>
+    </form>
+  </dialog>
   <script type="module" src="/src/main.js"></script>
 </body>
 </html>

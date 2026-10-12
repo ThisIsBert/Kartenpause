@@ -1,3 +1,4 @@
+import { t } from '../i18n.js';
 import { lab } from './image-features.js';
 // CIELAB distance handles both color nuances and brightness variations. Always
 // compare against the clicked color, never a moving flood-fill average.
@@ -5,7 +6,7 @@ import { lab } from './image-features.js';
 export function selectColor(raster, seed, tolerance, contiguous) {
   const { width, height, data } = raster, size = width * height;
   const [x, y] = seed.map(Math.round);
-  if (x < 0 || y < 0 || x >= width || y >= height || data[(y * width + x) * 4 + 3] < 128) throw new Error('Bitte in eine sichtbare Farbfläche klicken.');
+  if (x < 0 || y < 0 || x >= width || y >= height || data[(y * width + x) * 4 + 3] < 128) throw new Error(t('Bitte in eine sichtbare Farbfläche klicken.'));
   const reference = lab(data, (y * width + x) * 4), mask = new Uint8Array(size);
   const matches = index => {
     if (data[index * 4 + 3] < 128) return false;
@@ -76,7 +77,7 @@ function splitContacts(ring) {
 export function selectionPolygons(mask, width, height) {
   const edges = [], starts = new Map(), stride = width + 1;
   const edge = (x, y, nx, ny, direction) => {
-    if (edges.length >= 1000000) throw new Error('Die Auswahl enthält zu viele kleine Ränder. Bitte zusammenhängend auswählen oder die Toleranz anpassen.');
+    if (edges.length >= 1000000) throw new Error(t('Die Auswahl enthält zu viele kleine Ränder. Bitte zusammenhängend auswählen oder die Toleranz anpassen.'));
     const from = y * stride + x, to = ny * stride + nx, id = edges.length;
     edges.push({ from, to, direction, used: false });
     if (!starts.has(from)) starts.set(from, []);
@@ -103,7 +104,7 @@ export function selectionPolygons(mask, width, height) {
       // Turn toward the selected pixel at diagonal contacts: keep islands separate.
       const rank = e => [1, 0, 3, 2].indexOf((e.direction - current.direction + 4) % 4);
       candidates.sort((a, b) => rank(a) - rank(b));
-      if (!candidates.length) throw new Error('Der Auswahlrand konnte nicht geschlossen werden.');
+      if (!candidates.length) throw new Error(t('Der Auswahlrand konnte nicht geschlossen werden.'));
       current = candidates[0];
     } while (true);
     for (const simple of splitContacts(ring)) {
@@ -119,7 +120,7 @@ export function selectionPolygons(mask, width, height) {
     const [a, b] = hole.ring, length = Math.hypot(b[0] - a[0], b[1] - a[1]);
     const point = [(a[0] + b[0]) / 2 + (b[1] - a[1]) / length * .1, (a[1] + b[1]) / 2 - (b[0] - a[0]) / length * .1];
     const parent = outers.filter(r => contains(r.ring, point)).sort((a, b) => a.area - b.area)[0];
-    if (!parent) throw new Error('Ein Loch konnte keiner Fläche zugeordnet werden.');
+    if (!parent) throw new Error(t('Ein Loch konnte keiner Fläche zugeordnet werden.'));
     parent.holes.push(hole.ring);
   }
   return outers.map(r => [r.ring, ...r.holes]);

@@ -1,3 +1,4 @@
+import { t } from '../i18n.js';
 import GeoJSONReader from 'jsts/org/locationtech/jts/io/GeoJSONReader.js';
 import GeoJSONWriter from 'jsts/org/locationtech/jts/io/GeoJSONWriter.js';
 import Polygonizer from 'jsts/org/locationtech/jts/operation/polygonize/Polygonizer.js';
@@ -49,7 +50,7 @@ export function sectionIntersections(object, limit = 32) {
       if (adjacent && li.getIntersectionNum() === 1) continue;
       const p = li.getIntersection(0), type = li.isProper() ? 'crossing' : li.getIntersectionNum() > 1 ? 'overlap' : 'touch';
       issues.push({ point: [p.x, p.y], type, rings: [a.r, b.r], segments: [[a.a, a.b], [b.a, b.b]],
-        reason: type === 'crossing' ? 'Kreuzung zweier Randabschnitte' : type === 'overlap' ? 'Doppelt durchlaufener Rand' : 'Berührung zweier Randabschnitte' });
+        reason: type === 'crossing' ? t('Kreuzung zweier Randabschnitte') : type === 'overlap' ? t('Doppelt durchlaufener Rand') : t('Berührung zweier Randabschnitte') });
       if (issues.length >= limit) return issues;
     }
   }
@@ -105,13 +106,13 @@ export function prepareSection(result) {
   }
   const changed = JSON.stringify(objectRings(cleaned)) !== JSON.stringify(objectRings(result));
   if (!isClosed(cleaned.kind)) return { valid: true, result: cleaned, issues: [], cleaned: changed };
-  if (objectRings(cleaned).some(r => r.length < 3)) return { valid: false, result: cleaned, issues: [{ point: objectRings(result)[0][0], reason: 'Dieser Rand schließt keine Fläche mehr ein.' }], cleaned: changed };
+  if (objectRings(cleaned).some(r => r.length < 3)) return { valid: false, result: cleaned, issues: [{ point: objectRings(result)[0][0], reason: t('Dieser Rand schließt keine Fläche mehr ein.') }], cleaned: changed };
   const validation = new IsValidOp(asGeometry(cleaned));
   if (validation.isValid()) return { valid: true, result: cleaned, issues: [], cleaned: changed };
   const issues = sectionIntersections(cleaned);
   if (!issues.length) {
     const error = validation.getValidationError(), p = error.getCoordinate();
-    issues.push({ point: p ? [p.x, p.y] : null, reason: 'Unklare Zuordnung von Loch oder Teilfläche' });
+    issues.push({ point: p ? [p.x, p.y] : null, reason: t('Unklare Zuordnung von Loch oder Teilfläche') });
   }
   let normalized = null;
   try { normalized = polygonized(cleaned); } catch { /* Keep the editable input even if reconstruction fails. */ }

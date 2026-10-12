@@ -1,3 +1,4 @@
+import { t } from '../i18n.js';
 import { isClosed, isCurved, objectRings, sampledPoints, ringEntries } from './geometry.js';
 
 export function linearObject(object) {
@@ -64,7 +65,7 @@ export function replaceArc(object, start, end, path, other = false) {
     points = [...ring.slice(0, Math.ceil(a.at)), ...replacement, ...ring.slice(Math.floor(b.at) + 1)];
   }
   points = points.filter((p, i) => !i || Math.hypot(p[0] - points[i - 1][0], p[1] - points[i - 1][1]) > 1e-8);
-  if (points.length < (closed ? 3 : 2)) throw new Error('Der Ersatz lässt zu wenige Stützpunkte übrig.');
+  if (points.length < (closed ? 3 : 2)) throw new Error(t('Der Ersatz lässt zu wenige Stützpunkte übrig.'));
   if (closed) {
     const area = vertices => vertices.reduce((sum, p, i) => {
       const q = vertices[(i + 1) % vertices.length], origin = vertices[0];

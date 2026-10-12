@@ -13,7 +13,8 @@
     "preview": "vite preview",
     "test:ui": "playwright test",
     "test:ui:headed": "playwright test --headed",
-    "test:ui:report": "playwright show-report output/playwright/report"
+    "test:ui:report": "playwright show-report output/playwright/report",
+    "test:i18n": "node --test tests/i18n.unit.mjs"
   },
   "dependencies": {
     "jsts": "2.12.1",
@@ -24,7 +25,9 @@
     "proj4": "2.21.0"
   },
   "overrides": {
-    "osmtogeojson": { "@xmldom/xmldom": "0.8.15" }
+    "osmtogeojson": {
+      "@xmldom/xmldom": "0.8.15"
+    }
   },
   "devDependencies": {
     "@playwright/test": "1.62.0",

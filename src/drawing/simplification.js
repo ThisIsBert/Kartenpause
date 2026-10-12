@@ -1,3 +1,4 @@
+import { t as translate } from '../i18n.js';
 import { isClosed, objectRings, polygonParts } from './geometry.js';
 import { simplify } from './simplify-path.js';
 import { linearObject } from './rework-geometry.js';
@@ -66,7 +67,7 @@ function validRings(rings, originals, originalNesting, issues = [], local = fals
   for (let r = 0; r < rings.length; r++) {
     const ring = rings[r];
     if (ring.length < 3 || area(ring) * area(originals[r]) <= 0) {
-      issues.push({ point: ring[0], rings: [r], reason: 'Entarteter Rand' });
+      issues.push({ point: ring[0], rings: [r], reason: translate('Entarteter Rand') });
       if (!local) return false;
     }
     ring.forEach((a, i) => {
@@ -86,7 +87,7 @@ function validRings(rings, originals, originalNesting, issues = [], local = fals
         const ex = b.b[0] - b.a[0], ey = b.b[1] - b.a[1], denominator = dx * ey - dy * ex;
         const t = denominator ? ((b.a[0] - a.a[0]) * ey - (b.a[1] - a.a[1]) * ex) / denominator : 0;
         const point = denominator ? [a.a[0] + t * dx, a.a[1] + t * dy] : [(Math.max(a.minX, b.minX) + Math.min(a.maxX, b.maxX)) / 2, (Math.max(a.minY, b.minY) + Math.min(a.maxY, b.maxY)) / 2];
-        issues.push({ point, rings: [a.r, b.r], reason: 'Kreuzung oder doppelt durchlaufener Rand' });
+        issues.push({ point, rings: [a.r, b.r], reason: translate('Kreuzung oder doppelt durchlaufener Rand') });
       }
       return intersects;
     }) && !local) return false;
@@ -96,7 +97,7 @@ function validRings(rings, originals, originalNesting, issues = [], local = fals
   if (!valid) {
     for (const pair of new Set([...next, ...originalNesting])) if (next.has(pair) !== originalNesting.has(pair)) {
       const indices = pair.split(':').map(Number);
-      issues.push({ point: rings[indices[0]][0], rings: indices, reason: 'Veränderte Zuordnung von Loch oder Teilfläche' });
+      issues.push({ point: rings[indices[0]][0], rings: indices, reason: translate('Veränderte Zuordnung von Loch oder Teilfläche') });
       if (!local) break;
     }
   }

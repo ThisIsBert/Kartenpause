@@ -1,3 +1,4 @@
+import { t, tr } from '../i18n.js';
 import numeric from 'numeric';
 import { GeoFit } from './geo-fit.js';
 
@@ -61,7 +62,7 @@ function solveSurface(samples, key, regularization) {
   }
 
   const coefficients = numeric.solve(matrix, values);
-  if (!coefficients?.every(Number.isFinite)) throw new Error('TPS-Korrektur konnte nicht stabil berechnet werden.');
+  if (!coefficients?.every(Number.isFinite)) throw new Error(t('TPS-Korrektur konnte nicht stabil berechnet werden.'));
   return coefficients;
 }
 
@@ -88,10 +89,10 @@ function assertNoFolds(transform) {
       const down = mercator(transform(u, (row + 1) / divisions), origin.lon);
       const center = mercator(origin, origin.lon);
       const cross = (right.x - center.x) * (down.y - center.y) - (right.y - center.y) * (down.x - center.x);
-      if (!Number.isFinite(cross) || Math.abs(cross) < 1e-6) throw new Error('Die TPS-Korrektur erzeugt eine zusammengefaltete Bildfläche.');
+      if (!Number.isFinite(cross) || Math.abs(cross) < 1e-6) throw new Error(t('Die TPS-Korrektur erzeugt eine zusammengefaltete Bildfläche.'));
       const sign = Math.sign(cross);
       if (!orientation) orientation = sign;
-      else if (sign !== orientation) throw new Error('Die TPS-Korrektur würde Teile der Bildfläche umklappen.');
+      else if (sign !== orientation) throw new Error(t('Die TPS-Korrektur würde Teile der Bildfläche umklappen.'));
     }
   }
 }
@@ -102,10 +103,10 @@ export const ThinPlateSpline = {
   fitResiduals(points, width, height, basePredict, regularization = 1e-8) {
     const fitPoints = points.filter(point => point.fit);
     if (fitPoints.length < this.minimumPoints) {
-      throw new Error(`Mindestens ${this.minimumPoints} aktive Fit-Punkte für die TPS-Korrektur erforderlich.`);
+      throw new Error(tr`Mindestens ${this.minimumPoints} aktive Fit-Punkte für die TPS-Korrektur erforderlich.`);
     }
     const warning = GeoFit.distribution(points, width, height);
-    if (warning) throw new Error(`TPS nicht stabil: ${warning}`);
+    if (warning) throw new Error(tr`TPS nicht stabil: ${warning}`);
 
     const aspect = height / width;
     const samples = fitPoints.map(point => {
