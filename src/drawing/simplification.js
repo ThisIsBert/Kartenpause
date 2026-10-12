@@ -104,13 +104,13 @@ function validRings(rings, originals, originalNesting, issues = [], local = fals
   return valid && !issues.length;
 }
 
-export function topologyReport(object, original = object) {
+export function topologyReport(object, original = object, { allowExistingContacts = false } = {}) {
   if (object.kind === 'collection') {
-    const reports = object.parts.map((part, i) => topologyReport(part, original.parts[i]));
+    const reports = object.parts.map((part, i) => topologyReport(part, original.parts[i], { allowExistingContacts }));
     return { valid: reports.every(r => r.valid), issues: reports.flatMap(r => r.issues) };
   }
   const issues = [];
-  const valid = !isClosed(object.kind) || validRings(objectRings(object), objectRings(original), nesting(objectRings(original)), issues);
+  const valid = !isClosed(object.kind) || validRings(objectRings(object), objectRings(original), nesting(objectRings(original)), issues, allowExistingContacts);
   return { valid, issues };
 }
 

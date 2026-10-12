@@ -1,5 +1,11 @@
 # Tests
 
+## Gerade Zauberstab-Konturen mit geschützten Ecken
+
+`npm.cmd run test:wand` prüft zusätzlich die Rekonstruktion von Pixeltreppen: Eine schräge Dreiecksgrenze wird von 172 Stützpunkten auf drei exakte Ecken reduziert, rechtwinklige Einbuchtungen bleiben unverändert. Gerundete Umrisse erhalten gerade Segmente mit Punkten zwischen den Pixelecken; die Abweichung wird in beiden Richtungen auf höchstens 0,75 Quellpixel geprüft. Weitere Fälle schützen Löcher, Inseln innerhalb von Löchern, diagonale Kontakte und eine ein Pixel breite Verbindung. Alle 511 nichtleeren 3×3-Masken behalten gültige Konturen und ihre Rasterisierung. Die Worker-Ergebnisse enthalten die rekonstruierte Kontur zusätzlich zur unveränderten Pixelmaske und den exakten Pixelumrissen.
+
+Mehrpixelige Stufen werden zusätzlich mit Arbeitsraster-Maßstäben 2, 3, 4 und 8 geprüft: Die Dreiecksgrenze muss jeweils auf drei unveränderte Ecken schrumpfen, mit einer Abweichung von höchstens 0,75 × Maßstab Quellpixeln. Ein großes synthetisches Bild durchläuft die tatsächliche intelligente Auswahl und prüft die Übertragung ihres gröberen Maßstabs an die Konturrekonstruktion. Pinselkorrektur und wiederhergestellter Verlauf behalten diesen Maßstab; eine neue klassische Auswahl und eine geleerte Auswahl setzen ihn zurück.
+
 ## Nachträgliche Flächen- und Randbearbeitung
 
 `node node_modules/@playwright/test/cli.js test --grep 'Weiterbearbeiten:' --timeout 150000` prüft das erneute Öffnen von MultiPolygonen mit Löchern, Pinselkorrektur, Verwerfen, Ersetzen mit unveränderter Objekt-ID, Rückgängig/Wiederholen und erneutes Öffnen. Weitere Fälle prüfen Kantenanker, manuelles Ersetzen sowie Wechsel Magnetisch → Manuell → Magnetisch innerhalb eines Ersatzverlaufs. Die Geometrietests prüfen zusätzlich die kürzere Abschnittswahl bei umgekehrter Ankerreihenfolge, magnetische Spornbereinigung und Problemmarkierungen, alle 511 nichtleeren 3×3-Pixelmasken auf unveränderte Rasterisierung, Loch-/Teilflächen-Erhalt und Kurvenauflösung. Screenshot: `output/playwright/section-replacement.png`.

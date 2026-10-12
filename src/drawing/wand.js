@@ -12,6 +12,7 @@ export function createWand({ map, renderer, getOriginalRaster, getBasemapRaster,
   let renderedPolygons = null;
   let preserveExisting = false;
   let referenceModel = null;
+  let contourScale = 1;
   let mapMoving = false;
   const basemapMode = () => el('wandSource').value === 'basemap';
   const pixelUnit = () => basemapMode() ? t('Kartenpixel') : t('Originalpixel');
@@ -85,7 +86,7 @@ export function createWand({ map, renderer, getOriginalRaster, getBasemapRaster,
     worker = new Worker(new URL('./selection-worker.js', import.meta.url), { type: 'module' });
     worker.postMessage({ type: 'init', raster: source.raster });
   }
-  function snapshot() { return { mask: mask.slice(), polygons, count, referenceModel }; }
+  function snapshot() { return { mask: mask.slice(), polygons, count, referenceModel, contourScale }; }
   function compute(operation, base = mask, saveHistory = true) {
     const id = ++generation, before = snapshot();
     busy = true; startWorker();
@@ -100,7 +101,7 @@ export function createWand({ map, renderer, getOriginalRaster, getBasemapRaster,
           const limit = Math.max(1, Math.min(12, Math.floor(32000000 / mask.length)));
           while (undo.length > limit) undo.shift();
         }
-        mask = data.mask; polygons = data.polygons; count = data.count; referenceModel = data.referenceModel;
+        mask = data.mask; polygons = data.contours; count = data.count; referenceModel = data.referenceModel; contourScale = data.contourScale;
         if (data.debug) {
           window.kartenpauseWandDebug = data.debug;
           window.kartenpauseShowWandDebug = async () => (await import('./wand-debug.js')).showWandDebug(window.kartenpauseWandDebug);
@@ -110,7 +111,7 @@ export function createWand({ map, renderer, getOriginalRaster, getBasemapRaster,
       changed();
     };
     worker.onerror = () => { worker?.terminate(); worker = null; busy = false; status(t('Die Auswahl konnte nicht berechnet werden. Bitte erneut versuchen.')); changed(); };
-    const copy = base.slice(); worker.postMessage({ ...operation, id, mask: copy, preserveExisting, referenceModel }, [copy.buffer]);
+    const copy = base.slice(); worker.postMessage({ ...operation, id, mask: copy, preserveExisting, referenceModel, contourScale }, [copy.buffer]);
   }
   function cancelStroke() {
     stroke = null;
@@ -121,7 +122,7 @@ export function createWand({ map, renderer, getOriginalRaster, getBasemapRaster,
     releaseSource(); busy = false; cancelStroke();
     delete window.kartenpauseWandDebug;
     delete window.kartenpauseShowWandDebug;
-    polygons = []; count = 0; undo = []; redo = []; cursor = null; preserveExisting = false; referenceModel = null; status(''); changed();
+    polygons = []; count = 0; undo = []; redo = []; cursor = null; preserveExisting = false; referenceModel = null; contourScale = 1; status(''); changed();
   }
   const eventPixel = e => {
     const bounds = canvas.getBoundingClientRect();
@@ -237,7 +238,7 @@ export function createWand({ map, renderer, getOriginalRaster, getBasemapRaster,
       if (busy || stroke) return;
       const from = forward ? redo : undo, to = forward ? undo : redo;
       if (!from.length) return;
-      to.push(snapshot()); ({ mask, polygons, count, referenceModel } = from.pop());
+      to.push(snapshot()); ({ mask, polygons, count, referenceModel, contourScale } = from.pop());
       status(tr`${count.toLocaleString(getLocale())} ${pixelUnit()} ausgewählt${sourceInfo()}.`); changed();
     },
     finish() { if (count && !busy && !stroke) { const result = { polygons, source }; reset(); onComplete(result); } },

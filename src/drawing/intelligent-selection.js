@@ -514,6 +514,7 @@ export function selectIntelligent(prepared, seed, tolerance = 18, debug = false,
   const refined = refineIntelligent(prepared.raster, coarse.mask, coarse.reference, coarse.threshold, prepared.settings, coarse.rivals);
   return {
     mask: refined.mask,
+    contourScale: mode === 'subtract' || previousReference ? 1 : prepared.scale,
     referenceModel: { ...coarse.reference, variants: coarse.reference.variants || [] },
     ...(debug ? { debug: {
       simplified: { width: prepared.width, height: prepared.height, data: prepared.simplified },
