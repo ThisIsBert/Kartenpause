@@ -5,37 +5,22 @@ export function createBasemapRaster(map, layer) {
   const zoom = map.getZoom(), size = map.getSize();
   const width = Math.round(size.x), height = Math.round(size.y);
   if (!width || !height || width * height > 8000000) throw new Error(t('Der Kartenausschnitt ist zu groß. Bitte das Kartenfenster verkleinern.'));
-  if (layer?._basemapFailed) throw new Error(t('Im Ausschnitt fehlen Kartenkacheln. Bitte die Basiskarte neu laden oder wechseln.'));
-  const gl = layer?.getMaplibreMap?.();
-  if (!layer || (layer.options?.isBasemap && !gl) || (!gl && (layer.isLoading() || layer._tileZoom !== zoom))) throw new Error(t('Die Basiskarte lädt noch. Bitte kurz warten und erneut versuchen.'));
+  if (!layer || layer.isLoading() || layer._tileZoom !== zoom) throw new Error(t('Die Basiskarte lädt noch. Bitte kurz warten und erneut versuchen.'));
   const origin = map.project(map.containerPointToLatLng([0, 0]), zoom);
   const canvas = document.createElement('canvas');
   canvas.width = width; canvas.height = height;
   const ctx = canvas.getContext('2d', { willReadFrequently: true });
-  if (gl) {
-    // The unpadded GL canvas is in viewport coordinates, at device resolution.
-    // Refuse stale frames while Leaflet's camera/size update is still pending.
-    const topLeft = gl.project(map.containerPointToLatLng([0, 0]));
-    const frame = gl.getCanvas();
-    if (!gl.loaded() || layer._zooming || Math.abs(gl.getZoom() + 1 - zoom) > 1e-6 ||
-        Math.abs(topLeft.x) > .75 || Math.abs(topLeft.y) > .75 ||
-        Math.abs(frame.clientWidth - width) > 1 || Math.abs(frame.clientHeight - height) > 1) {
-      throw new Error(t('Die Basiskarte lädt noch. Bitte kurz warten und erneut versuchen.'));
-    }
-    ctx.drawImage(frame, 0, 0, width, height);
-  } else {
-    const tileSize = layer.getTileSize();
-    let count = 0;
-    // Leaflet 1.9 tile coordinates retain world-wrap offsets; image URLs do not.
-    for (const tile of Object.values(layer._tiles || {})) {
-      if (tile.coords.z !== zoom) continue;
-      const x = tile.coords.x * tileSize.x - origin.x, y = tile.coords.y * tileSize.y - origin.y;
-      if (x >= width || y >= height || x + tileSize.x <= 0 || y + tileSize.y <= 0) continue;
-      if (!tile.el.complete || !tile.el.naturalWidth) throw new Error(t('Im Ausschnitt fehlen Kartenkacheln. Bitte die Basiskarte neu laden oder wechseln.'));
-      ctx.drawImage(tile.el, x, y, tileSize.x, tileSize.y); count++;
-    }
-    if (!count) throw new Error(t('Noch keine Basiskartenkacheln verfügbar. Bitte kurz warten.'));
+  const tileSize = layer.getTileSize();
+  let count = 0;
+  // Leaflet 1.9 tile coordinates retain world-wrap offsets; image URLs do not.
+  for (const tile of Object.values(layer._tiles || {})) {
+    if (tile.coords.z !== zoom) continue;
+    const x = tile.coords.x * tileSize.x - origin.x, y = tile.coords.y * tileSize.y - origin.y;
+    if (x >= width || y >= height || x + tileSize.x <= 0 || y + tileSize.y <= 0) continue;
+    if (!tile.el.complete || !tile.el.naturalWidth) throw new Error(t('Im Ausschnitt fehlen Kartenkacheln. Bitte die Basiskarte neu laden oder wechseln.'));
+    ctx.drawImage(tile.el, x, y, tileSize.x, tileSize.y); count++;
   }
+  if (!count) throw new Error(t('Noch keine Basiskartenkacheln verfügbar. Bitte kurz warten.'));
   let raster;
   try { raster = ctx.getImageData(0, 0, width, height); }
   catch { throw new Error(t('Diese Basiskarte erlaubt keinen Pixelzugriff. Bitte eine andere Basiskarte wählen.')); }

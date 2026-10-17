@@ -658,7 +658,6 @@ test('Intelligenter Zauberstab: Basiskarte ohne Pixelvorlage, präzises Abziehen
   });
   await page.route('https://server.arcgisonline.com/**', route => route.fulfill({ contentType: 'image/png', body: Buffer.from(tile, 'base64') }));
   await page.goto('/');
-  await page.locator('#basemap').selectOption('esriStreet');
   await expect(page.locator('#drawingSidebar')).toBeVisible();
   const map = page.locator('#map');
   await expect.poll(async () => Math.round((await map.boundingBox()).width)).toBe(1014);
