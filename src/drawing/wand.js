@@ -24,7 +24,7 @@ export function createWand({ map, renderer, getOriginalRaster, getBasemapRaster,
     if (source?.basemap && !sourceLocked()) releaseSource();
   });
   map.on('layeradd layerremove', e => {
-    if (e.layer instanceof L.TileLayer && source?.basemap && !sourceLocked()) releaseSource();
+    if ((e.layer instanceof L.TileLayer || e.layer.options?.isBasemap) && source?.basemap && !sourceLocked()) releaseSource();
   });
   const status = text => { bindText(el('wandStatus'), () => text); };
   const painting = () => el('wandMode').value.startsWith('paint');

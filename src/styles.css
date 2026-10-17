@@ -141,6 +141,8 @@ body, body.drawing-mode {
 .tool-button:hover .tool-tooltip, .tool-button:focus-visible .tool-tooltip { visibility: visible; }
 #mapToolbar { grid-column: 2 / -1; grid-row: 1; display: flex; flex-wrap: wrap; align-items: center; gap: 10px; padding: 10px 16px; border-bottom: 1px solid #d8e1de; background: white; font-size: 12px; min-height: 38px; }
 #basemap { width: 158px; font-size: 12px; border: 1px solid #b8c9c4; border-radius: 5px; }
+#basemapNotice { color: #8a4b18; flex-basis: 100%; }
+.leaflet-gl-layer { pointer-events: none; }
 #rasterControls, #historyControls { display: flex; align-items: center; gap: 8px; }
 #rasterControls { padding: 0 12px; border-left: 1px solid #d8e1de; border-right: 1px solid #d8e1de; }
 #rasterControls .check { margin: 0; white-space: nowrap; font-size: 12px; }

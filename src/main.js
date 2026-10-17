@@ -1,4 +1,4 @@
-import { bindAttribute, bindText, getLocale, localizeDocument, localizeMapControls, t, tr, untranslated } from './i18n.js';
+import { bindAttribute, bindText, getLanguage, getLocale, localizeDocument, localizeMapControls, t, tr, untranslated } from './i18n.js';
 import { setupSettings } from './settings.js';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
@@ -22,13 +22,19 @@ import { setupWorkspace } from './workspace.js';
 import { createDrawingEditor } from './drawing/editor.js';
 import { createRasterInverse } from './drawing/raster-source.js';
 import { createBasemapRaster } from './drawing/basemap-source.js';
+import { createReferenceLayer } from './maps/reference-layer.js';
 
 
     localizeDocument();
     setupSettings();
-    const map = L.map('map', { preferCanvas: true }).setView([51.1, 10.3], 6);
+    const map = L.map('map', { preferCanvas: true, minZoom: 0, maxZoom: 19 }).setView([51.1, 10.3], 6);
 
     const basemaps = {
+      reference: createReferenceLayer(getLanguage(), unavailable => {
+        const notice = document.getElementById('basemapNotice');
+        notice.hidden = !unavailable;
+        bindText(notice, () => unavailable ? t('Referenzkarte nicht vollständig verfügbar. Bitte Internetverbindung prüfen oder eine andere Basiskarte wählen.') : '');
+      }),
       esriStreet: L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}', {
         maxZoom: 19, crossOrigin: true,
         attribution: 'Tiles &copy; Esri'
@@ -42,7 +48,7 @@ import { createBasemapRaster } from './drawing/basemap-source.js';
         attribution: t('&copy; OpenStreetMap-Mitwirkende')
       })
     };
-    let activeBasemap = basemaps.esriStreet.addTo(map);
+    let activeBasemap = basemaps.reference.addTo(map);
 
     // CRS-Definitionen. 4326 und 3857 kennt Proj4js bereits.
     const candidates = [
@@ -670,6 +676,7 @@ import { createBasemapRaster } from './drawing/basemap-source.js';
     });
     localizeMapControls(map); localizeMapControls(sourceMap);
     document.addEventListener('languagechange', () => {
+      basemaps.reference.setLanguage(getLanguage());
       updateStatus();
       for (const layer of Object.values(basemaps)) {
         const previous = layer.options.attribution;

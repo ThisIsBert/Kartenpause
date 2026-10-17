@@ -44,7 +44,7 @@ export function createMagneticTool({ map, renderer, getOriginalRaster, getBasema
     basemapDirty = true;
   });
   map.on('layeradd layerremove', e => {
-    if (e.layer instanceof L.TileLayer) basemapDirty = true;
+    if (e.layer instanceof L.TileLayer || e.layer.options?.isBasemap) basemapDirty = true;
   });
   const vectorMode = () => el('magneticSource').value === 'polygon';
   const screen = p => { const q = map.project(unproject(p)); return [q.x, q.y]; };
