@@ -1,0 +1,26 @@
+{
+  "createdBeforeFirstFit": true,
+  "referenceAccess": "Source image only until observations and algorithm hashes frozen.",
+  "files": [
+    {
+      "path": "src/headless/assignment.js",
+      "sha256": "c2fb551e90db4aa9095f6588c3c48f5ecc698799639d5f464563bfbcd257e016"
+    },
+    {
+      "path": "src/headless/model-selection.js",
+      "sha256": "7793be65f9a2d20bde1411320a6773d563c4c2d0d222ec1588a9c2c5ba837b8b"
+    },
+    {
+      "path": "src/headless/georeference.js",
+      "sha256": "b9d03a93ff99bf5f2345127aa96f6cef6fce76d4da312a997b76f9d6aca1f8e8"
+    },
+    {
+      "path": "benchmarks/holdout/australia-landmarks.json",
+      "sha256": "b2e39be0fe9892763d78c59e16b5a77ac51a523acc612631cbc1cee35c1f04fd"
+    },
+    {
+      "path": "benchmarks/holdout/australia-gazetteer.json",
+      "sha256": "4acb8f5ee4c08344b5da01f75adbbf5c4c2a429e489052d16d6dda1b39591837"
+    }
+  ]
+}

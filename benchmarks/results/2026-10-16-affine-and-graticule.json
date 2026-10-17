@@ -1,0 +1,156 @@
+{
+  "development": {
+    "expectedCases": 6,
+    "completeSuite": true,
+    "allPassed": false,
+    "cases": [
+      {
+        "name": "690px-Map_Germania_7-9",
+        "fitPoints": 6,
+        "checkpoints": 4,
+        "candidateRms": 14497.006835953514,
+        "referenceRms": 11589.039840491037,
+        "atLeastAsGood": false
+      },
+      {
+        "name": "el_dorado-000",
+        "fitPoints": 8,
+        "checkpoints": 3,
+        "candidateRms": 95301.92380343033,
+        "referenceRms": 197698.2193002457,
+        "atLeastAsGood": true
+      },
+      {
+        "name": "elena_image2",
+        "fitPoints": 6,
+        "checkpoints": 3,
+        "candidateRms": 9033.601349553204,
+        "referenceRms": 9986.113155773779,
+        "atLeastAsGood": true
+      },
+      {
+        "name": "iiif-service_gmd_gmd370_g3701_g3701s_cw0030300-full-pct_25-0-default",
+        "fitPoints": 9,
+        "checkpoints": 6,
+        "candidateRms": 13479.693217917034,
+        "referenceRms": 10595.808689095078,
+        "atLeastAsGood": false
+      },
+      {
+        "name": "inkareich",
+        "fitPoints": 7,
+        "checkpoints": 3,
+        "candidateRms": 33630.20823174408,
+        "referenceRms": 27989.05709245689,
+        "atLeastAsGood": false
+      },
+      {
+        "name": "westfront---x5",
+        "fitPoints": 9,
+        "checkpoints": 6,
+        "candidateRms": 13168.38412598484,
+        "referenceRms": 12339.688243318029,
+        "atLeastAsGood": false
+      }
+    ]
+  },
+  "graticule": {
+    "name": "westfront-graticule",
+    "measurementStatus": "assigned",
+    "lines": [
+      {
+        "id": "lon3",
+        "status": "measured",
+        "support": 0.8168316831683168,
+        "degree": 1,
+        "rmsPixels": 0.42125397408729426
+      },
+      {
+        "id": "lon4",
+        "status": "measured",
+        "support": 0.9158415841584159,
+        "degree": 1,
+        "rmsPixels": 0.5552935068082062
+      },
+      {
+        "id": "lon5",
+        "status": "measured",
+        "support": 0.9108910891089109,
+        "degree": 1,
+        "rmsPixels": 0.5941757809372364
+      },
+      {
+        "id": "lon6",
+        "status": "measured",
+        "support": 0.9207920792079208,
+        "degree": 1,
+        "rmsPixels": 0.5929376300800173
+      },
+      {
+        "id": "lon7",
+        "status": "measured",
+        "support": 0.8564356435643564,
+        "degree": 1,
+        "rmsPixels": 0.5732469964721713
+      },
+      {
+        "id": "lat48",
+        "status": "measured",
+        "support": 0.916256157635468,
+        "degree": 2,
+        "rmsPixels": 0.5220493087326044
+      },
+      {
+        "id": "lat49",
+        "status": "measured",
+        "support": 0.8267326732673267,
+        "degree": 2,
+        "rmsPixels": 0.4523240409992971
+      },
+      {
+        "id": "lat50",
+        "status": "measured",
+        "support": 0.8217821782178217,
+        "degree": 2,
+        "rmsPixels": 0.43719131411786705
+      },
+      {
+        "id": "lat51",
+        "status": "measured",
+        "support": 0.8955223880597015,
+        "degree": 2,
+        "rmsPixels": 0.43139604660851516
+      }
+    ],
+    "warning": "Development experiment, not unseen evaluation. Historic datum assumed WGS84. Original city checkpoints unchanged, including the problematic Paris observation.",
+    "withheldLine": {
+      "checkpoints": 5,
+      "candidateRms": 320.8993111697051,
+      "referenceRms": 950.3354956165856,
+      "atLeastAsGood": true
+    },
+    "originalCityChecks": {
+      "checkpoints": 6,
+      "candidateRms": 12631.63652767319,
+      "referenceRms": 12339.688243318029,
+      "atLeastAsGood": false
+    },
+    "modelValidation": {
+      "type": "leave-one-grid-line-out",
+      "folds": 8,
+      "rms": 618.7980852448381
+    }
+  },
+  "verification": {
+    "unitTests": {
+      "passed": 132,
+      "failed": 0
+    },
+    "headlessTests": 31,
+    "uiTests": {
+      "passed": 3,
+      "failed": 0
+    },
+    "build": "passed; existing numeric eval warnings"
+  }
+}

@@ -1,5 +1,11 @@
 # Kartenpause
 
+Ein lokales **Headless-CLI für KI-Agenten** steht unter `npm.cmd run headless -- --help`
+bereit. Es bietet Bildausschnitte mit Pixelgitter, Symbolvorschläge, Ortsnamensuche,
+gemeinsame Landmarkenzuweisung, Georeferenzierung mit Kreuzvalidierung und
+GeoJSON-Export aus Pixelgeometrien, Farbflächen und magnetischen Linien.
+[Anleitung und Grenzen](docs/headless.md), [aktueller Genauigkeitsnachweis](docs/headless-progress.md).
+
 Kartenpause ist eine Zeichenoberfläche für geografische Objekte auf einer Basiskarte. Historische oder thematische Pixelkarten lassen sich mit dem Werkzeug **Georeferenzieren** als Vorlage zuweisen. Die automatische Anpassung sucht eine passende Kartenprojektion und ergänzt bei Bedarf eine Thin-Plate-Spline-Korrektur (TPS).
 
 ## Lokal starten

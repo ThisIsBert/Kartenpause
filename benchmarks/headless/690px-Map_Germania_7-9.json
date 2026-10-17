@@ -1,0 +1,209 @@
+{
+  "image": "Karten/690px-Map_Germania_7-9.JPG",
+  "reference": "Karten/Ground truth/690px-Map_Germania_7-9.georeferenzierung.json",
+  "fit": {
+    "points": [
+      {
+        "id": 1,
+        "name": "Xanten",
+        "pixel": [
+          156,
+          223
+        ],
+        "target": {
+          "lon": 6.45297,
+          "lat": 51.65877
+        },
+        "coordinateSource": "https://www.geonames.org/2805385/",
+        "pixelSource": "AI visual identification in original raster; no Ground Truth alignment used"
+      },
+      {
+        "id": 2,
+        "name": "Cologne",
+        "pixel": [
+          170,
+          279
+        ],
+        "target": {
+          "lon": 6.95,
+          "lat": 50.93333
+        },
+        "coordinateSource": "https://www.geonames.org/2886242/",
+        "pixelSource": "AI visual identification in original raster; no Ground Truth alignment used"
+      },
+      {
+        "id": 3,
+        "name": "Mainz",
+        "pixel": [
+          222,
+          355
+        ],
+        "target": {
+          "lon": 8.28008,
+          "lat": 49.98185
+        },
+        "coordinateSource": "https://www.geonames.org/2874225/",
+        "pixelSource": "AI visual identification in original raster; no Ground Truth alignment used"
+      },
+      {
+        "id": 4,
+        "name": "Trier",
+        "pixel": [
+          147,
+          369
+        ],
+        "target": {
+          "lon": 6.63935,
+          "lat": 49.75565
+        },
+        "coordinateSource": "https://www.geonames.org/2821164/",
+        "pixelSource": "AI visual identification in original raster; no Ground Truth alignment used"
+      },
+      {
+        "id": 5,
+        "name": "Vindonissa / Windisch",
+        "pixel": [
+          214,
+          535
+        ],
+        "target": {
+          "lon": 8.21842,
+          "lat": 47.47899
+        },
+        "coordinateSource": "https://www.geonames.org/2657976/",
+        "pixelSource": "AI visual identification in original raster; no Ground Truth alignment used",
+        "fit": true
+      },
+      {
+        "id": 6,
+        "name": "Augsburg",
+        "pixel": [
+          341,
+          485
+        ],
+        "target": {
+          "lon": 10.89851,
+          "lat": 48.37154
+        },
+        "coordinateSource": "https://www.geonames.org/2954172/",
+        "pixelSource": "AI visual identification in original raster; no Ground Truth alignment used",
+        "fit": true
+      }
+    ]
+  },
+  "checks": {
+    "points": [
+      {
+        "id": 1,
+        "name": "Haltern",
+        "pixel": [
+          192,
+          216
+        ],
+        "target": {
+          "lon": 7.18163,
+          "lat": 51.74297
+        },
+        "coordinateSource": "https://www.geonames.org/2911395/",
+        "pixelSource": "AI visual identification in original raster; no Ground Truth alignment used",
+        "fit": false
+      },
+      {
+        "id": 2,
+        "name": "Fectio / Utrecht (fort east of city)",
+        "pixel": [
+          107,
+          191
+        ],
+        "target": {
+          "lon": 5.161857,
+          "lat": 52.057743
+        },
+        "coordinateSource": "https://vici.org/vici/49/?lang=en",
+        "pixelSource": "AI visual identification in original raster; no Ground Truth alignment used",
+        "fit": false,
+        "uncertaintyMetres": 3000
+      },
+      {
+        "id": 3,
+        "name": "Metz",
+        "pixel": [
+          118,
+          411
+        ],
+        "target": {
+          "lon": 6.17269,
+          "lat": 49.11911
+        },
+        "coordinateSource": "https://www.geonames.org/2994160/",
+        "pixelSource": "AI visual identification in original raster; no Ground Truth alignment used",
+        "fit": false
+      },
+      {
+        "id": 4,
+        "name": "Strasbourg",
+        "pixel": [
+          189,
+          465
+        ],
+        "target": {
+          "lon": 7.74553,
+          "lat": 48.58392
+        },
+        "coordinateSource": "https://www.geonames.org/2973783/",
+        "pixelSource": "AI visual identification in original raster; no Ground Truth alignment used",
+        "fit": false
+      }
+    ]
+  },
+  "revisions": [
+    {
+      "reason": "Original raster enlarged 8x with nearest-neighbour; previous checkpoints missed fort symbols.",
+      "changes": [
+        {
+          "name": "Fectio",
+          "from": [
+            74,
+            190
+          ],
+          "to": [
+            78,
+            186
+          ]
+        },
+        {
+          "name": "Strasbourg",
+          "from": [
+            163,
+            463
+          ],
+          "to": [
+            189,
+            465
+          ]
+        }
+      ],
+      "evidence": [
+        "output/headless/fectio-pixels.png",
+        "output/headless/strasbourg-pixels.png"
+      ]
+    },
+    {
+      "reason": "Fectio fort is the small ring below its caption; previous location was a river junction west of the fort.",
+      "changes": [
+        {
+          "name": "Fectio",
+          "from": [
+            78,
+            186
+          ],
+          "to": [
+            107,
+            191
+          ]
+        }
+      ],
+      "evidence": "output/headless/fectio-circles.png"
+    }
+  ]
+}

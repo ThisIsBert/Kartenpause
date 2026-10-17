@@ -1,0 +1,65 @@
+{
+  "australia": {
+    "name": "australia-relief",
+    "imageSha256": "ae849a31a9aa82824846b27600352adc46c13c1c193ad5f3a5b372e502f4cf48",
+    "protocolMatches": [
+      {
+        "path": "src/headless/assignment.js",
+        "matches": false
+      },
+      {
+        "path": "src/headless/model-selection.js",
+        "matches": true
+      },
+      {
+        "path": "src/headless/georeference.js",
+        "matches": true
+      },
+      {
+        "path": "benchmarks/holdout/australia-landmarks.json",
+        "matches": true
+      },
+      {
+        "path": "benchmarks/holdout/australia-gazetteer.json",
+        "matches": true
+      }
+    ],
+    "classification": "development after first result; not an unseen validation",
+    "assignmentStatus": "assigned",
+    "assigned": 5,
+    "unresolved": [],
+    "coverage": 0.1636587078651685,
+    "checkpoints": 5,
+    "candidateRms": 71118.54576607996,
+    "referenceRms": 59638.049777002205,
+    "atLeastAsGood": false
+  },
+  "verification": {
+    "unitTests": {
+      "passed": 124,
+      "failed": 0
+    },
+    "headlessTests": 23,
+    "uiTests": {
+      "passed": 2,
+      "failed": 0,
+      "scope": "Six published examples plus an actual CLI-created TPS project"
+    },
+    "build": "passed; existing numeric eval warnings",
+    "rasterVectorization": [
+      {
+        "name": "Bogotá (Punktprobe)",
+        "type": "Point"
+      },
+      {
+        "name": "Grüne Kartenfläche (Erkennungsprobe)",
+        "type": "MultiPolygon"
+      },
+      {
+        "name": "Küstenabschnitt bei Lima (Linienprobe)",
+        "type": "LineString"
+      }
+    ],
+    "developmentInputsUnchanged": true
+  }
+}

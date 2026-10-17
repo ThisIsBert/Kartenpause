@@ -1,0 +1,21 @@
+{
+  "objects": [
+    {
+      "name": "Bogotá (Punktprobe)",
+      "geometry": { "type": "Point", "coordinates": [147, 19] }
+    },
+    {
+      "name": "Grüne Kartenfläche (Erkennungsprobe)",
+      "mode": "region",
+      "seeds": [[225, 330]],
+      "algorithm": "intelligent",
+      "tolerance": 16
+    },
+    {
+      "name": "Küstenabschnitt bei Lima (Linienprobe)",
+      "mode": "magnetic",
+      "anchors": [[96, 156], [115, 181], [131, 196]],
+      "radius": 12
+    }
+  ]
+}

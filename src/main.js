@@ -1,3 +1,4 @@
+import { fixedProjections } from './geo/projections.js';
 import { bindAttribute, bindText, getLocale, localizeDocument, localizeMapControls, t, tr, untranslated } from './i18n.js';
 import { setupSettings } from './settings.js';
 import L from 'leaflet';
@@ -15,6 +16,7 @@ import {
   X, Check, Search, Pipette, CircleX, MousePointer2, MapPin, Slash, Pentagon, Spline, Circle, Magnet, WandSparkles, MapPinned, Undo2, Redo2, Settings
 } from 'lucide';
 import { GeoFit } from './geo/geo-fit.js';
+import { validateAffine } from './geo/raster-affine.js';
 import { ProjectionSearch } from './geo/projection-search.js';
 import { ThinPlateSpline } from './geo/thin-plate-spline.js';
 import './styles.css';
@@ -44,24 +46,7 @@ import { createBasemapRaster } from './drawing/basemap-source.js';
     };
     let activeBasemap = basemaps.esriStreet.addTo(map);
 
-    // CRS-Definitionen. 4326 und 3857 kennt Proj4js bereits.
-    const candidates = [
-      { code: 'EPSG:4326', label: t('Geografisch / Plate Carrée (EPSG:4326)') },
-      { code: 'EPSG:3857', label: 'Web Mercator (EPSG:3857)' },
-      { code: 'EPSG:3395', label: 'World Mercator (EPSG:3395)', def: '+proj=merc +lon_0=0 +k=1 +x_0=0 +y_0=0 +datum=WGS84 +units=m +no_defs' },
-      { code: 'EPSG:25832', label: 'ETRS89 / UTM 32N (EPSG:25832)', def: '+proj=utm +zone=32 +ellps=GRS80 +units=m +no_defs' },
-      { code: 'EPSG:25833', label: 'ETRS89 / UTM 33N (EPSG:25833)', def: '+proj=utm +zone=33 +ellps=GRS80 +units=m +no_defs' },
-      { code: 'EPSG:32632', label: 'WGS84 / UTM 32N (EPSG:32632)', def: '+proj=utm +zone=32 +datum=WGS84 +units=m +no_defs' },
-      { code: 'EPSG:32633', label: 'WGS84 / UTM 33N (EPSG:32633)', def: '+proj=utm +zone=33 +datum=WGS84 +units=m +no_defs' },
-      { code: 'EPSG:3035', label: 'ETRS89 / LAEA Europe (EPSG:3035)', def: '+proj=laea +lat_0=52 +lon_0=10 +x_0=4321000 +y_0=3210000 +ellps=GRS80 +units=m +no_defs' },
-      { code: 'EPSG:3034', label: 'ETRS89 / LCC Europe (EPSG:3034)', def: '+proj=lcc +lat_0=52 +lon_0=10 +lat_1=35 +lat_2=65 +x_0=4000000 +y_0=2800000 +ellps=GRS80 +units=m +no_defs' },
-      { code: 'DHDN:GK3', label: t('DHDN / Gauß-Krüger Zone 3'), def: '+proj=tmerc +lat_0=0 +lon_0=9 +k=1 +x_0=3500000 +y_0=0 +ellps=bessel +towgs84=598.1,73.7,418.2,0.202,0.045,-2.455,6.7 +units=m +no_defs' },
-      { code: 'DHDN:GK4', label: t('DHDN / Gauß-Krüger Zone 4'), def: '+proj=tmerc +lat_0=0 +lon_0=12 +k=1 +x_0=4500000 +y_0=0 +ellps=bessel +towgs84=598.1,73.7,418.2,0.202,0.045,-2.455,6.7 +units=m +no_defs' },
-      { code: 'WORLD:ROBIN', label: 'Robinson', def: '+proj=robin +lon_0=0 +datum=WGS84 +units=m +no_defs' },
-      { code: 'WORLD:MOLL', label: 'Mollweide', def: '+proj=moll +lon_0=0 +datum=WGS84 +units=m +no_defs' },
-      { code: 'WORLD:EQEARTH', label: 'Equal Earth', def: '+proj=eqearth +lon_0=0 +datum=WGS84 +units=m +no_defs' }
-    ];
-    for (const c of candidates) if (c.def) proj4.defs(c.code, c.def);
+    const candidates = fixedProjections();
     const fixedCodes = candidates.map(c=>c.code);
 
     const els = {
@@ -93,7 +78,7 @@ import { createBasemapRaster } from './drawing/basemap-source.js';
     const sourceMarks = L.layerGroup().addTo(sourceMap), targetMarks = L.layerGroup().addTo(map), residualMarks = L.layerGroup().addTo(map);
     let sourceLayer = null;
     let imageCenter = L.latLng(51.1, 10.3);
-    let halfWidthSource = null;
+    let halfWidthSource = null, sourceAffine = null;
 
     function currentCrs() { return candidates[currentCrsIndex]; }
 
@@ -108,7 +93,7 @@ import { createBasemapRaster } from './drawing/basemap-source.js';
       const aspect = image.naturalHeight / image.naturalWidth;
       const hh = hw * aspect;
       const rot = rotation * Math.PI / 180;
-      return { cx, cy, hw, hh, rot };
+      return { cx, cy, hw, hh, rot, affine: sourceAffine };
     }
 
     function rotatePoint(x, y, g) {
@@ -124,6 +109,7 @@ import { createBasemapRaster } from './drawing/basemap-source.js';
     }
 
     function projectionUvToLatLng(u, v, g, code = currentCrs().code) {
+      if (g.affine) return sourceToLatLng(g.cx + g.affine[0]*(u-.5) + g.affine[1]*(.5-v), g.cy + g.affine[2]*(u-.5) + g.affine[3]*(.5-v), code);
       let x = g.cx + (u * 2 - 1) * g.hw;
       let y = g.cy + (1 - v * 2) * g.hh;
       [x, y] = rotatePoint(x, y, g);
@@ -292,7 +278,7 @@ import { createBasemapRaster } from './drawing/basemap-source.js';
       bindText(ui.alignmentLabel, () => fitted ? t('Automatisch angepasst') : t('Noch nicht angepasst'));
     }
     function invalidateResults() {
-      fitted = false; transformMode = 'projection'; tpsCorrection = null;
+      fitted = false; transformMode = 'projection'; tpsCorrection = null; sourceAffine = null;
       bindText(ui.automationInfo, () => points.length ? t('Referenzpunkte geändert. Anpassung neu berechnen.') : '');
     }
     function refresh() {
@@ -380,7 +366,7 @@ import { createBasemapRaster } from './drawing/basemap-source.js';
       const index = candidates.findIndex(c => c.code === result.code);
       const ll = sourceToLatLng(result.g.cx, result.g.cy, result.code);
       currentCrsIndex = index; imageCenter = ll; halfWidthSource = result.g.hw;
-      rotation = result.g.rot*180/Math.PI; fitted = true; transformMode = 'projection'; tpsCorrection = null;
+      rotation = result.g.rot*180/Math.PI; fitted = true; transformMode = 'projection'; tpsCorrection = null; sourceAffine = result.g.affine ?? null;
       bindText(ui.notice, () => result.warning || ''); refresh();
     }
     function setBusy(value) {
@@ -485,14 +471,14 @@ import { createBasemapRaster } from './drawing/basemap-source.js';
     function saveProject() {
       if (!image || busy || capture) return;
       const viewCenter = map.getCenter().wrap();
-      const project = { format: 'pixelkarte-georeferenzierung', version: 3, image: { name: imageName, data: imageData }, points, alignment: { method: transformMode, code: currentCrs().code, projection: currentCrs().model, center: { lat: imageCenter.lat, lon: imageCenter.lng }, halfWidth: halfWidthSource, rotation, tpsRegularization: transformMode === 'projection+tps' ? tpsCorrection.regularization : undefined }, view: { center: { lat: Math.max(-85,Math.min(85,viewCenter.lat)), lon: viewCenter.lng }, zoom: map.getZoom(), basemap: els.basemap.value, opacity: Number(els.opacity.value), mesh: renderMesh, showSource: ui.showSource.checked, showResiduals: ui.showResiduals.checked } };
+      const project = { format: 'pixelkarte-georeferenzierung', version: sourceAffine ? 4 : 3, image: { name: imageName, data: imageData }, points, alignment: { method: transformMode, code: currentCrs().code, projection: currentCrs().model, center: { lat: imageCenter.lat, lon: imageCenter.lng }, halfWidth: halfWidthSource, rotation, affine: sourceAffine ?? undefined, tpsRegularization: transformMode === 'projection+tps' ? tpsCorrection.regularization : undefined }, view: { center: { lat: Math.max(-85,Math.min(85,viewCenter.lat)), lon: viewCenter.lng }, zoom: map.getZoom(), basemap: els.basemap.value, opacity: Number(els.opacity.value), mesh: renderMesh, showSource: ui.showSource.checked, showResiduals: ui.showResiduals.checked } };
       const url = URL.createObjectURL(new Blob([JSON.stringify(project, null, 2)], { type: 'application/json' }));
       const link = document.createElement('a'); link.href = url; link.download = imageName.replace(/\.[^.]+$/, '') + '.georeferenzierung.json'; document.body.appendChild(link); link.click(); link.remove(); setTimeout(() => URL.revokeObjectURL(url), 1000);
     }
     function validateProject(data) {
       const finite = Number.isFinite;
       const ll = p => p && finite(p.lat) && finite(p.lon) && Math.abs(p.lat) <= 85.05112878 && Math.abs(p.lon) <= 180;
-      if (!data || data.format !== 'pixelkarte-georeferenzierung' || ![1,2,3].includes(data.version)) throw new Error(t('Unbekanntes Projektformat oder unbekannte Version.'));
+      if (!data || data.format !== 'pixelkarte-georeferenzierung' || ![1,2,3,4].includes(data.version)) throw new Error(t('Unbekanntes Projektformat oder unbekannte Version.'));
       if (typeof data.image?.name !== 'string' || typeof data.image?.data !== 'string' || !/^data:image\/(png|jpeg|webp|gif);base64,[A-Za-z0-9+/=\r\n]+$/.test(data.image.data)) throw new Error(t('Projekt enthält kein unterstütztes eingebettetes Bild.'));
       if (!Array.isArray(data.points)) throw new Error(t('Referenzpunktliste fehlt.'));
       const ids = new Set();
@@ -501,6 +487,10 @@ import { createBasemapRaster } from './drawing/basemap-source.js';
         ids.add(p.id);
       }
       const a = data.alignment, v = data.view;
+      if (a?.affine !== undefined) {
+        if (data.version < 4) throw new Error(t('Unbekanntes Projektformat oder unbekannte Version.'));
+        try { validateAffine(a.affine); } catch { throw new Error(t('Ungültige Ausrichtung.')); }
+      }
       if (!a || !ll(a.center) || !finite(a.halfWidth) || a.halfWidth <= 0 || !finite(a.rotation) || Math.abs(a.rotation) > 180) throw new Error(t('Ungültige Ausrichtung.'));
       const method = data.version >= 3 ? a.method : 'projection';
       if (!['projection','projection+tps'].includes(method)) throw new Error(t('Unbekannte Transformationsmethode.'));
@@ -523,7 +513,7 @@ import { createBasemapRaster } from './drawing/basemap-source.js';
         capture = null; installImage(img, data.image.data, data.image.name);
         points = data.points.map(p => ({ id: p.id, fit: p.fit, source: { u: p.source.u, v: p.source.v }, target: { lat: p.target.lat, lon: p.target.lon } })); nextPointId = points.reduce((m,p) => Math.max(m,p.id+1),1);
         currentCrsIndex = candidates.findIndex(c => c.code === a.code);
-        imageCenter = L.latLng(a.center.lat,a.center.lon); halfWidthSource = a.halfWidth; rotation = a.rotation; renderMesh = v.mesh;
+        imageCenter = L.latLng(a.center.lat,a.center.lon); halfWidthSource = a.halfWidth; rotation = a.rotation; renderMesh = v.mesh; sourceAffine = a.affine ?? null;
         els.opacity.value = v.opacity; bindText(els.opacityValue, () => v.opacity+' %');
         map.removeLayer(activeBasemap); els.basemap.value = v.basemap; activeBasemap = basemaps[v.basemap].addTo(map);
         map.setView([v.center.lat,v.center.lon],v.zoom, { animate: false }); ui.showResiduals.checked = v.showResiduals; setSourceVisible(v.showSource);
@@ -535,7 +525,7 @@ import { createBasemapRaster } from './drawing/basemap-source.js';
             const latLng = projectionUvToLatLng(u, v, geometry, code);
             return { lat: latLng.lat, lon: latLng.lng };
           };
-          tpsCorrection = ThinPlateSpline.fitResiduals(points, image.naturalWidth, image.naturalHeight, basePredict, a.tpsRegularization || 1e-8);
+          tpsCorrection = ThinPlateSpline.fitResiduals(points, image.naturalWidth, image.naturalHeight, basePredict, a.tpsRegularization ?? 1e-8);
           transformMode = 'projection+tps';
         }
         updateCapture(); bindText(ui.notice, () => t('Projekt geladen.'));
@@ -564,7 +554,7 @@ import { createBasemapRaster } from './drawing/basemap-source.js';
         const data = await readDataUrl(file), img = await decodeImage(data);
         if (version !== imageLoadVersion) return;
         capture = null; points = []; nextPointId = 1; installImage(img,data,file.name);
-        imageCenter = map.getCenter(); halfWidthSource = null; rotation = 0; currentCrsIndex = 3;
+        imageCenter = map.getCenter(); halfWidthSource = null; rotation = 0; currentCrsIndex = 3; sourceAffine = null;
         invalidateResults(); updateCapture(); bindText(ui.notice, () => ''); refresh();
       } catch (err) { showError(err); }
       finally { els.file.value = ''; setBusy(false); }
@@ -611,7 +601,7 @@ import { createBasemapRaster } from './drawing/basemap-source.js';
         const previous = georeferenceSnapshot;
         imageLoadVersion++;
         ({ image, imageName, imageData, points, nextPointId, fitted, transformMode, tpsCorrection,
-          currentCrsIndex, rotation, renderMesh, imageCenter, halfWidthSource } = previous);
+          currentCrsIndex, rotation, renderMesh, imageCenter, halfWidthSource, sourceAffine } = previous);
         capture = null;
         candidates.splice(0, candidates.length, ...previous.candidates);
         for (const entry of candidates) if (entry.def) proj4.defs(entry.code, entry.def);
@@ -655,7 +645,7 @@ import { createBasemapRaster } from './drawing/basemap-source.js';
       onModeChange(active) {
         if (!active) georeferenceSnapshot = {
           image, imageName, imageData, points: structuredClone(points), nextPointId, fitted,
-          transformMode, tpsCorrection, currentCrsIndex, rotation, renderMesh, imageCenter, halfWidthSource,
+          transformMode, tpsCorrection, currentCrsIndex, rotation, renderMesh, imageCenter, halfWidthSource, sourceAffine,
           candidates: structuredClone(candidates), opacity: els.opacity.value, basemap: els.basemap.value,
           showRaster: document.getElementById('showRaster').checked, pixelView: document.getElementById('pixelView').checked,
           showSource: ui.showSource.checked, showResiduals: ui.showResiduals.checked,

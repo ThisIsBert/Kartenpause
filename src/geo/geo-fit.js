@@ -12,10 +12,13 @@ export const GeoFit = (() => {
     function xy(point, width, height) {
       return [(point.source.u - .5) * width, (.5 - point.source.v) * height];
     }
-    function predict(point, g, code, width, height) {
+    function predict(point, g, code, width, height, projection) {
       const [x, y] = xy(point, width, height), scale = 2 * g.hw / width;
       const c = Math.cos(g.rot), s = Math.sin(g.rot);
-      const ll = proj4(code, 'EPSG:4326', [g.cx + scale * (c * x - s * y), g.cy + scale * (s * x + c * y)]);
+      const projected = g.affine
+        ? [g.cx + g.affine[0] * x / width + g.affine[1] * y / height, g.cy + g.affine[2] * x / width + g.affine[3] * y / height]
+        : [g.cx + scale * (c * x - s * y), g.cy + scale * (s * x + c * y)];
+      const ll = (projection ?? proj4(code, 'EPSG:4326')).forward(projected);
       if (!ll.every(Number.isFinite) || Math.abs(ll[1]) > 90) throw new Error(t('Punkt außerhalb des Projektionsbereichs.'));
       return { lon: ll[0], lat: ll[1] };
     }
@@ -25,13 +28,19 @@ export const GeoFit = (() => {
       return { rms: Math.sqrt(rows.reduce((s, r) => s + r.error ** 2, 0) / rows.length), mean: rows.reduce((s, r) => s + r.error, 0) / rows.length, max: Math.max(...rows.map(r => r.error)), count: rows.length };
     }
     function evaluate(points, g, code, width, height) {
+      let projection;
       const rows = points.map(point => {
         try {
-          const predicted = predict(point, g, code, width, height);
-          const target = proj4('EPSG:4326', code, [point.target.lon,point.target.lat]);
+          projection ??= proj4(code, 'EPSG:4326');
+          const predicted = predict(point, g, code, width, height, projection);
+          const target = projection.inverse([point.target.lon,point.target.lat]);
           const dx=target[0]-g.cx, dy=target[1]-g.cy, c=Math.cos(g.rot), s=Math.sin(g.rot), scale=2*g.hw/width;
           const [x,y]=xy(point,width,height);
-          const pixelError=Math.hypot((c*dx+s*dy)/scale-x,(-s*dx+c*dy)/scale-y);
+          let pixelError;
+          if (g.affine) {
+            const [a,b,C,d] = g.affine, determinant = a*d-b*C;
+            pixelError = Math.hypot(width*(d*dx-b*dy)/determinant-x,height*(-C*dx+a*dy)/determinant-y);
+          } else pixelError=Math.hypot((c*dx+s*dy)/scale-x,(-s*dx+c*dy)/scale-y);
           return { id: point.id, fit: point.fit, predicted, error: distance(predicted, point.target), pixelError };
         }
         catch (_) { return { id: point.id, fit: point.fit, predicted: null, error: Infinity }; }
@@ -54,10 +63,11 @@ export const GeoFit = (() => {
       const fit = points.filter(p => p.fit);
       if (fit.length < 3) throw new Error(t('Mindestens drei aktive Fit-Punktpaare erforderlich.'));
       const src = fit.map(p => xy(p, width, height));
+      const projection = proj4('EPSG:4326', code);
       const dst = fit.map(p => {
-        const q = proj4('EPSG:4326', code, [p.target.lon, p.target.lat]);
+        const q = projection.forward([p.target.lon, p.target.lat]);
         if (!q.every(Number.isFinite)) throw new Error(t('Zielpunkt nicht projizierbar.'));
-        const back = proj4(code, 'EPSG:4326', q);
+        const back = projection.inverse(q);
         if (!back.every(Number.isFinite) || distance(p.target, { lon: back[0], lat: back[1] }) > 2) throw new Error(t('Zielpunkt außerhalb des zuverlässig transformierbaren Bereichs.'));
         return q;
       });

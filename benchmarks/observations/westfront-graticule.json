@@ -1,0 +1,153 @@
+{
+  "image": {
+    "sha256": "223af9acc39775061a7604c2bd89b2542001d455e22e72b7c4d4149df6159f6b"
+  },
+  "lines": [
+    {
+      "id": "lon3",
+      "axis": "longitude",
+      "value": 3,
+      "from": [
+        137,
+        146
+      ],
+      "to": [
+        130,
+        748
+      ],
+      "role": "fit",
+      "evidence": "Printed longitude degree labels 3 on the Westfront map frame; coarse corridor read from original raster, no reference alignment used. Historic datum not identified; interpreted as WGS84 for this development experiment."
+    },
+    {
+      "id": "lon4",
+      "axis": "longitude",
+      "value": 4,
+      "from": [
+        229,
+        146
+      ],
+      "to": [
+        232,
+        748
+      ],
+      "role": "fit",
+      "evidence": "Printed longitude degree labels 4 on the Westfront map frame; coarse corridor read from original raster, no reference alignment used. Historic datum not identified; interpreted as WGS84 for this development experiment."
+    },
+    {
+      "id": "lon5",
+      "axis": "longitude",
+      "value": 5,
+      "from": [
+        319,
+        146
+      ],
+      "to": [
+        332,
+        748
+      ],
+      "role": "fit",
+      "evidence": "Printed longitude degree labels 5 on the Westfront map frame; coarse corridor read from original raster, no reference alignment used. Historic datum not identified; interpreted as WGS84 for this development experiment."
+    },
+    {
+      "id": "lon6",
+      "axis": "longitude",
+      "value": 6,
+      "from": [
+        411,
+        146
+      ],
+      "to": [
+        432,
+        748
+      ],
+      "role": "fit",
+      "evidence": "Printed longitude degree labels 6 on the Westfront map frame; coarse corridor read from original raster, no reference alignment used. Historic datum not identified; interpreted as WGS84 for this development experiment."
+    },
+    {
+      "id": "lon7",
+      "axis": "longitude",
+      "value": 7,
+      "from": [
+        505,
+        146
+      ],
+      "to": [
+        534,
+        748
+      ],
+      "role": "fit",
+      "evidence": "Printed longitude degree labels 7 on the Westfront map frame; coarse corridor read from original raster, no reference alignment used. Historic datum not identified; interpreted as WGS84 for this development experiment."
+    },
+    {
+      "id": "lat48",
+      "axis": "latitude",
+      "value": 48,
+      "from": [
+        30,
+        669
+      ],
+      "to": [
+        633,
+        654
+      ],
+      "role": "fit",
+      "evidence": "Printed latitude degree labels 48 on the Westfront map frame; coarse corridor read from original raster, no reference alignment used. Historic datum not identified; interpreted as WGS84 for this development experiment."
+    },
+    {
+      "id": "lat49",
+      "axis": "latitude",
+      "value": 49,
+      "from": [
+        30,
+        518
+      ],
+      "to": [
+        632,
+        505
+      ],
+      "role": "control",
+      "evidence": "Printed latitude degree labels 49 on the Westfront map frame; coarse corridor read from original raster, no reference alignment used. Historic datum not identified; interpreted as WGS84 for this development experiment."
+    },
+    {
+      "id": "lat50",
+      "axis": "latitude",
+      "value": 50,
+      "from": [
+        30,
+        370
+      ],
+      "to": [
+        630,
+        357
+      ],
+      "role": "fit",
+      "evidence": "Printed latitude degree labels 50 on the Westfront map frame; coarse corridor read from original raster, no reference alignment used. Historic datum not identified; interpreted as WGS84 for this development experiment."
+    },
+    {
+      "id": "lat51",
+      "axis": "latitude",
+      "value": 51,
+      "from": [
+        30,
+        219
+      ],
+      "to": [
+        628,
+        207
+      ],
+      "role": "fit",
+      "evidence": "Printed latitude degree labels 51 on the Westfront map frame; coarse corridor read from original raster, no reference alignment used. Historic datum not identified; interpreted as WGS84 for this development experiment."
+    }
+  ],
+  "fitOptions": {
+    "codes": [
+      "EPSG:4326",
+      "EPSG:3857"
+    ],
+    "families": [
+      "lcc",
+      "eqdc"
+    ],
+    "tps": "never"
+  }
+}

@@ -14,7 +14,10 @@
     "test:ui": "playwright test",
     "test:ui:headed": "playwright test --headed",
     "test:ui:report": "playwright show-report output/playwright/report",
-    "test:i18n": "node --test tests/i18n.unit.mjs"
+    "test:i18n": "node --test tests/i18n.unit.mjs",
+    "headless": "node scripts/headless.mjs",
+    "test:headless": "node --test tests/headless.unit.mjs tests/assignment.unit.mjs tests/landmark-tools.unit.mjs tests/landmark-cli.unit.mjs tests/affine.unit.mjs tests/graticule.unit.mjs",
+    "benchmark:headless": "node scripts/benchmark-headless.mjs"
   },
   "dependencies": {
     "jsts": "2.12.1",
@@ -22,7 +25,8 @@
     "lucide": "0.468.0",
     "numeric": "1.2.6",
     "osmtogeojson": "3.0.0-beta.5",
-    "proj4": "2.21.0"
+    "proj4": "2.21.0",
+    "sharp": "^0.35.5"
   },
   "overrides": {
     "osmtogeojson": {

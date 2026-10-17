@@ -1,0 +1,228 @@
+{
+  "image": "Karten/westfront---x5.jpg",
+  "reference": "Karten/Ground truth/westfront---x5.georeferenzierung.json",
+  "fit": {
+    "points": [
+      {
+        "id": 1,
+        "name": "Ostend",
+        "pixel": [
+          115,
+          200
+        ],
+        "target": {
+          "lon": 2.927,
+          "lat": 51.21551
+        },
+        "coordinateSource": "https://www.geonames.org/2789786/",
+        "pixelSource": "AI visual identification in original raster; no Ground Truth alignment used"
+      },
+      {
+        "id": 2,
+        "name": "Antwerpen",
+        "pixel": [
+          269,
+          185
+        ],
+        "target": {
+          "lon": 4.40026,
+          "lat": 51.22047
+        },
+        "coordinateSource": "https://www.geonames.org/2803138/",
+        "pixelSource": "AI visual identification in original raster; no Ground Truth alignment used"
+      },
+      {
+        "id": 3,
+        "name": "Brussels",
+        "pixel": [
+          262,
+          246
+        ],
+        "target": {
+          "lon": 4.34878,
+          "lat": 50.85045
+        },
+        "coordinateSource": "https://www.geonames.org/2800866/",
+        "pixelSource": "AI visual identification in original raster; no Ground Truth alignment used"
+      },
+      {
+        "id": 4,
+        "name": "Cologne",
+        "pixel": [
+          500,
+          229
+        ],
+        "target": {
+          "lon": 6.95,
+          "lat": 50.93333
+        },
+        "coordinateSource": "https://www.geonames.org/2886242/",
+        "pixelSource": "AI visual identification in original raster; no Ground Truth alignment used"
+      },
+      {
+        "id": 5,
+        "name": "Basel",
+        "pixel": [
+          596,
+          728
+        ],
+        "target": {
+          "lon": 7.57327,
+          "lat": 47.55839
+        },
+        "coordinateSource": "https://www.geonames.org/2661604/",
+        "pixelSource": "AI visual identification in original raster; no Ground Truth alignment used"
+      },
+      {
+        "id": 6,
+        "name": "Reims",
+        "pixel": [
+          238,
+          485
+        ],
+        "target": {
+          "lon": 4.02853,
+          "lat": 49.26526
+        },
+        "coordinateSource": "https://www.geonames.org/2984114/",
+        "pixelSource": "AI visual identification in original raster; no Ground Truth alignment used"
+      },
+      {
+        "id": 7,
+        "name": "Amiens",
+        "pixel": [
+          75,
+          386
+        ],
+        "target": {
+          "lon": 2.3,
+          "lat": 49.9
+        },
+        "coordinateSource": "https://www.geonames.org/3037854/",
+        "pixelSource": "AI visual identification in original raster; no Ground Truth alignment used"
+      },
+      {
+        "id": 8,
+        "name": "Epinal",
+        "pixel": [
+          470,
+          637
+        ],
+        "target": {
+          "lon": 6.45304,
+          "lat": 48.18324
+        },
+        "coordinateSource": "https://www.geonames.org/3020035/",
+        "pixelSource": "AI visual identification in original raster; no Ground Truth alignment used"
+      },
+      {
+        "id": 9,
+        "name": "Metz",
+        "pixel": [
+          442,
+          499
+        ],
+        "target": {
+          "lon": 6.17269,
+          "lat": 49.11911
+        },
+        "coordinateSource": "https://www.geonames.org/2994160/",
+        "pixelSource": "AI visual identification in original raster; no Ground Truth alignment used"
+      }
+    ]
+  },
+  "checks": {
+    "points": [
+      {
+        "id": 1,
+        "name": "Paris",
+        "pixel": [
+          110,
+          541
+        ],
+        "target": {
+          "lon": 2.3488,
+          "lat": 48.85341
+        },
+        "coordinateSource": "https://www.geonames.org/2988507/",
+        "pixelSource": "AI visual identification in original raster; no Ground Truth alignment used",
+        "fit": false
+      },
+      {
+        "id": 2,
+        "name": "Lille",
+        "pixel": [
+          143,
+          275
+        ],
+        "target": {
+          "lon": 3.05512,
+          "lat": 50.63391
+        },
+        "coordinateSource": "https://www.geonames.org/2998324/",
+        "pixelSource": "AI visual identification in original raster; no Ground Truth alignment used",
+        "fit": false
+      },
+      {
+        "id": 3,
+        "name": "Strasbourg",
+        "pixel": [
+          601,
+          573
+        ],
+        "target": {
+          "lon": 7.74553,
+          "lat": 48.58392
+        },
+        "coordinateSource": "https://www.geonames.org/2973783/",
+        "pixelSource": "AI visual identification in original raster; no Ground Truth alignment used",
+        "fit": false
+      },
+      {
+        "id": 4,
+        "name": "Belfort",
+        "pixel": [
+          515,
+          717
+        ],
+        "target": {
+          "lon": 6.85385,
+          "lat": 47.64218
+        },
+        "coordinateSource": "https://www.geonames.org/3033791/",
+        "pixelSource": "AI visual identification in original raster; no Ground Truth alignment used",
+        "fit": false
+      },
+      {
+        "id": 5,
+        "name": "Brugge",
+        "pixel": [
+          156,
+          190
+        ],
+        "target": {
+          "lon": 3.22424,
+          "lat": 51.20892
+        },
+        "coordinateSource": "https://www.geonames.org/2800931/",
+        "pixelSource": "AI visual identification in original raster; no Ground Truth alignment used",
+        "fit": false
+      },
+      {
+        "id": 6,
+        "name": "Cambrai",
+        "pixel": [
+          163,
+          344
+        ],
+        "target": {
+          "lon": 3.23472,
+          "lat": 50.17596
+        },
+        "coordinateSource": "https://www.geonames.org/3029030/",
+        "pixelSource": "AI visual identification in original raster; no Ground Truth alignment used",
+        "fit": false
+      }
+    ]
+  }
+}

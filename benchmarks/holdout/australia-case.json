@@ -1,0 +1,7 @@
+{
+  "name": "australia-relief",
+  "imageProject": "examples/534px-Australia_relief_map.georeferenzierung.json",
+  "landmarks": "benchmarks/holdout/australia-landmarks.json",
+  "protocol": "benchmarks/holdout/australia-protocol.json",
+  "reference": "examples/534px-Australia_relief_map.georeferenzierung.json"
+}

@@ -1,0 +1,103 @@
+{
+  "development": {
+    "protocol": "benchmarks/protocol/headless-development-lock.json",
+    "expectedCases": 6,
+    "completeSuite": true,
+    "allPassed": false,
+    "cases": [
+      {
+        "name": "690px-Map_Germania_7-9",
+        "fitPoints": 6,
+        "checkpoints": 4,
+        "candidateRms": 14497.006835953514,
+        "referenceRms": 11589.039840491037,
+        "atLeastAsGood": false
+      },
+      {
+        "name": "el_dorado-000",
+        "fitPoints": 8,
+        "checkpoints": 3,
+        "candidateRms": 95301.92380343033,
+        "referenceRms": 197698.2193002457,
+        "atLeastAsGood": true
+      },
+      {
+        "name": "elena_image2",
+        "fitPoints": 6,
+        "checkpoints": 3,
+        "candidateRms": 9033.601349553204,
+        "referenceRms": 9986.113155773779,
+        "atLeastAsGood": true
+      },
+      {
+        "name": "iiif-service_gmd_gmd370_g3701_g3701s_cw0030300-full-pct_25-0-default",
+        "fitPoints": 9,
+        "checkpoints": 6,
+        "candidateRms": 13479.693217917034,
+        "referenceRms": 10595.808689095078,
+        "atLeastAsGood": false
+      },
+      {
+        "name": "inkareich",
+        "fitPoints": 7,
+        "checkpoints": 3,
+        "candidateRms": 33630.20823174408,
+        "referenceRms": 27989.05709245689,
+        "atLeastAsGood": false
+      },
+      {
+        "name": "westfront---x5",
+        "fitPoints": 9,
+        "checkpoints": 6,
+        "candidateRms": 13168.38412598484,
+        "referenceRms": 12339.688243318029,
+        "atLeastAsGood": false
+      }
+    ]
+  },
+  "firstUnseenAustralia": {
+    "protocol": "benchmarks/holdout/australia-protocol.json",
+    "assignment": {
+      "assigned": [
+        "surveyor",
+        "poeppel",
+        "haddon",
+        "cape-york"
+      ],
+      "unresolved": [
+        {
+          "id": "south-east-cape",
+          "reason": "No unique target within the geometric consensus threshold."
+        }
+      ],
+      "diagnostics": {
+        "trials": 384,
+        "maxErrorPixels": 6,
+        "consensusCount": 4,
+        "competingHypotheses": 0,
+        "projection": "EPSG:3857",
+        "normalizedCost": 0.2882260498508743,
+        "imageHullFraction": 0.05947253433208488,
+        "hullPixels": [
+          [
+            214,
+            229
+          ],
+          [
+            378,
+            23
+          ],
+          [
+            362,
+            229
+          ]
+        ],
+        "note": "Coarse geometric consistency, not proof of landmark identity or map accuracy. Controls never participate in assignment."
+      }
+    },
+    "candidateRms": 85729.8501165664,
+    "referenceRms": 59638.049777002205,
+    "atLeastAsGood": false,
+    "caution": "Single image, uncertain visual capes, failed initial run. Subsequent algorithm development on this image is not an unseen validation."
+  }
+}

@@ -1,0 +1,258 @@
+{
+  "image": "Karten/inkareich.png",
+  "reference": "Karten/Ground truth/inkareich.georeferenzierung.json",
+  "fit": {
+    "points": [
+      {
+        "id": 1,
+        "name": "Bogota",
+        "pixel": [
+          147.434,
+          18.736
+        ],
+        "target": {
+          "lon": -74.08175,
+          "lat": 4.60971
+        },
+        "coordinateSource": "https://www.geonames.org/3688689/",
+        "pixelSource": "Dark-disc centroid in radius 4 around visually identified city marker, weights max(0,110-meanRGB), independently of geographic models",
+        "uncertaintyPixels": 0.75
+      },
+      {
+        "id": 2,
+        "name": "Quito",
+        "pixel": [
+          104.369,
+          74.005
+        ],
+        "target": {
+          "lon": -78.52495,
+          "lat": -0.22985
+        },
+        "coordinateSource": "https://www.geonames.org/3652462/",
+        "pixelSource": "Dark-disc centroid in radius 4 around visually identified city marker, weights max(0,110-meanRGB), independently of geographic models",
+        "uncertaintyPixels": 0.75
+      },
+      {
+        "id": 3,
+        "name": "Santiago",
+        "pixel": [
+          211.303,
+          414.007
+        ],
+        "target": {
+          "lon": -70.64827,
+          "lat": -33.45694
+        },
+        "coordinateSource": "https://www.geonames.org/3871336/",
+        "pixelSource": "Dark-disc centroid in radius 4 around visually identified city marker, weights max(0,110-meanRGB), independently of geographic models",
+        "uncertaintyPixels": 0.75
+      },
+      {
+        "id": 4,
+        "name": "Buenos Aires",
+        "pixel": [
+          318.207,
+          418.909
+        ],
+        "target": {
+          "lon": -58.37723,
+          "lat": -34.61315
+        },
+        "coordinateSource": "https://www.geonames.org/3435910/",
+        "pixelSource": "Dark-disc centroid in radius 4 around visually identified city marker, weights max(0,110-meanRGB), independently of geographic models",
+        "uncertaintyPixels": 0.75
+      },
+      {
+        "id": 5,
+        "name": "Bolivia northernmost border vertex",
+        "pixel": [
+          247,
+          165
+        ],
+        "target": {
+          "lon": -65.4382139860927,
+          "lat": -9.669633002177568
+        },
+        "coordinateSource": "https://www.geoboundaries.org/api/current/gbOpen/BOL/ADM0/",
+        "pixelSource": "AI matching of national-border bends in 6x original-pixel preview; independent public boundary coordinates",
+        "uncertaintyPixels": 1.5
+      },
+      {
+        "id": 6,
+        "name": "Peru-Brazil-Bolivia tripoint",
+        "pixel": [
+          206,
+          180
+        ],
+        "target": {
+          "lon": -69.56325479365357,
+          "lat": -10.945834393830266
+        },
+        "coordinateSource": "https://www.geoboundaries.org/api/current/gbOpen/BOL/ADM0/",
+        "pixelSource": "AI matching of national-border bends in 6x original-pixel preview; independent public boundary coordinates",
+        "uncertaintyPixels": 1.5
+      },
+      {
+        "id": 7,
+        "name": "Bolivia easternmost border bend",
+        "pixel": [
+          329.5,
+          250.5
+        ],
+        "target": {
+          "lon": -57.45443352770995,
+          "lat": -18.231024371838156
+        },
+        "coordinateSource": "https://www.geoboundaries.org/api/current/gbOpen/BOL/ADM0/",
+        "pixelSource": "AI identification of easternmost bend in the national border in original raster at 8x zoom",
+        "uncertaintyPixels": 1.5
+      }
+    ]
+  },
+  "checks": {
+    "points": [
+      {
+        "id": 1,
+        "name": "Lima",
+        "pixel": [
+          131.078,
+          196.103
+        ],
+        "target": {
+          "lon": -77.02824,
+          "lat": -12.04318
+        },
+        "coordinateSource": "https://www.geonames.org/3936456/",
+        "pixelSource": "Dark-disc centroid in radius 4 around visually identified city marker, weights max(0,110-meanRGB), independently of geographic models",
+        "fit": false,
+        "uncertaintyPixels": 0.75
+      },
+      {
+        "id": 2,
+        "name": "La Paz",
+        "pixel": [
+          220.558,
+          235.578
+        ],
+        "target": {
+          "lon": -68.15,
+          "lat": -16.5
+        },
+        "coordinateSource": "https://www.geonames.org/3911925/",
+        "pixelSource": "Dark-disc centroid in radius 4 around visually identified city marker, weights max(0,110-meanRGB), independently of geographic models",
+        "fit": false,
+        "uncertaintyPixels": 0.75
+      },
+      {
+        "id": 3,
+        "name": "Asuncion",
+        "pixel": [
+          330.275,
+          323.847
+        ],
+        "target": {
+          "lon": -57.647,
+          "lat": -25.28646
+        },
+        "coordinateSource": "https://www.geonames.org/3439389/",
+        "pixelSource": "Dark-disc centroid in radius 4 around visually identified city marker, weights max(0,110-meanRGB), independently of geographic models",
+        "fit": false,
+        "uncertaintyPixels": 0.75
+      }
+    ]
+  },
+  "revisions": [
+    {
+      "reason": "Added two independently identified national-border vertices to constrain the projection in the map interior. Existing city checkpoints retained.",
+      "evidence": "output/headless/inka-bolivia-pixels.png"
+    },
+    {
+      "reason": "Refined all city marker centroids by the same raster-only rule, retaining all fit/check roles. Added independently identified eastern border bend.",
+      "changes": [
+        {
+          "name": "Bogota",
+          "from": [
+            147,
+            19
+          ],
+          "to": [
+            147.434,
+            18.736
+          ]
+        },
+        {
+          "name": "Quito",
+          "from": [
+            104,
+            74
+          ],
+          "to": [
+            104.369,
+            74.005
+          ]
+        },
+        {
+          "name": "Santiago",
+          "from": [
+            211,
+            414
+          ],
+          "to": [
+            211.303,
+            414.007
+          ]
+        },
+        {
+          "name": "Buenos Aires",
+          "from": [
+            318,
+            420
+          ],
+          "to": [
+            318.207,
+            418.909
+          ]
+        },
+        {
+          "name": "Lima",
+          "from": [
+            131,
+            196
+          ],
+          "to": [
+            131.078,
+            196.103
+          ]
+        },
+        {
+          "name": "La Paz",
+          "from": [
+            221,
+            236
+          ],
+          "to": [
+            220.558,
+            235.578
+          ]
+        },
+        {
+          "name": "Asuncion",
+          "from": [
+            331,
+            325
+          ],
+          "to": [
+            330.275,
+            323.847
+          ]
+        }
+      ],
+      "evidence": [
+        "output/headless/inka-symbol-Asuncion.png",
+        "output/headless/inka-symbol-La-Paz.png",
+        "output/headless/inka-east-bolivia.png"
+      ]
+    }
+  ]
+}

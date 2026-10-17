@@ -1,0 +1,29 @@
+{
+  "purpose": "Existing development observations frozen after user requested generalizable assignment improvements. This is not a blind generalization benchmark.",
+  "files": [
+    {
+      "path": "benchmarks/headless/690px-Map_Germania_7-9.json",
+      "sha256": "ad9f5d24f8fda35ec140a7e130512d6aacfa53cb222dcb0b3d857c670100c7e2"
+    },
+    {
+      "path": "benchmarks/headless/elena_image2.json",
+      "sha256": "42b2a5fc3ac52d083a1fddbc408bd211ec37f33bab38b2ab1719bdd26ff36f72"
+    },
+    {
+      "path": "benchmarks/headless/el_dorado-000.json",
+      "sha256": "54cc40708374ebf8b621df99e2c054d6340973c180cb9e9024b14b5349fa8ed1"
+    },
+    {
+      "path": "benchmarks/headless/iiif-service_gmd_gmd370_g3701_g3701s_cw0030300-full-pct_25-0-default.json",
+      "sha256": "eb314914e860b9f5e8edab3ce8949214cd2492d4fc68f0705ac218b215282add"
+    },
+    {
+      "path": "benchmarks/headless/inkareich.json",
+      "sha256": "ea679141b380a72c97448cafaa8a0c2b7f8f5c6d318f0fb1202fc8174f1398c1"
+    },
+    {
+      "path": "benchmarks/headless/westfront---x5.json",
+      "sha256": "a4d6be5136f9a73ee18b7db2bddd1fc39b86e28afb73b5a85d4f1972a0481329"
+    }
+  ]
+}

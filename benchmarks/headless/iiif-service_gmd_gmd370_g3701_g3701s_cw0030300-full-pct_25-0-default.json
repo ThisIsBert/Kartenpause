@@ -1,0 +1,228 @@
+{
+  "image": "Karten/iiif-service_gmd_gmd370_g3701_g3701s_cw0030300-full-pct_25-0-default.jpg",
+  "reference": "Karten/Ground truth/iiif-service_gmd_gmd370_g3701_g3701s_cw0030300-full-pct_25-0-default.georeferenzierung.json",
+  "fit": {
+    "points": [
+      {
+        "id": 1,
+        "name": "Richmond",
+        "pixel": [
+          1065,
+          318
+        ],
+        "target": {
+          "lon": -77.46026,
+          "lat": 37.55376
+        },
+        "coordinateSource": "https://www.geonames.org/4781708/",
+        "pixelSource": "AI visual identification in original raster; no Ground Truth alignment used"
+      },
+      {
+        "id": 2,
+        "name": "Norfolk",
+        "pixel": [
+          1218,
+          423
+        ],
+        "target": {
+          "lon": -76.28522,
+          "lat": 36.84681
+        },
+        "coordinateSource": "https://www.geonames.org/4776222/",
+        "pixelSource": "AI visual identification in original raster; no Ground Truth alignment used"
+      },
+      {
+        "id": 3,
+        "name": "Raleigh",
+        "pixel": [
+          929,
+          617
+        ],
+        "target": {
+          "lon": -78.63861,
+          "lat": 35.7721
+        },
+        "coordinateSource": "https://www.geonames.org/4487042/",
+        "pixelSource": "AI visual identification in original raster; no Ground Truth alignment used"
+      },
+      {
+        "id": 4,
+        "name": "Columbia",
+        "pixel": [
+          582,
+          924
+        ],
+        "target": {
+          "lon": -81.03481,
+          "lat": 34.00071
+        },
+        "coordinateSource": "https://www.geonames.org/4575352/",
+        "pixelSource": "AI visual identification in original raster; no Ground Truth alignment used"
+      },
+      {
+        "id": 5,
+        "name": "Savannah",
+        "pixel": [
+          568,
+          1273
+        ],
+        "target": {
+          "lon": -81.09983,
+          "lat": 32.08354
+        },
+        "coordinateSource": "https://www.geonames.org/4221552/",
+        "pixelSource": "AI visual identification in original raster; no Ground Truth alignment used"
+      },
+      {
+        "id": 6,
+        "name": "Tallahassee",
+        "pixel": [
+          70,
+          1523
+        ],
+        "target": {
+          "lon": -84.28073,
+          "lat": 30.43826
+        },
+        "coordinateSource": "https://www.geonames.org/4174715/",
+        "pixelSource": "AI visual identification in original raster; no Ground Truth alignment used"
+      },
+      {
+        "id": 7,
+        "name": "Knoxville",
+        "pixel": [
+          130,
+          566
+        ],
+        "target": {
+          "lon": -83.92074,
+          "lat": 35.96064
+        },
+        "coordinateSource": "https://www.geonames.org/4634946/",
+        "pixelSource": "AI visual identification in original raster; no Ground Truth alignment used"
+      },
+      {
+        "id": 8,
+        "name": "Augusta",
+        "pixel": [
+          435,
+          1030
+        ],
+        "target": {
+          "lon": -81.97484,
+          "lat": 33.47097
+        },
+        "coordinateSource": "https://www.geonames.org/4180531/",
+        "pixelSource": "AI visual identification in original raster; no Ground Truth alignment used"
+      },
+      {
+        "id": 9,
+        "name": "Lexington",
+        "pixel": [
+          76,
+          200
+        ],
+        "target": {
+          "lon": -84.45855,
+          "lat": 38.0498
+        },
+        "coordinateSource": "https://www.geonames.org/4297999/",
+        "pixelSource": "AI visual identification in original raster; no Ground Truth alignment used"
+      }
+    ]
+  },
+  "checks": {
+    "points": [
+      {
+        "id": 1,
+        "name": "Charleston",
+        "pixel": [
+          718,
+          1136
+        ],
+        "target": {
+          "lon": -79.93275,
+          "lat": 32.77632
+        },
+        "coordinateSource": "https://www.geonames.org/4574324/",
+        "pixelSource": "AI visual identification in original raster; no Ground Truth alignment used",
+        "fit": false
+      },
+      {
+        "id": 2,
+        "name": "Atlanta",
+        "pixel": [
+          46,
+          950
+        ],
+        "target": {
+          "lon": -84.38798,
+          "lat": 33.749
+        },
+        "coordinateSource": "https://www.geonames.org/4180439/",
+        "pixelSource": "AI visual identification in original raster; no Ground Truth alignment used",
+        "fit": false
+      },
+      {
+        "id": 3,
+        "name": "Jacksonville",
+        "pixel": [
+          453,
+          1562
+        ],
+        "target": {
+          "lon": -81.65565,
+          "lat": 30.33218
+        },
+        "coordinateSource": "https://www.geonames.org/4160021/",
+        "pixelSource": "AI visual identification in original raster; no Ground Truth alignment used",
+        "fit": false
+      },
+      {
+        "id": 4,
+        "name": "Charlotte",
+        "pixel": [
+          619,
+          703
+        ],
+        "target": {
+          "lon": -80.84313,
+          "lat": 35.22709
+        },
+        "coordinateSource": "https://www.geonames.org/4460243/",
+        "pixelSource": "AI visual identification in original raster; no Ground Truth alignment used",
+        "fit": false
+      },
+      {
+        "id": 5,
+        "name": "Wilmington",
+        "pixel": [
+          1017,
+          889
+        ],
+        "target": {
+          "lon": -77.94604,
+          "lat": 34.23556
+        },
+        "coordinateSource": "https://www.geonames.org/4499379/",
+        "pixelSource": "AI visual identification in original raster; no Ground Truth alignment used",
+        "fit": false
+      },
+      {
+        "id": 6,
+        "name": "Lynchburg",
+        "pixel": [
+          830,
+          339
+        ],
+        "target": {
+          "lon": -79.14225,
+          "lat": 37.41375
+        },
+        "coordinateSource": "https://www.geonames.org/4771075/",
+        "pixelSource": "AI visual identification in original raster; no Ground Truth alignment used",
+        "fit": false
+      }
+    ]
+  }
+}

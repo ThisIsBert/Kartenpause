@@ -1,0 +1,5 @@
+{
+  "name": "westfront-graticule",
+  "developmentCase": "benchmarks/headless/westfront---x5.json",
+  "gridRequest": "benchmarks/observations/westfront-graticule.json"
+}

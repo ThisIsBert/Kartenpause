@@ -1,0 +1,141 @@
+{
+  "image": "Karten/elena_image2.png",
+  "reference": "Karten/Ground truth/elena_image2.georeferenzierung.json",
+  "fit": {
+    "points": [
+      {
+        "id": 1,
+        "name": "Rocky Point",
+        "pixel": [
+          430,
+          88
+        ],
+        "target": {
+          "lon": -88.09866,
+          "lat": 18.37356
+        },
+        "coordinateSource": "https://www.geonames.org/3581281/",
+        "pixelSource": "AI visual matching of coastline and boundary shapes, independent of Ground Truth alignment"
+      },
+      {
+        "id": 2,
+        "name": "Western boundary bend",
+        "pixel": [
+          54,
+          244
+        ],
+        "target": {
+          "lon": -89.151956,
+          "lat": 17.938272
+        },
+        "coordinateSource": "https://www.geoboundaries.org/api/current/gbOpen/BLZ/ADM0/",
+        "pixelSource": "AI visual matching of coastline and boundary shapes, independent of Ground Truth alignment"
+      },
+      {
+        "id": 3,
+        "name": "Southwest boundary corner",
+        "pixel": [
+          20,
+          1004
+        ],
+        "target": {
+          "lon": -89.2262083,
+          "lat": 15.8957204
+        },
+        "coordinateSource": "https://www.geoboundaries.org/api/current/gbOpen/BLZ/ADM0/",
+        "pixelSource": "AI visual matching of coastline and boundary shapes, independent of Ground Truth alignment"
+      },
+      {
+        "id": 4,
+        "name": "Sarstoon mouth",
+        "pixel": [
+          132,
+          1003
+        ],
+        "target": {
+          "lon": -88.91444,
+          "lat": 15.89847
+        },
+        "coordinateSource": "https://www.geonames.org/3581115/",
+        "pixelSource": "AI visual matching of coastline and boundary shapes, independent of Ground Truth alignment"
+      },
+      {
+        "id": 5,
+        "name": "Rogues Point",
+        "pixel": [
+          383,
+          404
+        ],
+        "target": {
+          "lon": -88.18565,
+          "lat": 17.48071
+        },
+        "coordinateSource": "https://www.geonames.org/3581276/",
+        "pixelSource": "AI visual matching of coastline and boundary shapes, independent of Ground Truth alignment"
+      },
+      {
+        "id": 6,
+        "name": "Placencia Point",
+        "pixel": [
+          327,
+          765
+        ],
+        "target": {
+          "lon": -88.36667,
+          "lat": 16.5
+        },
+        "coordinateSource": "https://www.geonames.org/3581448/",
+        "pixelSource": "AI visual matching of coastline and boundary shapes, independent of Ground Truth alignment"
+      }
+    ]
+  },
+  "checks": {
+    "points": [
+      {
+        "id": 1,
+        "name": "Ambergris Caye southern tip",
+        "pixel": [
+          447,
+          278
+        ],
+        "target": {
+          "lon": -87.961706,
+          "lat": 17.9276243
+        },
+        "coordinateSource": "https://www.geoboundaries.org/api/current/gbOpen/BLZ/ADM0/",
+        "pixelSource": "AI visual matching of coastline and boundary shapes, independent of Ground Truth alignment",
+        "fit": false
+      },
+      {
+        "id": 2,
+        "name": "Cay Bokel / Turneffe southern tip",
+        "pixel": [
+          499,
+          533
+        ],
+        "target": {
+          "lon": -87.90996,
+          "lat": 17.16377
+        },
+        "coordinateSource": "https://www.geonames.org/3582433/",
+        "pixelSource": "AI visual matching of coastline and boundary shapes, independent of Ground Truth alignment",
+        "fit": false
+      },
+      {
+        "id": 3,
+        "name": "Monkey River mouth",
+        "pixel": [
+          302,
+          794
+        ],
+        "target": {
+          "lon": -88.48438,
+          "lat": 16.36311
+        },
+        "coordinateSource": "https://www.geonames.org/3581642/",
+        "pixelSource": "AI visual matching of coastline and boundary shapes, independent of Ground Truth alignment",
+        "fit": false
+      }
+    ]
+  }
+}

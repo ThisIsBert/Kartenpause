@@ -1,0 +1,268 @@
+{
+  "image": {
+    "sha256": "ae849a31a9aa82824846b27600352adc46c13c1c193ad5f3a5b372e502f4cf48"
+  },
+  "protocol": "Algorithm unchanged before first real holdout. Source image only extracted from existing project; no reference points or alignment used to choose observations. Targets from Geoscience Australia, observations visually identified on original raster. No post-comparison corrections permitted within this run.",
+  "landmarks": [
+    {
+      "id": "surveyor",
+      "role": "fit",
+      "observations": [
+        {
+          "id": "visual",
+          "pixel": [
+            214,
+            229
+          ],
+          "evidence": "Intersection of the straight Western Australia and northern South Australia borders."
+        }
+      ],
+      "candidates": [
+        {
+          "id": "surveyor",
+          "name": "Surveyor General Corner",
+          "target": {
+            "lon": 129,
+            "lat": -26
+          },
+          "source": "https://www.ga.gov.au/scientific-topics/national-location-information/dimensions/border-lengths",
+          "country": "AU"
+        }
+      ]
+    },
+    {
+      "id": "poeppel",
+      "role": "fit",
+      "observations": [
+        {
+          "id": "visual",
+          "pixel": [
+            324,
+            229
+          ],
+          "evidence": "Northern Territory/Queensland meridian meets northern South Australia parallel."
+        }
+      ],
+      "candidates": [
+        {
+          "id": "poeppel",
+          "name": "Poeppel Corner",
+          "target": {
+            "lon": 138,
+            "lat": -26
+          },
+          "source": "https://www.ga.gov.au/scientific-topics/national-location-information/dimensions/border-lengths",
+          "country": "AU"
+        }
+      ]
+    },
+    {
+      "id": "haddon",
+      "role": "fit",
+      "observations": [
+        {
+          "id": "visual",
+          "pixel": [
+            362,
+            229
+          ],
+          "evidence": "Northeastern right angle of South Australia border."
+        }
+      ],
+      "candidates": [
+        {
+          "id": "haddon",
+          "name": "Haddon Corner",
+          "target": {
+            "lon": 141,
+            "lat": -26
+          },
+          "source": "https://www.ga.gov.au/scientific-topics/national-location-information/dimensions/border-lengths",
+          "country": "AU"
+        }
+      ]
+    },
+    {
+      "id": "cape-york",
+      "role": "fit",
+      "observations": [
+        {
+          "id": "visual",
+          "pixel": [
+            378,
+            23
+          ],
+          "evidence": "Northernmost mainland tip, excluding the detached offshore pixels further north."
+        }
+      ],
+      "candidates": [
+        {
+          "id": "cape-york",
+          "name": "Cape York",
+          "target": {
+            "lon": 142.53055555555557,
+            "lat": -10.689166666666667
+          },
+          "source": "https://www.ga.gov.au/scientific-topics/national-location-information/dimensions/continental-extremities",
+          "country": "AU"
+        }
+      ]
+    },
+    {
+      "id": "south-east-cape",
+      "role": "fit",
+      "observations": [
+        {
+          "id": "visual",
+          "pixel": [
+            431,
+            468
+          ],
+          "evidence": "Southern tip of Tasmania east of the small southwestern bay."
+        }
+      ],
+      "candidates": [
+        {
+          "id": "south-east-cape",
+          "name": "South East Cape",
+          "target": {
+            "lon": 146.825,
+            "lat": -43.644444444444446
+          },
+          "source": "https://www.ga.gov.au/scientific-topics/national-location-information/dimensions/continental-extremities",
+          "country": "AU"
+        }
+      ]
+    },
+    {
+      "id": "cameron",
+      "role": "control",
+      "observations": [
+        {
+          "id": "visual",
+          "pixel": [
+            362,
+            270
+          ],
+          "evidence": "South Australia meridian meets the straight Queensland/New South Wales parallel."
+        }
+      ],
+      "candidates": [
+        {
+          "id": "cameron",
+          "name": "Cameron Corner",
+          "target": {
+            "lon": 141,
+            "lat": -29
+          },
+          "source": "https://www.ga.gov.au/scientific-topics/national-location-information/dimensions/border-lengths",
+          "country": "AU"
+        }
+      ]
+    },
+    {
+      "id": "maccabe",
+      "role": "control",
+      "observations": [
+        {
+          "id": "visual",
+          "pixel": [
+            362,
+            343
+          ],
+          "evidence": "Straight South Australia/New South Wales border meets the Murray River."
+        }
+      ],
+      "candidates": [
+        {
+          "id": "maccabe",
+          "name": "MacCabe Corner",
+          "target": {
+            "lon": 141,
+            "lat": -34
+          },
+          "source": "https://www.ga.gov.au/scientific-topics/national-location-information/dimensions/border-lengths",
+          "country": "AU"
+        }
+      ]
+    },
+    {
+      "id": "cape-byron",
+      "role": "control",
+      "observations": [
+        {
+          "id": "visual",
+          "pixel": [
+            516,
+            248
+          ],
+          "evidence": "Outermost eastern headland near the mainland eastern extremity; low-resolution coastline has approximately 3 px uncertainty."
+        }
+      ],
+      "candidates": [
+        {
+          "id": "cape-byron",
+          "name": "Cape Byron",
+          "target": {
+            "lon": 153.63722222222222,
+            "lat": -28.6375
+          },
+          "source": "https://www.ga.gov.au/scientific-topics/national-location-information/dimensions/continental-extremities",
+          "country": "AU"
+        }
+      ]
+    },
+    {
+      "id": "south-point",
+      "role": "control",
+      "observations": [
+        {
+          "id": "visual",
+          "pixel": [
+            428,
+            405
+          ],
+          "evidence": "Southern mainland promontory tip, excluding the detached island further south."
+        }
+      ],
+      "candidates": [
+        {
+          "id": "south-point",
+          "name": "South Point",
+          "target": {
+            "lon": 146.3738888888889,
+            "lat": -39.138888888888886
+          },
+          "source": "https://www.ga.gov.au/scientific-topics/national-location-information/dimensions/continental-extremities",
+          "country": "AU"
+        }
+      ]
+    },
+    {
+      "id": "steep-point",
+      "role": "control",
+      "observations": [
+        {
+          "id": "visual",
+          "pixel": [
+            20,
+            229
+          ],
+          "evidence": "Western mainland point south of detached Dirk Hartog Island, approximately 3 px uncertainty."
+        }
+      ],
+      "candidates": [
+        {
+          "id": "steep-point",
+          "name": "Steep Point",
+          "target": {
+            "lon": 113.155,
+            "lat": -26.15138888888889
+          },
+          "source": "https://www.ga.gov.au/scientific-topics/national-location-information/dimensions/continental-extremities",
+          "country": "AU"
+        }
+      ]
+    }
+  ]
+}

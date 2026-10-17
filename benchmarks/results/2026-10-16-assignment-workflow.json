@@ -1,0 +1,134 @@
+{
+  "expectedCases": 6,
+  "completeSuite": true,
+  "allPassed": false,
+  "cases": [
+    {
+      "name": "690px-Map_Germania_7-9",
+      "originalFitPoints": 6,
+      "fitPoints": 6,
+      "assignmentStatus": "needs-review",
+      "diagnostics": {
+        "trials": 384,
+        "refinedModels": 114,
+        "maxErrorPixels": 6,
+        "consensusCount": 6,
+        "competingHypotheses": 0,
+        "projection": "+proj=ortho +lon_0=39.32125904736178 +lat_0=54.35698584737764 +x_0=0 +y_0=0 +datum=WGS84 +units=m +no_defs",
+        "normalizedCost": 1.7681656966274104,
+        "imageHullFraction": 0.07101185290779016,
+        "hullPixels": [
+          [
+            147,
+            369
+          ],
+          [
+            156,
+            223
+          ],
+          [
+            341,
+            484.99999999999994
+          ],
+          [
+            214.00000000000003,
+            535
+          ]
+        ],
+        "minimumCoverage": 0.1,
+        "coverageWarning": "Resolved anchors cover too little of the image; add distributed landmarks or explicitly set a smaller minimumCoverage.",
+        "note": "Geometric consistency, not proof of landmark identity or map accuracy. Controls never participate in assignment or model refinement."
+      },
+      "unresolved": [],
+      "atLeastAsGood": false,
+      "reason": "Assignment requires review; no georeference produced."
+    },
+    {
+      "name": "el_dorado-000",
+      "originalFitPoints": 8,
+      "fitPoints": 0,
+      "assignmentStatus": "needs-review",
+      "diagnostics": {
+        "trials": 384,
+        "maxErrorPixels": 6
+      },
+      "unresolved": [
+        {
+          "id": "1:Cabo de La Vela",
+          "reason": "No four-landmark consensus within the tested projection hypotheses."
+        },
+        {
+          "id": "2:Cabo de San Francisco",
+          "reason": "No four-landmark consensus within the tested projection hypotheses."
+        },
+        {
+          "id": "3:Punta Santa Elena",
+          "reason": "No four-landmark consensus within the tested projection hypotheses."
+        },
+        {
+          "id": "4:Río Meta",
+          "reason": "No four-landmark consensus within the tested projection hypotheses."
+        },
+        {
+          "id": "5:Río Guaviare",
+          "reason": "No four-landmark consensus within the tested projection hypotheses."
+        },
+        {
+          "id": "6:Río Vaupés",
+          "reason": "No four-landmark consensus within the tested projection hypotheses."
+        },
+        {
+          "id": "7:Río Apaporis",
+          "reason": "No four-landmark consensus within the tested projection hypotheses."
+        },
+        {
+          "id": "8:Río Putumayo",
+          "reason": "No four-landmark consensus within the tested projection hypotheses."
+        }
+      ],
+      "atLeastAsGood": false,
+      "reason": "Assignment requires review; no georeference produced."
+    },
+    {
+      "name": "elena_image2",
+      "originalFitPoints": 6,
+      "fitPoints": 4,
+      "assignmentStatus": "assigned",
+      "checkpoints": 3,
+      "candidateRms": 10035.798827636892,
+      "referenceRms": 9986.113155773779,
+      "atLeastAsGood": false
+    },
+    {
+      "name": "iiif-service_gmd_gmd370_g3701_g3701s_cw0030300-full-pct_25-0-default",
+      "originalFitPoints": 9,
+      "fitPoints": 4,
+      "assignmentStatus": "assigned",
+      "checkpoints": 6,
+      "candidateRms": 19486.81374347243,
+      "referenceRms": 10595.808689095078,
+      "atLeastAsGood": false
+    },
+    {
+      "name": "inkareich",
+      "originalFitPoints": 7,
+      "fitPoints": 7,
+      "assignmentStatus": "assigned",
+      "checkpoints": 3,
+      "candidateRms": 33630.20823174408,
+      "referenceRms": 27989.05709245689,
+      "atLeastAsGood": false
+    },
+    {
+      "name": "westfront---x5",
+      "originalFitPoints": 9,
+      "fitPoints": 7,
+      "assignmentStatus": "assigned",
+      "checkpoints": 6,
+      "candidateRms": 11054.679341529885,
+      "referenceRms": 12339.688243318029,
+      "atLeastAsGood": true
+    }
+  ],
+  "note": "Optional experimental assignment stage, frozen input positions unchanged. Improvements are not consistent across maps. Do not enable as a blanket default."
+}

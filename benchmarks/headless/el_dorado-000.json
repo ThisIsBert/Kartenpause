@@ -1,0 +1,181 @@
+{
+  "image": "Karten/el_dorado-000.jpg",
+  "reference": "Karten/Ground truth/el_dorado-000.georeferenzierung.json",
+  "fit": {
+    "points": [
+      {
+        "id": 1,
+        "name": "Cabo de La Vela",
+        "pixel": [
+          5550,
+          48
+        ],
+        "target": {
+          "lon": -72.14756,
+          "lat": 12.20917
+        },
+        "coordinateSource": "https://www.geonames.org/3676843/",
+        "pixelSource": "AI visual identification of cape or river confluence; Ecuador coastline checked against geoBoundaries ECU ADM0",
+        "uncertaintyPixels": 15
+      },
+      {
+        "id": 2,
+        "name": "Cabo de San Francisco",
+        "pixel": [
+          2510,
+          5230
+        ],
+        "target": {
+          "lon": -80.08268,
+          "lat": 0.64816
+        },
+        "coordinateSource": "https://www.geonames.org/3651892/",
+        "pixelSource": "AI visual identification of cape or river confluence; Ecuador coastline checked against geoBoundaries ECU ADM0",
+        "uncertaintyPixels": 15
+      },
+      {
+        "id": 3,
+        "name": "Punta Santa Elena",
+        "pixel": [
+          1560,
+          7160
+        ],
+        "target": {
+          "lon": -81.01136,
+          "lat": -2.19027
+        },
+        "coordinateSource": "https://www.geonames.org/3651434/",
+        "pixelSource": "AI visual identification of cape or river confluence; Ecuador coastline checked against geoBoundaries ECU ADM0",
+        "uncertaintyPixels": 15
+      },
+      {
+        "id": 4,
+        "name": "Río Meta",
+        "pixel": [
+          8180,
+          2790
+        ],
+        "target": {
+          "lon": -67.46881,
+          "lat": 6.1967
+        },
+        "coordinateSource": "https://www.geonames.org/3674807/",
+        "pixelSource": "AI visual identification of cape or river confluence; Ecuador coastline checked against geoBoundaries ECU ADM0",
+        "uncertaintyPixels": 15
+      },
+      {
+        "id": 5,
+        "name": "Río Guaviare",
+        "pixel": [
+          7970,
+          3780
+        ],
+        "target": {
+          "lon": -67.71692,
+          "lat": 4.03776
+        },
+        "coordinateSource": "https://www.geonames.org/3681343/",
+        "pixelSource": "AI visual identification of cape or river confluence; Ecuador coastline checked against geoBoundaries ECU ADM0",
+        "uncertaintyPixels": 15
+      },
+      {
+        "id": 6,
+        "name": "Río Vaupés",
+        "pixel": [
+          8410,
+          6050
+        ],
+        "target": {
+          "lon": -67.34038,
+          "lat": 0.09372
+        },
+        "coordinateSource": "https://www.geonames.org/3661742/",
+        "pixelSource": "AI visual identification of cape or river confluence; Ecuador coastline checked against geoBoundaries ECU ADM0",
+        "uncertaintyPixels": 15
+      },
+      {
+        "id": 7,
+        "name": "Río Apaporis",
+        "pixel": [
+          7480,
+          6740
+        ],
+        "target": {
+          "lon": -69.42927,
+          "lat": -1.38996
+        },
+        "coordinateSource": "https://www.geonames.org/3689801/",
+        "pixelSource": "AI visual identification of cape or river confluence; Ecuador coastline checked against geoBoundaries ECU ADM0",
+        "uncertaintyPixels": 15
+      },
+      {
+        "id": 8,
+        "name": "Río Putumayo",
+        "pixel": [
+          8160,
+          7470
+        ],
+        "target": {
+          "lon": -67.97818,
+          "lat": -3.13698
+        },
+        "coordinateSource": "https://www.geonames.org/3664041/",
+        "pixelSource": "AI visual identification of cape or river confluence; Ecuador coastline checked against geoBoundaries ECU ADM0",
+        "uncertaintyPixels": 15
+      }
+    ]
+  },
+  "checks": {
+    "points": [
+      {
+        "id": 1,
+        "name": "Cabo Pasado",
+        "pixel": [
+          2330,
+          5770
+        ],
+        "target": {
+          "lon": -80.48775,
+          "lat": -0.36515
+        },
+        "coordinateSource": "https://www.geonames.org/3653406/",
+        "pixelSource": "AI visual identification of cape or river confluence; Ecuador coastline checked against geoBoundaries ECU ADM0",
+        "uncertaintyPixels": 15,
+        "fit": false
+      },
+      {
+        "id": 2,
+        "name": "Cabo San Mateo",
+        "pixel": [
+          1810,
+          6260
+        ],
+        "target": {
+          "lon": -80.8191,
+          "lat": -0.95495
+        },
+        "coordinateSource": "https://www.geonames.org/3651649/",
+        "pixelSource": "AI visual identification of cape or river confluence; Ecuador coastline checked against geoBoundaries ECU ADM0",
+        "uncertaintyPixels": 15,
+        "fit": false
+      },
+      {
+        "id": 3,
+        "name": "Rio Branco",
+        "pixel": [
+          11400,
+          6350
+        ],
+        "target": {
+          "lon": -61.85142,
+          "lat": -1.39192
+        },
+        "coordinateSource": "https://www.geonames.org/3664885/",
+        "pixelSource": "AI visual identification of cape or river confluence; Ecuador coastline checked against geoBoundaries ECU ADM0",
+        "uncertaintyPixels": 15,
+        "fit": false
+      }
+    ]
+  },
+  "notes": "Handwritten city dots intentionally excluded: placement is schematic and displaced from the underlying map geography. Cape and river assignments are provisional visual measurements."
+}

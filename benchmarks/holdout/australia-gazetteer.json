@@ -1,0 +1,102 @@
+[
+  {
+    "id": "cape-york",
+    "name": "Cape York",
+    "target": {
+      "lon": 142.53055555555557,
+      "lat": -10.689166666666667
+    },
+    "source": "https://www.ga.gov.au/scientific-topics/national-location-information/dimensions/continental-extremities",
+    "country": "AU"
+  },
+  {
+    "id": "cape-byron",
+    "name": "Cape Byron",
+    "target": {
+      "lon": 153.63722222222222,
+      "lat": -28.6375
+    },
+    "source": "https://www.ga.gov.au/scientific-topics/national-location-information/dimensions/continental-extremities",
+    "country": "AU"
+  },
+  {
+    "id": "south-point",
+    "name": "South Point",
+    "target": {
+      "lon": 146.3738888888889,
+      "lat": -39.138888888888886
+    },
+    "source": "https://www.ga.gov.au/scientific-topics/national-location-information/dimensions/continental-extremities",
+    "country": "AU"
+  },
+  {
+    "id": "south-east-cape",
+    "name": "South East Cape",
+    "target": {
+      "lon": 146.825,
+      "lat": -43.644444444444446
+    },
+    "source": "https://www.ga.gov.au/scientific-topics/national-location-information/dimensions/continental-extremities",
+    "country": "AU"
+  },
+  {
+    "id": "steep-point",
+    "name": "Steep Point",
+    "target": {
+      "lon": 113.155,
+      "lat": -26.15138888888889
+    },
+    "source": "https://www.ga.gov.au/scientific-topics/national-location-information/dimensions/continental-extremities",
+    "country": "AU"
+  },
+  {
+    "id": "surveyor",
+    "name": "Surveyor General Corner",
+    "target": {
+      "lon": 129,
+      "lat": -26
+    },
+    "source": "https://www.ga.gov.au/scientific-topics/national-location-information/dimensions/border-lengths",
+    "country": "AU"
+  },
+  {
+    "id": "poeppel",
+    "name": "Poeppel Corner",
+    "target": {
+      "lon": 138,
+      "lat": -26
+    },
+    "source": "https://www.ga.gov.au/scientific-topics/national-location-information/dimensions/border-lengths",
+    "country": "AU"
+  },
+  {
+    "id": "haddon",
+    "name": "Haddon Corner",
+    "target": {
+      "lon": 141,
+      "lat": -26
+    },
+    "source": "https://www.ga.gov.au/scientific-topics/national-location-information/dimensions/border-lengths",
+    "country": "AU"
+  },
+  {
+    "id": "cameron",
+    "name": "Cameron Corner",
+    "target": {
+      "lon": 141,
+      "lat": -29
+    },
+    "source": "https://www.ga.gov.au/scientific-topics/national-location-information/dimensions/border-lengths",
+    "country": "AU"
+  },
+  {
+    "id": "maccabe",
+    "name": "MacCabe Corner",
+    "target": {
+      "lon": 141,
+      "lat": -34
+    },
+    "source": "https://www.ga.gov.au/scientific-topics/national-location-information/dimensions/border-lengths",
+    "country": "AU"
+  }
+]
