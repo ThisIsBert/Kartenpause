@@ -1,6 +1,23 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createBasemapRaster, createBasemapCoordinates } from '../src/drawing/basemap-source.js';
+import { validateStyleMin } from '@maplibre/maplibre-gl-style-spec';
+import { createReferenceStyle, referenceColors } from '../src/maps/reference-style.js';
+import { selectColor } from '../src/drawing/selection.js';
+
+test('reference styles validate against the renderer specification in both languages', () => {
+  for (const language of ['de', 'en']) {
+    const errors = validateStyleMin(createReferenceStyle(language));
+    assert.deepEqual(errors.map(e => e.message), []);
+  }
+});
+
+test('water and land remain separate at the default wand tolerance', () => {
+  const rgba = hex => [...hex.match(/\w\w/g).map(v => parseInt(v, 16)), 255];
+  const raster = { width: 2, height: 1, data: new Uint8ClampedArray([...rgba(referenceColors.water), ...rgba(referenceColors.land)]) };
+  assert.deepEqual([...selectColor(raster, [0, 0], 18, false)], [1, 0]);
+  assert.deepEqual([...selectColor(raster, [1, 0], 18, false)], [0, 1]);
+});
 
 function fixture(t) {
   const calls = [];
@@ -47,6 +64,32 @@ test('basemap source reports pending, missing, failed, and unreadable tiles', t 
   assert.throws(() => createBasemapRaster(f.map, f.layer), /keinen Pixelzugriff/);
   delete f.layer._tiles.current;
   assert.throws(() => createBasemapRaster(f.map, f.layer), /keine Basiskartenkacheln/);
+});
+
+test('vector basemap snapshots scale device pixels and reject incomplete or stale frames', t => {
+  const f = fixture(t);
+  const frame = { width: 200, height: 160, clientWidth: 100, clientHeight: 80 };
+  const gl = { loaded: () => true, getZoom: () => 1, getCanvas: () => frame, project: () => ({ x: 0, y: 0 }) };
+  const layer = { getMaplibreMap: () => gl, options: { isBasemap: true } };
+  const source = createBasemapRaster(f.map, layer);
+  assert.deepEqual(f.calls[0], [frame, 0, 0, 100, 80]);
+  const anchor = source.pixelToLatLng([25, 30]);
+  layer._basemapFailed = true;
+  assert.throws(() => createBasemapRaster(f.map, layer), /fehlen Kartenkacheln/);
+  layer._basemapFailed = false;
+  f.move();
+  assert.deepEqual(source.latLngToPixel(anchor), [25, 30]);
+  assert.throws(() => createBasemapRaster(f.map, layer), /lädt noch/);
+  f.move(2, 530, 280);
+  gl.loaded = () => false;
+  assert.throws(() => createBasemapRaster(f.map, layer), /lädt noch/);
+  gl.loaded = () => true;
+  gl.project = () => ({ x: 20, y: 0 });
+  assert.throws(() => createBasemapRaster(f.map, layer), /lädt noch/);
+  gl.project = () => ({ x: 0, y: 0 });
+  frame.clientWidth = 200;
+  assert.throws(() => createBasemapRaster(f.map, layer), /lädt noch/);
+  assert.throws(() => createBasemapRaster(f.map, { ...layer, getMaplibreMap: () => null }), /lädt noch/);
 });
 
 test('drawing coordinates accept newly exposed areas and preserve old points across new snapshots', t => {

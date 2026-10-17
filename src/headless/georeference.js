@@ -132,7 +132,7 @@ export async function fitGeoreference(points, width, height, options = {}) {
   const project = {
     format: 'pixelkarte-georeferenzierung', version: best.g.affine ? 4 : 3, points,
     alignment: { method, code: best.code, projection: best.model, definition: best.definition, center: { lon, lat }, halfWidth: best.g.hw, rotation: best.g.rot * 180 / Math.PI, ...(best.g.affine ? { affine: best.g.affine } : {}), ...(method === 'projection+tps' ? { tpsRegularization: regularization } : {}) },
-    view: { center: { lon, lat }, zoom: 5, basemap: 'esriStreet', opacity: 70, mesh: 20, showSource: true, showResiduals: true }
+    view: { center: { lon, lat }, zoom: 5, basemap: 'reference', opacity: 70, mesh: 20, showSource: true, showResiduals: true }
   };
   return { project, transform, report: { ...evaluate(transform, points), geometry: best.geometry, warning: tpsWarning, selection, validation, validationRankings, basePixelRms: best.pixel.rms, conditionalLeaveOneOut: conditionalLeaveOneOut(points, width, height, best), candidates: candidates.map(c => ({ code: c.code, geometry: c.geometry, model: c.model, rms: c.fit.rms, pixelRms: c.pixel.rms })), failures } };
 }

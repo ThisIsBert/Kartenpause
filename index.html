@@ -28,7 +28,8 @@
 <header id="mapToolbar" aria-label="Kartenansicht">
   <span id="geoToolbarTitle">Geodaten suchen · OpenStreetMap</span>
   <label for="basemap">Basiskarte</label>
-  <select id="basemap"><option value="esriStreet" selected>Esri Straße</option><option value="esriTopo">Esri Topografie</option><option value="osm">OpenStreetMap</option></select>
+  <select id="basemap"><option value="reference" selected>OSM · Referenzkarte</option><option value="esriStreet">Esri Straße</option><option value="esriTopo">Esri Topografie</option><option value="osm">OpenStreetMap</option></select>
+  <span id="basemapNotice" role="status" hidden></span>
   <div id="rasterControls" role="group" aria-label="Pixelkarte">
     <label class="check"><input id="showRaster" type="checkbox" checked />Pixelkarte</label>
     <label for="opacity">Deckkraft</label><input id="opacity" type="range" min="0" max="100" value="55" /><output id="opacityValue" for="opacity">55 %</output>
