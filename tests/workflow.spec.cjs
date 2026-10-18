@@ -35,7 +35,7 @@ test('vereinfachter Georeferenzierungs-Workflow', async ({ page }) => {
 
   const marker = page.locator('.point-marker').first();
   await expect(marker).toBeVisible();
-  expect(await marker.evaluate(element => getComputedStyle(element).cursor)).toBe('crosshair');
+  expect(await marker.evaluate(element => getComputedStyle(element).cursor)).toContain('16 16, crosshair');
   expect(await marker.evaluate(element => getComputedStyle(element, '::before').content)).not.toBe('none');
   await expect(marker.locator('span')).toHaveText('1');
   expect(await marker.locator('span').evaluate(element => getComputedStyle(element).backgroundColor)).toBe('rgb(23, 108, 101)');

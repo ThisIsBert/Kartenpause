@@ -5,7 +5,7 @@
   "private": true,
   "description": "Lokale Tests für den Kartenprojektions-Prototyp",
   "scripts": {
-    "test:trace": "node --test tests/trace.unit.mjs tests/basemap-source.unit.mjs tests/polygon-operation.unit.mjs tests/curves.unit.mjs",
+    "test:trace": "node --test tests/trace.unit.mjs tests/basemap-source.unit.mjs tests/polygon-operation.unit.mjs tests/curves.unit.mjs tests/reference-capture.unit.mjs",
     "test:wand": "node --test tests/intelligent-selection.unit.mjs tests/selection-contours.unit.mjs",
     "test:geodata": "node --test tests/geodata.unit.mjs",
     "dev": "vite",

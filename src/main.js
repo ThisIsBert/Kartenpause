@@ -23,6 +23,7 @@ import { createDrawingEditor } from './drawing/editor.js';
 import { createRasterInverse } from './drawing/raster-source.js';
 import { createBasemapRaster } from './drawing/basemap-source.js';
 import { createReferenceLayer } from './maps/reference-layer.js';
+import { sourceFromTriangles } from './geo/reference-capture.js';
 
 
     localizeDocument();
@@ -80,7 +81,7 @@ import { createReferenceLayer } from './maps/reference-layer.js';
     let imageName = '';
     let imageData = '';
     let points = [], nextPointId = 1, capture = null, busy = false;
-    let fitted = false, imageLoadVersion = 0, searchCancelled = false, cancellable = false;
+    let fitted = false, alignmentDirty = false, imageLoadVersion = 0, searchCancelled = false, cancellable = false;
     let transformMode = 'projection', tpsCorrection = null;
     let currentCrsIndex = 3, rotation = 0, renderMesh = 20;
     const ui = Object.fromEntries(['workspace','showSource','showResiduals','sourceFit','addPoint','cancelPoint','clearPoints','captureStatus','pointList','metrics','fitCrs','automationInfo','saveProject','loadProject','projectFile','notice','renderNote','alignmentLabel','cancelSearch'].map(id => [id, document.getElementById(id)]));
@@ -192,7 +193,8 @@ import { createReferenceLayer } from './maps/reference-layer.js';
         L.DomUtil.setPosition(this._canvas, topLeft);
         const ctx = this._canvas.getContext('2d');
         ctx.clearRect(0, 0, size.x, size.y);
-        if (!image || !fitted || !document.getElementById('showRaster').checked) return;
+        this._triangles = [];
+        if (!image || !fitted || !document.getElementById('showRaster').checked || (capture?.fromOverlay && capture.phase === 'target')) return;
         ctx.globalAlpha = Number(els.opacity.value) / 100;
         ctx.imageSmoothingEnabled = !document.getElementById('pixelView').checked;
 
@@ -220,6 +222,7 @@ import { createReferenceLayer } from './maps/reference-layer.js';
         const triangle = (a,b,c) => {
           if (!a || !b || !c || Math.max(a.lon,b.lon,c.lon) - Math.min(a.lon,b.lon,c.lon) > 180) { skipped++; return; }
           drawTriangle(ctx, image, a,b,c);
+          this._triangles.push([a, b, c]);
         };
         for (let j = 0; j < n; j++) for (let i = 0; i < n; i++) {
           const p00 = points[j][i], p10 = points[j][i+1], p01 = points[j+1][i], p11 = points[j+1][i+1];
@@ -253,7 +256,7 @@ import { createReferenceLayer } from './maps/reference-layer.js';
     function updateStatus(extra='') {
       const imageText = image ? tr`Bild: ${untranslated(imageName)} (${image.naturalWidth}×${image.naturalHeight} px)` : t('Noch kein Bild geladen.');
       const method = transformMode === 'projection+tps' ? t('Projektionsmodell mit TPS-Korrektur') : t('Projektionsmodell');
-      const fitText = fitted ? tr`\nMethode: ${method}\nAutomatisch angepasst.` : image ? t('\nNoch nicht angepasst. Referenzpunkte setzen und die Projektion automatisch anpassen.') : '';
+      const fitText = alignmentDirty ? t('\nReferenzpunkte geändert. Die bisherige Überlagerung bleibt bis zum erneuten Anpassen erhalten.') : fitted ? tr`\nMethode: ${method}\nAutomatisch angepasst.` : image ? t('\nNoch nicht angepasst. Referenzpunkte setzen und die Projektion automatisch anpassen.') : '';
       bindText(els.status, () => `${imageText}${fitText}${extra ? '\n' + extra : ''}`);
     }
     function showError(err) { bindText(ui.notice, () => t('Fehler: ') + t(err?.message || err)); }
@@ -291,24 +294,26 @@ import { createReferenceLayer } from './maps/reference-layer.js';
       ui.clearPoints.disabled = !points.length || busy;
       ui.fitCrs.disabled = !image || !enough || busy || !!capture;
       ui.cancelSearch.hidden = !busy || !cancellable; ui.cancelSearch.disabled = !busy || !cancellable || searchCancelled;
-      ui.saveProject.disabled = !image || !fitted || busy || !!capture;
+      ui.saveProject.disabled = !image || !fitted || alignmentDirty || busy || !!capture;
+      ui.showSource.disabled = busy || !!capture;
       ui.sourceFit.disabled = !image || busy;
       document.getElementById('zoomImage').disabled = !image || !fitted || busy;
       ui.cancelPoint.hidden = !capture;
-      bindText(ui.alignmentLabel, () => fitted ? t('Automatisch angepasst') : t('Noch nicht angepasst'));
+      bindText(ui.alignmentLabel, () => alignmentDirty ? t('Anpassung aktualisieren') : fitted ? t('Automatisch angepasst') : t('Noch nicht angepasst'));
     }
-    function invalidateResults() {
-      fitted = false; transformMode = 'projection'; tpsCorrection = null;
+    function invalidateResults({ keepAlignment = false } = {}) {
+      alignmentDirty = keepAlignment && fitted;
+      if (!alignmentDirty) { fitted = false; transformMode = 'projection'; tpsCorrection = null; }
       bindText(ui.automationInfo, () => points.length ? t('Referenzpunkte geändert. Anpassung neu berechnen.') : '');
     }
     function refresh() {
       overlay.redraw(); renderPoints(); updateStatus(); updateAvailability();
     }
-    function pointsChanged() { invalidateResults(); bindText(ui.notice, () => ''); refresh(); }
+    function pointsChanged(options) { invalidateResults(options); bindText(ui.notice, () => ''); refresh(); }
     function renderPoints() {
       sourceMarks.clearLayers(); targetMarks.clearLayers(); residualMarks.clearLayers(); ui.pointList.replaceChildren();
       let evaluation = null;
-      if (image && fitted) {
+      if (image && fitted && !alignmentDirty) {
         try { evaluation = transformMode === 'projection+tps' ? tpsCorrection : GeoFit.evaluate(points, sourceGeometry(), currentCrs().code, image.naturalWidth, image.naturalHeight); }
         catch (err) { showError(err); }
       }
@@ -342,6 +347,7 @@ import { createReferenceLayer } from './maps/reference-layer.js';
         }
       }
       if (capture?.source && image) L.marker([(1-capture.source.v)*image.naturalHeight, capture.source.u*image.naturalWidth], { icon: markerIcon({ id: capture.id, fit: true }, 'pending'), interactive: false }).addTo(sourceMarks);
+      if (capture?.mapSource) L.marker(capture.mapSource, { icon: markerIcon({ id: capture.id, fit: true }, 'pending'), interactive: false }).addTo(targetMarks);
       const lines = [];
       if (transformMode === 'projection+tps' && evaluation?.fit) {
         lines.push(tr`TPS (${evaluation.fit.count} Stützpunkte): an den Fit-Punkten passgenau\nGenauigkeit zwischen und außerhalb der Punkte hängt von deren Verteilung ab.`);
@@ -359,11 +365,18 @@ import { createReferenceLayer } from './maps/reference-layer.js';
     }
     function startCapture(id = nextPointId) {
       if (!image || busy) return;
-      capture = { id, phase: 'source', source: null }; setSourceVisible(true); updateCapture(); renderPoints();
+      capture = { id, phase: 'source', source: null, fromOverlay: false };
+      if (!overlaySourceAvailable()) setSourceVisible(true);
+      updateCapture(); renderPoints();
+    }
+    function overlaySourceAvailable() {
+      return fitted && document.getElementById('showRaster').checked && Number(els.opacity.value) > 0;
     }
     function updateCapture() {
       document.body.classList.toggle('capture-source', capture?.phase === 'source'); document.body.classList.toggle('capture-target', capture?.phase === 'target');
-      bindText(ui.captureStatus, () => capture ? capture.phase === 'source' ? tr`Punkt ${capture.id}: Ort im Originalbild wählen.` : tr`Punkt ${capture.id}: Denselben Ort auf der Basiskarte wählen.` : '');
+      document.body.classList.toggle('capture-overlay', !!capture && overlaySourceAvailable());
+      bindText(ui.captureStatus, () => capture ? capture.phase === 'source' ? overlaySourceAvailable() ? tr`Punkt ${capture.id}: Ort im Originalbild oder auf der überlagerten Pixelkarte wählen.` : tr`Punkt ${capture.id}: Ort im Originalbild wählen.` : tr`Punkt ${capture.id}: Denselben Ort auf der Basiskarte wählen.` : '');
+      overlay.redraw();
       updateAvailability();
     }
     function cancelCapture() { capture = null; updateCapture(); renderPoints(); }
@@ -374,19 +387,31 @@ import { createReferenceLayer } from './maps/reference-layer.js';
       bindText(ui.notice, () => ''); capture.source = { u, v }; capture.phase = 'target'; updateCapture(); renderPoints();
     });
     map.on('click', e => {
-      if (!capture || capture.phase !== 'target' || busy) return;
+      if (!capture || busy) return;
+      if (capture.phase === 'source') {
+        if (!overlaySourceAvailable()) return;
+        if (overlay._zooming) { showError(t('Bitte warten, bis die Kartenbewegung beendet ist.')); return; }
+        const frame = overlay._canvas.getBoundingClientRect();
+        const point = { x: e.originalEvent.clientX - frame.left, y: e.originalEvent.clientY - frame.top };
+        const source = sourceFromTriangles(point, overlay._triangles || [], image.naturalWidth, image.naturalHeight);
+        if (!source) { showError(t('Bitte einen Punkt innerhalb der überlagerten Pixelkarte wählen.')); return; }
+        capture.source = source; capture.mapSource = e.latlng; capture.fromOverlay = true; capture.phase = 'target';
+        bindText(ui.notice, () => ''); updateCapture(); renderPoints();
+        return;
+      }
       const ll = e.latlng.wrap(); if (Math.abs(ll.lat) > 85.05112878) return;
       const existing = points.find(p => p.id === capture.id);
       const point = { id: capture.id, source: capture.source, target: { lon: ll.lng, lat: ll.lat }, fit: existing ? existing.fit : true };
       if (existing) points[points.indexOf(existing)] = point; else { points.push(point); nextPointId++; }
-      capture = null; updateCapture(); pointsChanged();
+      const keepAlignment = fitted;
+      capture = null; updateCapture(); pointsChanged({ keepAlignment });
     });
     function applyResult(result) {
       if(result.model) registerModel(result.model);
       const index = candidates.findIndex(c => c.code === result.code);
       const ll = sourceToLatLng(result.g.cx, result.g.cy, result.code);
       currentCrsIndex = index; imageCenter = ll; halfWidthSource = result.g.hw;
-      rotation = result.g.rot*180/Math.PI; fitted = true; transformMode = 'projection'; tpsCorrection = null;
+      rotation = result.g.rot*180/Math.PI; fitted = true; alignmentDirty = false; transformMode = 'projection'; tpsCorrection = null;
       bindText(ui.notice, () => result.warning || ''); refresh();
     }
     function setBusy(value) {
@@ -489,7 +514,7 @@ import { createReferenceLayer } from './maps/reference-layer.js';
       fitSource();
     }
     function saveProject() {
-      if (!image || busy || capture) return;
+      if (!image || !fitted || alignmentDirty || busy || capture) return;
       const viewCenter = map.getCenter().wrap();
       const project = { format: 'pixelkarte-georeferenzierung', version: 3, image: { name: imageName, data: imageData }, points, alignment: { method: transformMode, code: currentCrs().code, projection: currentCrs().model, center: { lat: imageCenter.lat, lon: imageCenter.lng }, halfWidth: halfWidthSource, rotation, tpsRegularization: transformMode === 'projection+tps' ? tpsCorrection.regularization : undefined }, view: { center: { lat: Math.max(-85,Math.min(85,viewCenter.lat)), lon: viewCenter.lng }, zoom: map.getZoom(), basemap: els.basemap.value, opacity: Number(els.opacity.value), mesh: renderMesh, showSource: ui.showSource.checked, showResiduals: ui.showResiduals.checked } };
       const url = URL.createObjectURL(new Blob([JSON.stringify(project, null, 2)], { type: 'application/json' }));
@@ -533,7 +558,7 @@ import { createReferenceLayer } from './maps/reference-layer.js';
         els.opacity.value = v.opacity; bindText(els.opacityValue, () => v.opacity+' %');
         map.removeLayer(activeBasemap); els.basemap.value = v.basemap; activeBasemap = basemaps[v.basemap].addTo(map);
         map.setView([v.center.lat,v.center.lon],v.zoom, { animate: false }); ui.showResiduals.checked = v.showResiduals; setSourceVisible(v.showSource);
-        fitted = true; transformMode = 'projection'; tpsCorrection = null;
+        fitted = true; alignmentDirty = false; transformMode = 'projection'; tpsCorrection = null;
         if (a.method === 'projection+tps') {
           const geometry = sourceGeometry();
           const code = currentCrs().code;
@@ -576,7 +601,7 @@ import { createReferenceLayer } from './maps/reference-layer.js';
       finally { els.file.value = ''; setBusy(false); }
     });
 
-    els.opacity.addEventListener('input', () => { bindText(els.opacityValue, () => els.opacity.value + ' %'); overlay.redraw(); });
+    els.opacity.addEventListener('input', () => { bindText(els.opacityValue, () => els.opacity.value + ' %'); if (capture) updateCapture(); else overlay.redraw(); });
 
     ui.addPoint.onclick = () => startCapture();
     ui.cancelPoint.onclick = cancelCapture;
@@ -609,14 +634,14 @@ import { createReferenceLayer } from './maps/reference-layer.js';
     let georeferenceSnapshot = null;
     document.getElementById('chooseImage').onclick = () => els.file.click();
     setupWorkspace();
-    document.getElementById('showRaster').onchange = () => overlay.redraw();
+    document.getElementById('showRaster').onchange = () => { if (capture) updateCapture(); else overlay.redraw(); };
     document.getElementById('pixelView').onchange = () => overlay.redraw();
     createDrawingEditor({ map, sourceMap, canEnter: () => !busy && !capture,
       onCancelGeoreference() {
         if (busy || !georeferenceSnapshot) return false;
         const previous = georeferenceSnapshot;
         imageLoadVersion++;
-        ({ image, imageName, imageData, points, nextPointId, fitted, transformMode, tpsCorrection,
+        ({ image, imageName, imageData, points, nextPointId, fitted, alignmentDirty, transformMode, tpsCorrection,
           currentCrsIndex, rotation, renderMesh, imageCenter, halfWidthSource } = previous);
         capture = null;
         candidates.splice(0, candidates.length, ...previous.candidates);
@@ -660,7 +685,7 @@ import { createReferenceLayer } from './maps/reference-layer.js';
       },
       onModeChange(active) {
         if (!active) georeferenceSnapshot = {
-          image, imageName, imageData, points: structuredClone(points), nextPointId, fitted,
+          image, imageName, imageData, points: structuredClone(points), nextPointId, fitted, alignmentDirty,
           transformMode, tpsCorrection, currentCrsIndex, rotation, renderMesh, imageCenter, halfWidthSource,
           candidates: structuredClone(candidates), opacity: els.opacity.value, basemap: els.basemap.value,
           showRaster: document.getElementById('showRaster').checked, pixelView: document.getElementById('pixelView').checked,

@@ -1,4 +1,6 @@
-:root { font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
+:root { font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --reference-cursor: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='32' height='32' viewBox='0 0 32 32'%3E%3Cpath d='M3 16H11M21 16H29M16 3V11M16 21V29' stroke='white' stroke-width='3'/%3E%3Cpath d='M3 16H11M21 16H29M16 3V11M16 21V29' stroke='%231d3331' stroke-width='1'/%3E%3C/svg%3E") 16 16, crosshair;
+}
     html, body { height: 100%; margin: 0; }
     body { display: grid; grid-template-columns: 360px minmax(0, 1fr); overflow: hidden; background: #f6f6f6; }
     #sidebar { box-sizing: border-box; height: 100%; overflow: auto; padding: 16px; border-right: 1px solid #ccc; background: white; }
@@ -45,15 +47,15 @@
     #automationInfo { line-height: 1.5; overflow-wrap: anywhere; white-space: pre-line; margin: 8px 0; }
     #searchAvailability { font-size: 12px; line-height: 1.45; color: #555; overflow-wrap: anywhere; }
     #searchAvailability:empty { display: none; }
-    .point-marker { --marker-color: #176c65; width: 32px !important; height: 32px !important; margin: -16px 0 0 -16px !important; color: var(--marker-color); cursor: crosshair; }
-    .point-marker::before, .point-marker::after { content: ""; position: absolute; background: var(--marker-color); box-shadow: 0 0 0 1px rgba(255,255,255,.85); }
-    .point-marker::before { left: 0; top: 15px; width: 32px; height: 2px; }
-    .point-marker::after { left: 15px; top: 0; width: 2px; height: 32px; }
+    .point-marker { --marker-color: #176c65; width: 32px !important; height: 32px !important; margin: -16px 0 0 -16px !important; color: var(--marker-color); cursor: var(--reference-cursor); }
+    .point-marker::before, .point-marker::after { content: ""; position: absolute; background: var(--marker-color); }
+    .point-marker::before { left: 0; top: 15px; width: 11px; height: 2px; box-shadow: 0 0 0 1px #ffffffd9, 21px 0 0 var(--marker-color), 21px 0 0 1px #ffffffd9; }
+    .point-marker::after { left: 15px; top: 0; width: 2px; height: 11px; box-shadow: 0 0 0 1px #ffffffd9, 0 21px 0 var(--marker-color), 0 21px 0 1px #ffffffd9; }
     .point-marker span { position: absolute; z-index: 1; left: 20px; top: -7px; min-width: 15px; height: 15px; padding: 0 3px; box-sizing: border-box; border-radius: 8px; background: var(--marker-color); color: #fff; font: bold 10px/15px system-ui; text-align: center; box-shadow: 0 0 0 1px #fff; }
     .point-marker.control { --marker-color: #675694; }
     .point-marker.pending { --marker-color: #a76a00; }
     .predicted-marker { --marker-color: #b0273f; }
-    .capture-source #sourceMap, .capture-target #map { cursor: crosshair; }
+    .capture-source #sourceMap, .capture-target #map, .capture-overlay #map { cursor: var(--reference-cursor); }
     [hidden] { display: none !important; }
     html.app-busy, html.app-busy * { cursor: progress !important; }
     body { grid-template-columns: 360px minmax(0, 1fr) 0px; transition: grid-template-columns .32s ease; }

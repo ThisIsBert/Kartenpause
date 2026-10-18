@@ -1,4 +1,8 @@
 {
+  "Punkt {0}: Ort im Originalbild oder auf der überlagerten Pixelkarte wählen.": "Point {0}: choose a location in the source image or on the overlaid raster map.",
+  "Bitte einen Punkt innerhalb der überlagerten Pixelkarte wählen.": "Please choose a point inside the overlaid raster map.",
+  "Anpassung aktualisieren": "Update alignment",
+  "\nReferenzpunkte geändert. Die bisherige Überlagerung bleibt bis zum erneuten Anpassen erhalten.": "\nControl points changed. The previous overlay is preserved until you fit the map again.",
   "OSM · Referenzkarte": "OSM · Reference map",
   "Referenzkarte nicht vollständig verfügbar. Bitte Internetverbindung prüfen oder eine andere Basiskarte wählen.": "Reference map not fully available. Please check your internet connection or choose another basemap.",
   "Farbverlauf": "Color tracking",
