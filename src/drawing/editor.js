@@ -32,6 +32,7 @@ export function createDrawingEditor({ map, sourceMap, canEnter, onModeChange, on
   let simplification = null, simplifyAmount = 0;
   let simplifyWorker = null, simplifyTimer = null, simplifyBusy = false, simplifyGeneration = 0;
   let areaEdit = null, polygonWorker = null, polygonIssues = [];
+  let waterEdit = null, waterWorker = null, waterTimer = null;
   const selection = () => selectedIds.map(id => objects.find(object => object.id === id)).filter(Boolean);
   const selected = () => selectedIds.length === 1 ? objects.find(object => object.id === selectedIds[0]) : undefined;
   const project = ll => { const p = L.CRS.EPSG3857.project(ll); return [p.x, p.y]; };
@@ -79,7 +80,65 @@ export function createDrawingEditor({ map, sourceMap, canEnter, onModeChange, on
     },
     onCancel() { tool = 'select'; message(t('Original unverändert.')); render(); }
   });
-  const reworking = () => !!areaEdit || section.active || !!polygonWorker;
+  const reworking = () => !!areaEdit || section.active || !!polygonWorker || !!waterEdit;
+  function stopWaterWorker() {
+    clearTimeout(waterTimer); waterTimer = null;
+    waterWorker?.terminate(); waterWorker = null; setBusy('water-operation', false);
+  }
+  function cancelWater() {
+    stopWaterWorker(); waterEdit = null; message(t('Original unverändert.')); render();
+  }
+  function calculateWater() {
+    if (!waterEdit) return;
+    stopWaterWorker();
+    const session = waterEdit;
+    session.result = null; session.ready = false; session.changed = false; session.error = false;
+    session.status = t('Lade Wasserdaten … Esc bricht ab.');
+    const fail = error => {
+      stopWaterWorker(); session.error = true;
+      session.status = tr`Wasserabzug fehlgeschlagen: ${error}. Das Original bleibt erhalten.`; render();
+    };
+    try {
+      const worker = new Worker(new URL('./water-worker.js', import.meta.url), { type: 'module' });
+      waterWorker = worker; setBusy('water-operation', true); render();
+      waterTimer = setTimeout(() => {
+        if (waterWorker === worker) fail(t('Die Berechnung hat zu lange gedauert. Bitte erneut versuchen oder die Fläche aufteilen.'));
+      }, 120000);
+      worker.onmessage = ({ data }) => {
+        if (waterWorker !== worker || waterEdit !== session) return;
+        if (data.error) { fail(data.error); return; }
+        const resolution = Math.max(1, Math.round(data.resolution ?? data.progress?.resolution));
+        if (data.progress) {
+          session.status = tr`Lade Wasserdaten: ${data.progress.finished}/${data.progress.total} Kacheln. Küstendetail ungefähr ${resolution} m.`;
+          updateUI(); return;
+        }
+        if (data.processing) { session.status = t('Berechne Wasserabzug … Esc bricht ab.'); updateUI(); return; }
+        stopWaterWorker(); session.ready = true; session.result = data.result; session.changed = data.changed;
+        session.status = !data.result ? t('Die gesamte Fläche liegt im Wasser. Keine Restfläche zum Übernehmen; bei Bedarf das Objekt löschen.')
+          : !data.changed ? t('Keine passende Wasserfläche im Objekt gefunden. Das Original bleibt unverändert.')
+            : tr`Vorschau fertig. Küstendetail ungefähr ${resolution} m. Fertig übernimmt den Wasserabzug; Abbrechen erhält das Original.`;
+        render();
+      };
+      worker.onerror = () => { if (waterWorker === worker) fail(t('Hintergrundberechnung nicht verfügbar.')); };
+      worker.postMessage({ object: session.original, mode: el('waterMode').value });
+    } catch (error) { fail(error.message); }
+  }
+  el('reworkWater').onclick = () => {
+    const object = selected();
+    if (!object || !isClosed(object.kind) || simplification || reworking() || draft) return;
+    clearPolygonIssues(); waterEdit = { original: structuredClone(object) }; vertexIndex = null;
+    calculateWater();
+  };
+  el('waterMode').onchange = calculateWater;
+  el('waterRetry').onclick = calculateWater;
+  el('waterCancel').onclick = cancelWater;
+  el('waterApply').onclick = () => {
+    if (!waterEdit?.ready || !waterEdit.result || !waterEdit.changed || waterWorker) return;
+    const result = waterEdit.result;
+    record(); objects = objects.map(object => object.id === result.id ? result : object);
+    waterEdit = null; vertexRing = 0;
+    message(t('Wasserfläche abgezogen. Mit Rückgängig wiederherstellen.')); render();
+  };
   function cancelArea() {
     areaEdit = null; tool = 'select'; wand.cancel(); message(t('Original unverändert.')); render();
   }
@@ -103,7 +162,7 @@ export function createDrawingEditor({ map, sourceMap, canEnter, onModeChange, on
   };
 
   function history(from, to) {
-    if (geodata?.active || polygonWorker) return;
+    if (geodata?.active || polygonWorker || waterEdit) return;
     if (section.active) { if (from === undo) section.undo(); return; }
     if (simplification) { cancelSimplification(); return; }
     if (tool === 'wand' && (areaEdit || wand.hasDraft || wand.canUndo || wand.canRedo)) { wand.history(from === redo); return; }
@@ -121,13 +180,13 @@ export function createDrawingEditor({ map, sourceMap, canEnter, onModeChange, on
 
   function updateUI() {
     const object = selected();
-    const currentTool = areaEdit ? 'area' : tool;
+    const currentTool = waterEdit ? 'water' : areaEdit ? 'area' : tool;
     if (currentTool !== displayedTool) { el('drawingSidebar').scrollTop = 0; displayedTool = currentTool; }
-    bindText(el('toolTitle'), () => areaEdit ? t('Fläche weiterbearbeiten') : toolLabels[tool]);
+    bindText(el('toolTitle'), () => waterEdit ? t('Wasserfläche abziehen') : areaEdit ? t('Fläche weiterbearbeiten') : toolLabels[tool]);
     el('areaActions').hidden = !areaEdit;
     el('sectionActions').hidden = !section.active;
     el('objectPanel').hidden = tool !== 'select';
-    el('drawingSelection').hidden = !object;
+    el('drawingSelection').hidden = !object || !!waterEdit;
     el('filePanel').hidden = tool !== 'files';
     el('drawingActions').hidden = tool === 'files' || tool === 'select' || reworking();
     el('historyControls').hidden = !active;
@@ -136,6 +195,14 @@ export function createDrawingEditor({ map, sourceMap, canEnter, onModeChange, on
     el('drawingSelection').disabled = !object || !!draft || magnetic.hasDraft || wand.hasDraft || reworking();
     el('reworkArea').disabled = !object || !isClosed(object.kind) || !!simplification;
     el('reworkSection').disabled = !object || geometryLeaves(object).every(part => part.kind === 'point') || !!simplification;
+    el('reworkWater').disabled = !object || !isClosed(object.kind) || !!simplification;
+    el('waterPanel').hidden = !waterEdit;
+    el('drawingHelp').hidden = !!waterEdit;
+    el('polygonSelectionHelp').hidden = !!waterEdit;
+    for (const id of ['unionDrawings', 'intersectDrawings']) el(id).parentElement.hidden = !!waterEdit;
+    el('waterApply').disabled = !waterEdit?.ready || !waterEdit.result || !waterEdit.changed || !!waterWorker;
+    el('waterRetry').hidden = !waterEdit?.error;
+    bindText(el('waterStatus'), () => waterEdit?.status || '');
     el('areaEditSettings').hidden = !areaEdit;
     el('areaApply').disabled = !wand.canFinish;
     el('sectionSettings').hidden = !section.active;
@@ -169,7 +236,7 @@ export function createDrawingEditor({ map, sourceMap, canEnter, onModeChange, on
     bindText(el('polygonSelectionHelp'), () => polygonWorker ? t('Berechne Ergebnisfläche … Esc bricht die Berechnung ab.')
       : chosen.length >= 2 ? chosen.map((object,i)=>`${i+1}: ${object.name}`).join(' · ') + (chosen.every(object=>isClosed(object.kind)) ? t('. Subtrahieren zieht alle weiteren Flächen von der ersten ab. Schnittmenge behält nur die gemeinsame Fläche; Exklusiv (XOR) behält Bereiche mit einer ungeraden Anzahl überlagerter Flächen.') : t('. Flächenoperationen sind nur für Flächen möglich.')) + t(' Das Ergebnis wird als neues Objekt angelegt; die Ausgangsobjekte bleiben erhalten.')
       : t('Weitere Objekte mit Strg/⌘ oder Umschalt anklicken. Das Ergebnis wird als neues Objekt angelegt; die Ausgangsobjekte bleiben erhalten.'));
-    if (polygonWorker) el('undoDrawing').disabled = el('redoDrawing').disabled = true;
+    if (polygonWorker || waterEdit) el('undoDrawing').disabled = el('redoDrawing').disabled = true;
     bindAttribute(el('undoDrawing'), 'title', () => (draft ? t('Letzten Punkt zurück') : magnetic.hasDraft ? t('Letzten Abschnitt zurück') : wand.hasDraft ? t('Letzte Auswahländerung zurück') : t('Rückgängig')) + t(' (Strg+Z)'));
     bindText(el('drawingHelp'), () => tool === 'files' ? t('Lade vorhandene Objekte oder speichere deine Zeichnung für die Weiterarbeit.') : tool === 'select'
       ? t('Objekt anklicken; mit Strg/⌘ oder Umschalt weitere auswählen. Stützpunkte ziehen; + fügt einen Punkt hinzu. Stützpunkt anklicken und mit Entf löschen.')
@@ -377,7 +444,12 @@ export function createDrawingEditor({ map, sourceMap, canEnter, onModeChange, on
 
   function render() {
     shapes.clearLayers(); handles.clearLayers(); layers = new Map();
-    objects.forEach(object => { if (object.id !== areaEdit?.id) drawShape(simplification?.id === object.id ? simplification : object); });
+    objects.forEach(object => {
+      if (object.id === areaEdit?.id) return;
+      if (waterEdit?.ready && object.id === waterEdit.original.id) {
+        if (waterEdit.result) drawShape(waterEdit.result, true);
+      } else drawShape(simplification?.id === object.id ? simplification : object);
+    });
     if (active && selected() && !draft && !simplification && !reworking()) renderHandles(selected());
     if (active && draft) {
       drawShape(draft, true);
@@ -436,7 +508,7 @@ export function createDrawingEditor({ map, sourceMap, canEnter, onModeChange, on
   }
 
   function mapClick(e) {
-    if (!active || geodata?.active || polygonWorker || tool === 'files') return;
+    if (!active || geodata?.active || polygonWorker || waterEdit || tool === 'files') return;
     if (simplification) { message(t('Bitte die Vereinfachung zuerst übernehmen oder verwerfen.')); return; }
     if (section.active) { section.click(e.latlng, e.originalEvent); return; }
     if (tool === 'magnetic') { magnetic.click(e.latlng, e.originalEvent); return; }
@@ -591,7 +663,13 @@ export function createDrawingEditor({ map, sourceMap, canEnter, onModeChange, on
     e.preventDefault(); message(t('Ausgewähltes Objekt als GeoJSON kopiert.'));
   });
   document.addEventListener('keydown', e => {
-    if (!active || geodata?.active || editingText(e.target)) return;
+    if (!active || geodata?.active) return;
+    if (waterEdit) {
+      if (e.key === 'Escape') { e.preventDefault(); cancelWater(); }
+      else if (e.key === 'Enter' && !editingText(e.target)) { e.preventDefault(); el('waterApply').click(); }
+      return;
+    }
+    if (editingText(e.target)) return;
     if (polygonWorker) { if (e.key === 'Escape') { e.preventDefault(); cancelPolygonOperation(); } return; }
     if (section.active && (e.key === 'Delete' || e.key === 'Backspace')) { e.preventDefault(); section.deleteVertex(); return; }
     if (section.active && e.key === 'Enter') { e.preventDefault(); section.enter(); return; }

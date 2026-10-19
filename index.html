@@ -170,6 +170,7 @@
       <button id="copyDrawing">In die Zwischenablage kopieren</button>
       <button id="reworkArea">Fläche weiterbearbeiten</button>
       <button id="reworkSection">Randabschnitt ersetzen</button>
+      <button id="reworkWater">Wasserfläche abziehen</button>
       <div class="row"><label for="simplifyDrawing">Vereinfachen und glätten</label><output id="simplifyValue">0 %</output></div>
       <input id="simplifyDrawing" type="range" min="0" max="100" step="1" value="0" aria-describedby="simplifyStatus" />
       <p id="simplifyStatus" class="hint" aria-live="polite">Objekt auswählen.</p>
@@ -178,6 +179,16 @@
         <button id="cancelSimplification" disabled><i data-lucide="x"></i> Abbrechen</button>
       </div>
     </fieldset>
+    <section id="waterPanel" hidden>
+      <h2>Wasserfläche abziehen</h2>
+      <label for="waterMode">Abziehen</label>
+      <select id="waterMode"><option value="ocean">Nur Meer</option><option value="all">Alle Wasserflächen</option></select>
+      <p class="hint">Die Küstenauflösung richtet sich nach der Objektgröße. Kleine Objekte erhalten feinere Küsten. Alle Wasserflächen umfasst auch Seen und flächig erfasste Flüsse.</p>
+      <p class="hint">Wasserdaten: <a href="https://openfreemap.org/" target="_blank" rel="noopener">OpenFreeMap</a> / <a href="https://openmaptiles.org/" target="_blank" rel="noopener">OpenMapTiles</a> / <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">© OpenStreetMap</a>. Internet erforderlich.</p>
+      <p id="waterStatus" role="status" aria-live="polite"></p>
+      <button id="waterRetry" hidden>Erneut versuchen</button>
+      <div class="commands"><button id="waterApply" class="primary" disabled>Fertig</button><button id="waterCancel">Abbrechen</button></div>
+    </section>
     </section>
     <section id="filePanel" hidden>
     <h2>Zeichnung laden</h2>
