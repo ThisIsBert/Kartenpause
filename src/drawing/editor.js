@@ -1,8 +1,9 @@
 import { bindAttribute, bindText, t, tr, untranslated } from '../i18n.js';
 import L from 'leaflet';
-import { createElement, Trash2 } from 'lucide';
+import { createElement, Eye, EyeOff, Trash2 } from 'lucide';
 import { curveLayer } from './curve-layer.js';
-import { isClosed, minimumPoints, sampledPoints, edgePoint, splitEdge, removeVertex, sampledRings, toFeature, polygonParts, objectRings, geometryLeaves, ringEntries } from './geometry.js';
+import { isClosed, isCurved, hasCurves, minimumPoints, sampledPoints, edgePoint, splitEdge, removeVertex, sampledRings, toFeature, polygonParts, objectRings, geometryLeaves, ringEntries } from './geometry.js';
+import { materializeControls, vertexControls, controlsAligned, moveControl, alignControls } from './bezier-handles.js';
 import { createMagneticTool, densifyPixels } from './magnetic.js';
 import { simplify } from './simplify-path.js';
 import { createWand } from './wand.js';
@@ -22,11 +23,17 @@ export function createDrawingEditor({ map, sourceMap, canEnter, onModeChange, on
   map.createPane('drawingShapes');
   map.getPane('drawingShapes').style.zIndex = 450;
   const renderer = L.svg({ pane: 'drawingShapes' });
+  map.createPane('drawingControls');
+  map.getPane('drawingControls').style.zIndex = 550;
+  map.getPane('drawingControls').style.pointerEvents = 'none';
+  const controlRenderer = L.svg({ pane: 'drawingControls' });
   let drawingView = null, displayedTool = null;
   let geodata = null;
   const toolLabels = { select: 'Auswahl', point: 'Punkt', line: 'Linie', polygon: 'Polygon', curve: 'Kurve', curvePolygon: 'Kurvenfläche', magnetic: 'Magnetisch zeichnen', wand: 'Zauberstab', section: 'Randabschnitt ersetzen', files: 'Import / Export' };
   let active = false, tool = 'select', objects = [], selectedIds = [], vertexIndex = null, draft = null;
   let undo = [], redo = [], layers = new Map();
+  const hiddenIds = new Set();
+  const isVisible = object => !hiddenIds.has(object.id);
   let savedObjects = JSON.stringify(objects);
   let vertexRing = 0;
   let simplification = null, simplifyAmount = 0;
@@ -43,7 +50,7 @@ export function createDrawingEditor({ map, sourceMap, canEnter, onModeChange, on
   const snapshot = () => JSON.stringify({ objects, selectedIds });
   const record = () => { clearPolygonIssues(); undo.push(snapshot()); if (undo.length > 100) undo.shift(); redo = []; };
   const magnetic = createMagneticTool({ map, renderer, getOriginalRaster, getBasemapRaster,
-    getObjects: () => objects.filter(object => !section.active || object.id !== selectedIds[0]),
+    getObjects: () => objects.filter(object => isVisible(object) && (!section.active || object.id !== selectedIds[0])),
     project, unproject, onState: updateUI, onComplete({ pixels, source, closed }) {
     record();
     const projected = source.vector ? pixels : (source.basemap ? pixels : densifyPixels(pixels)).map(p => project(source.pixelToLatLng(p)));
@@ -175,6 +182,7 @@ export function createDrawingEditor({ map, sourceMap, canEnter, onModeChange, on
     clearPolygonIssues();
     to.push(snapshot());
     ({ objects, selectedIds = [] } = JSON.parse(from.pop()));
+    selectedIds = selectedIds.filter(id => !hiddenIds.has(id));
     vertexIndex = null; render();
   }
 
@@ -208,6 +216,10 @@ export function createDrawingEditor({ map, sourceMap, canEnter, onModeChange, on
     el('sectionSettings').hidden = !section.active;
     if (section.active) el('sectionConnect').disabled = !section.canConnect;
     el('drawingName').value = object?.name || '';
+    const selectedRing = object && ringEntries(object)[vertexRing]?.shape;
+    const controls = selectedRing && vertexIndex !== null && selectedRing.vertices[vertexIndex] ? vertexControls(selectedRing, vertexIndex) : null;
+    el('bezierSettings').hidden = !controls || (!controls.incoming && !controls.outgoing) || !!simplification;
+    el('alignBezierHandles').disabled = !controls?.incoming || !controls?.outgoing || controlsAligned(selectedRing, vertexIndex);
     for (const id of ['drawingName', 'saveSelectedDrawing', 'copyDrawing', 'deleteDrawing']) el(id).disabled = !!simplification;
     el('simplifyDrawing').disabled = !object || geometryLeaves(object).every(part => part.kind === 'point');
     el('simplifyDrawing').value = simplifyAmount;
@@ -232,18 +244,18 @@ export function createDrawingEditor({ map, sourceMap, canEnter, onModeChange, on
     const chosen = selection(), canCombine = chosen.length >= 2 && chosen.every(object => isClosed(object.kind)) && !pending;
     for(const id of ['unionDrawings','subtractDrawings','intersectDrawings','xorDrawings']) el(id).disabled=!canCombine;
     el('cancelPolygonOperation').hidden = !polygonWorker;
-    el('showPolygonIssue').hidden = !active || tool !== 'select' || !polygonIssues.some(issue => issue.point);
+    el('showPolygonIssue').hidden = !active || tool !== 'select' || !polygonIssues.some(issue => issue.point && !hiddenIds.has(issue.objectId));
     bindText(el('polygonSelectionHelp'), () => polygonWorker ? t('Berechne Ergebnisfläche … Esc bricht die Berechnung ab.')
       : chosen.length >= 2 ? chosen.map((object,i)=>`${i+1}: ${object.name}`).join(' · ') + (chosen.every(object=>isClosed(object.kind)) ? t('. Subtrahieren zieht alle weiteren Flächen von der ersten ab. Schnittmenge behält nur die gemeinsame Fläche; Exklusiv (XOR) behält Bereiche mit einer ungeraden Anzahl überlagerter Flächen.') : t('. Flächenoperationen sind nur für Flächen möglich.')) + t(' Das Ergebnis wird als neues Objekt angelegt; die Ausgangsobjekte bleiben erhalten.')
       : t('Weitere Objekte mit Strg/⌘ oder Umschalt anklicken. Das Ergebnis wird als neues Objekt angelegt; die Ausgangsobjekte bleiben erhalten.'));
     if (polygonWorker || waterEdit) el('undoDrawing').disabled = el('redoDrawing').disabled = true;
     bindAttribute(el('undoDrawing'), 'title', () => (draft ? t('Letzten Punkt zurück') : magnetic.hasDraft ? t('Letzten Abschnitt zurück') : wand.hasDraft ? t('Letzte Auswahländerung zurück') : t('Rückgängig')) + t(' (Strg+Z)'));
     bindText(el('drawingHelp'), () => tool === 'files' ? t('Lade vorhandene Objekte oder speichere deine Zeichnung für die Weiterarbeit.') : tool === 'select'
-      ? t('Objekt anklicken; mit Strg/⌘ oder Umschalt weitere auswählen. Stützpunkte ziehen; + fügt einen Punkt hinzu. Stützpunkt anklicken und mit Entf löschen.')
+      ? t('Objekt anklicken; mit Strg/⌘ oder Umschalt weitere auswählen. Stützpunkte ziehen; + fügt einen Punkt hinzu. Stützpunkt anklicken und mit Entf löschen.') + (object && hasCurves(object) ? t(' Runde Bézier-Anfasser formen die Kurve. Alt/Option beim Ziehen entkoppelt sie für Ecken; Umschalt rastet den Winkel in 45°-Schritten ein.') : '')
       : tool === 'magnetic' ? t('Enter übernimmt die Vorschau. Ohne Vorschau schließt „Fertig“ die Linie ab. „Polygon schließen“ übernimmt die Vorschau und schließt die Fläche automatisch. Esc bricht die Zeichnung ab.')
       : tool === 'wand' ? t('Farbfläche auswählen und bei Bedarf mit dem Pinsel korrigieren. Fertig übernimmt die Umrisse, Esc verwirft die Auswahl.')
       : tool === 'point' ? t('Auf die Karte klicken, um einen Punkt zu setzen.')
-        : tr`Stützpunkte durch Klicken setzen. ${isClosed(tool) ? t('Mindestens drei') : t('Mindestens zwei')} Punkte. Mit Enter oder „Fertig“ abschließen, Esc bricht ab.`);
+        : tr`Stützpunkte durch Klicken setzen. ${isClosed(tool) ? t('Mindestens drei') : t('Mindestens zwei')} Punkte. Mit Enter oder „Fertig“ abschließen, Esc bricht ab.` + (isCurved(tool) ? t(' Anschließend die Kurve mit den runden Bézier-Anfassern formen.') : ''));
     if (section.active) bindText(el('drawingHelp'), () => t('Wähle Anfang und Ende des Randabschnitts und zeichne den neuen Verlauf. Mit „Fertig“ speicherst du ihn; Esc verwirft die Änderungen.'));
     document.querySelectorAll('[data-tool]').forEach(button => { button.setAttribute('aria-pressed', String(active && !geodata?.active && button.dataset.tool === tool)); button.disabled = reworking(); });
     map.getContainer().classList.toggle('drawing-crosshair', active && !['select', 'files'].includes(tool));
@@ -255,21 +267,38 @@ export function createDrawingEditor({ map, sourceMap, canEnter, onModeChange, on
     wand.setEnabled(active && !geodata?.active && tool === 'wand');
     const list = el('drawingObjects'); list.replaceChildren();
     for (const object of objects) {
-      const row=document.createElement('div'); row.className='drawing-object-row';
+      const visible = isVisible(object);
+      const row=document.createElement('div'); row.className=`drawing-object-row${visible ? '' : ' is-hidden'}`;
       const button = document.createElement('button'); button.className='drawing-object-select';
+      button.disabled = !visible;
       const index = chosen.findIndex(item => item.id === object.id);
       bindText(button, () => `${chosen.length >= 2 && index !== -1 ? `${index + 1}. ` : ''}${object.name}`, false);
       button.setAttribute('aria-pressed', String(index !== -1));
       button.onclick = event => select(object.id, event.ctrlKey || event.metaKey || event.shiftKey);
+      const visibility=document.createElement('button'); visibility.className='drawing-object-visibility';
+      bindAttribute(visibility, 'title', () => visible ? tr`„${untranslated(object.name)}“ ausblenden` : tr`„${untranslated(object.name)}“ einblenden`);
+      bindAttribute(visibility, 'aria-label', () => visibility.title);
+      visibility.setAttribute('aria-pressed', String(visible)); visibility.disabled=pending;
+      const eye=createElement(visible ? Eye : EyeOff); eye.setAttribute('aria-hidden','true'); visibility.append(eye);
+      visibility.onclick=()=> {
+        if (pending) return;
+        if (visible) {
+          hiddenIds.add(object.id); selectedIds=selectedIds.filter(id=>id!==object.id);
+          if (!selected()) vertexIndex=null;
+        } else hiddenIds.delete(object.id);
+        message(visible ? t('Objekt ausgeblendet.') : t('Objekt eingeblendet.')); render();
+        el('drawingObjects').children[objects.indexOf(object)]?.querySelector('.drawing-object-visibility')?.focus({ preventScroll:true });
+      };
       const remove=document.createElement('button'); remove.className='drawing-object-delete';
       bindAttribute(remove, 'title', () => tr`„${untranslated(object.name)}“ löschen`); bindAttribute(remove, "aria-label", () => remove.title); remove.disabled=pending;
       const icon=createElement(Trash2); icon.setAttribute('aria-hidden','true'); remove.append(icon);
       remove.onclick=()=>deleteObject(object.id);
-      row.append(button,remove); list.append(row);
+      row.append(button,visibility,remove); list.append(row);
     }
   }
 
   function select(id, additive = false) {
+    if (hiddenIds.has(id)) return;
     if (draft || magnetic.hasDraft || wand.hasDraft || simplification || reworking()) { message(t('Bitte zuerst die begonnene Form oder Vorschau übernehmen oder verwerfen.')); return; }
     if (!additive) selectedIds=[id];
     else if (selectedIds.includes(id)) selectedIds=selectedIds.filter(chosen=>chosen!==id);
@@ -287,6 +316,7 @@ export function createDrawingEditor({ map, sourceMap, canEnter, onModeChange, on
     polygonIssueLayer.clearLayers();
     if (!active || geodata?.active || tool !== 'select') return;
     for (const issue of polygonIssues) {
+      if (hiddenIds.has(issue.objectId)) continue;
       for (const edge of issue.segments || []) L.polyline(edge.map(unproject), {
         renderer, color: '#c22', weight: 4, dashArray: '3 5', interactive: false
       }).addTo(polygonIssueLayer);
@@ -300,7 +330,7 @@ export function createDrawingEditor({ map, sourceMap, canEnter, onModeChange, on
     }
   }
   el('showPolygonIssue').onclick = () => {
-    const points = polygonIssues.flatMap(issue => [...(issue.point ? [issue.point] : []), ...(issue.segments || []).flat()]);
+    const points = polygonIssues.filter(issue => !hiddenIds.has(issue.objectId)).flatMap(issue => [...(issue.point ? [issue.point] : []), ...(issue.segments || []).flat()]);
     if (points.length) map.fitBounds(L.latLngBounds(points.map(unproject)), { padding: [80, 80], maxZoom: 16, animate: false });
   };
   function cancelPolygonOperation() {
@@ -383,6 +413,25 @@ export function createDrawingEditor({ map, sourceMap, canEnter, onModeChange, on
         html: `<span>${className.includes('midpoint') ? '+' : ''}</span>`, iconSize: [18, 18], iconAnchor: [9, 9] }) }).addTo(handles);
   }
 
+  function allowShiftDrag(handle) {
+    // Leaflet normally reserves Shift+mousedown for box zoom. These handles
+    // use Shift for angle snapping; subsequent drag events keep real modifiers.
+    const draggable = handle.dragging._draggable, onDown = draggable._onDown;
+    handle.dragging.disable();
+    L.DomEvent.disableClickPropagation(handle.getElement());
+    draggable._onDown = function(event) {
+      const start = event.shiftKey ? new Proxy(event, {
+        get(target, key) {
+          if (key === 'shiftKey') return false;
+          const value = Reflect.get(target, key, target);
+          return typeof value === 'function' ? value.bind(target) : value;
+        }
+      }) : event;
+      return onDown.call(this, start);
+    };
+    handle.dragging.enable();
+  }
+
   function renderHandles(object) {
     const dense = vertexCount(object) > 1000, cells = new Set(), size = map.getSize();
     let shown = 0;
@@ -400,7 +449,12 @@ export function createDrawingEditor({ map, sourceMap, canEnter, onModeChange, on
     });
   }
   function renderRingHandles(object, vertices, ringIndex, prefix, visible, kind = object.kind, shape = object) {
-    const midpointMarkers = [];
+    const midpointMarkers = [], controlLayers = [], controlMarkers = [];
+    const refreshControls = () => controlMarkers.forEach(({ index, side, handle, line }) => {
+      const point = vertexControls(shape, index)[side];
+      handle.setLatLng(unproject(point));
+      line.setLatLngs([unproject(vertices[index]), unproject(point)]);
+    });
     vertices.forEach((point, index) => {
       if (!visible(point, vertexIndex === index && vertexRing === ringIndex)) return;
       const handle = marker(point, `drawing-vertex${vertexIndex === index && vertexRing === ringIndex ? ' chosen' : ''}`, tr`${prefix}Stützpunkt ${index + 1}`, true);
@@ -411,10 +465,41 @@ export function createDrawingEditor({ map, sourceMap, canEnter, onModeChange, on
       };
       handle.getElement().addEventListener('pointerdown', choose);
       handle.on('click', choose);
-      handle.on('dragstart', () => { record(); vertexIndex = index; vertexRing = ringIndex; midpointMarkers.forEach(m => handles.removeLayer(m)); });
-      handle.on('drag', () => { vertices[index] = project(handle.getLatLng()); updateShape(object); });
+      handle.on('dragstart', () => {
+        record();
+        if (isCurved(kind)) materializeControls(shape);
+        vertexIndex = index; vertexRing = ringIndex; midpointMarkers.forEach(m => handles.removeLayer(m));
+      });
+      handle.on('drag', () => { vertices[index] = project(handle.getLatLng()); updateShape(object); refreshControls(); });
       handle.on('dragend', () => { message(t('Stützpunkt verschoben.')); render(); });
       handle.on('keydown', e => { if (e.originalEvent.key === 'Enter') { vertexIndex = index; vertexRing = ringIndex; render(); } });
+      handle.setZIndexOffset(1000);
+      for (const [side, control] of Object.entries(vertexControls(shape, index))) {
+        if (!control) continue;
+        const line = L.polyline([unproject(point), unproject(control)], {
+          renderer: controlRenderer, color: '#287ac7', weight: 1, opacity: .75, interactive: false, className: 'drawing-bezier-arm'
+        }).addTo(handles);
+        const controlHandle = marker(control, 'drawing-bezier-handle', tr`${prefix}Bézier-Anfasser ${index + 1}: ${side === 'incoming' ? t('eingehend') : t('ausgehend')}`, true);
+        allowShiftDrag(controlHandle);
+        controlHandle.setZIndexOffset(500);
+        controlLayers.push(line, controlHandle);
+        controlMarkers.push({ index, side, handle: controlHandle, line });
+        let coupled = false;
+        controlHandle.getElement().addEventListener('pointerdown', choose);
+        controlHandle.on('click', choose);
+        controlHandle.on('dragstart', () => {
+          record(); materializeControls(shape); coupled = controlsAligned(shape, index);
+          vertexIndex = index; vertexRing = ringIndex;
+          midpointMarkers.forEach(m => handles.removeLayer(m));
+        });
+        controlHandle.on('drag', e => {
+          // Once broken, the tangent stays independent for the rest of this drag.
+          if (e.originalEvent?.altKey) coupled = false;
+          moveControl(shape, index, side, project(controlHandle.getLatLng()), { coupled, snap: !!e.originalEvent?.shiftKey });
+          refreshControls(); updateShape(object);
+        });
+        controlHandle.on('dragend', () => { message(t('Bézier-Anfasser verschoben.')); render(); });
+      }
     });
     if (kind === 'point') return;
     const count = vertices.length - (isClosed(kind) ? 0 : 1);
@@ -430,6 +515,7 @@ export function createDrawingEditor({ map, sourceMap, canEnter, onModeChange, on
       };
       mid.on('dragstart', () => {
         insert(); midpointMarkers.filter(m => m !== mid).forEach(m => handles.removeLayer(m));
+        controlLayers.forEach(layer => handles.removeLayer(layer));
         mid.getElement().className = 'leaflet-marker-icon drawing-vertex chosen leaflet-zoom-animated leaflet-interactive';
         bindText(mid.getElement().firstElementChild, () => '');
       });
@@ -445,12 +531,13 @@ export function createDrawingEditor({ map, sourceMap, canEnter, onModeChange, on
   function render() {
     shapes.clearLayers(); handles.clearLayers(); layers = new Map();
     objects.forEach(object => {
+      if (!isVisible(object)) return;
       if (object.id === areaEdit?.id) return;
       if (waterEdit?.ready && object.id === waterEdit.original.id) {
         if (waterEdit.result) drawShape(waterEdit.result, true);
       } else drawShape(simplification?.id === object.id ? simplification : object);
     });
-    if (active && selected() && !draft && !simplification && !reworking()) renderHandles(selected());
+    if (active && selected() && isVisible(selected()) && !draft && !simplification && !reworking()) renderHandles(selected());
     if (active && draft) {
       drawShape(draft, true);
       draft.vertices.forEach((point, i) => marker(point, 'drawing-vertex draft', tr`Neuer Stützpunkt ${i + 1}`));
@@ -489,6 +576,7 @@ export function createDrawingEditor({ map, sourceMap, canEnter, onModeChange, on
     if (tool === 'wand') { wand.finish(); return; }
     if (tool === 'magnetic') { magnetic.finish(); return; }
     if (!draft || draft.vertices.length < minimumPoints(draft.kind)) return;
+    if (isCurved(draft.kind)) materializeControls(draft);
     record(); objects.push(draft); selectedIds = [draft.id]; draft = null; vertexIndex = null; tool = 'select';
     message(t('Objekt angelegt. Die Stützpunkte sind jetzt bearbeitbar.')); render();
   }
@@ -504,8 +592,19 @@ export function createDrawingEditor({ map, sourceMap, canEnter, onModeChange, on
     if (!object || vertexIndex === null || draft || simplification || reworking()) return;
     const vertices = objectRings(object)[vertexRing];
     if (!vertices || vertices.length <= minimumPoints(ringEntries(object)[vertexRing].kind)) { message(t('Diese Form benötigt ihre verbleibenden Stützpunkte.')); return; }
-    record(); removeVertex(ringEntries(object)[vertexRing].shape,vertexIndex); vertexIndex = null; render();
+    const shape = ringEntries(object)[vertexRing].shape;
+    record(); if (isCurved(shape.kind)) materializeControls(shape);
+    removeVertex(shape,vertexIndex); vertexIndex = null; render();
   }
+
+  el('alignBezierHandles').onclick = () => {
+    const object = selected();
+    if (!object || vertexIndex === null || draft || simplification || reworking()) return;
+    const shape = ringEntries(object)[vertexRing]?.shape;
+    if (!shape) return;
+    record(); alignControls(shape, vertexIndex);
+    message(t('Anfasser ausgerichtet. Der Übergang ist wieder glatt.')); render();
+  };
 
   function mapClick(e) {
     if (!active || geodata?.active || polygonWorker || waterEdit || tool === 'files') return;
@@ -528,7 +627,7 @@ export function createDrawingEditor({ map, sourceMap, canEnter, onModeChange, on
   map.on('click', mapClick);
   map.on('moveend zoomend', () => {
     const object = selected();
-    if (active && object && !draft && !simplification && !reworking() && vertexCount(object) > 1000) {
+    if (active && object && isVisible(object) && !draft && !simplification && !reworking() && vertexCount(object) > 1000) {
       handles.clearLayers(); renderHandles(object);
     }
   });
@@ -600,7 +699,7 @@ export function createDrawingEditor({ map, sourceMap, canEnter, onModeChange, on
   };
   el('zoomContent').onclick = () => {
     const bounds = L.latLngBounds([]);
-    for (const object of objects) for (const ring of objectRings(object)) for (const p of ring) bounds.extend(unproject(p));
+    for (const object of objects.filter(isVisible)) for (const ring of objectRings(object)) for (const p of ring) bounds.extend(unproject(p));
     if (bounds.isValid()) map.fitBounds(bounds, { padding: [30, 30], maxZoom: 16 });
     else el('zoomImage').click();
   };

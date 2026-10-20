@@ -42,7 +42,14 @@ export function restoreCurves(geo,properties,project) {
       const coordinates=(value,n)=>n?value.map(v=>coordinates(v,n-1)):point(value);
       return {type:g.type,coordinates:coordinates(g.coordinates,depth)};
     };
-    if(!same(toFeature(restored,p=>p).geometry,projectGeo(geo)))return null;
+    const projected=projectGeo(geo);
+    if(!same(toFeature(restored,p=>p).geometry,projected)) {
+      // Older two-anchor curves were exported as a single straight segment.
+      // They now have editable tangents, but describe the same original line.
+      const legacy=shape=>shape.parts?{...shape,parts:shape.parts.map(legacy)}
+        :shape.kind==='curve'&&shape.vertices.length===2&&!shape.curveSegments?{...shape,kind:'line'}:shape;
+      if(!same(toFeature(legacy(restored),p=>p).geometry,projected))return null;
+    }
     return restored;
   } catch {return null;}
 }

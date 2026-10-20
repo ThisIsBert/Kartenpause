@@ -5,6 +5,7 @@ import {toFeature,objectRings,hasCurves,edgePoint,splitEdge,ringEntries,removeVe
 import {linearObject} from '../src/drawing/rework-geometry.js';
 import {simplifyObject} from '../src/drawing/simplification.js';
 import {importGeoJSON} from '../src/drawing/import.js';
+import {materializeControls,vertexControls,controlsAligned,moveControl,alignControls} from '../src/drawing/bezier-handles.js';
 const curve={kind:'curvePolygon',vertices:[[0,0],[10,0],[10,10],[0,10]]};
 const rect=(x,y,w,h)=>({kind:'polygon',vertices:[[x,y],[x+w,y],[x+w,y+h],[x,y+h]]});
 const count=o=>objectRings(o).reduce((n,r)=>n+r.length,0);
@@ -63,4 +64,84 @@ test('inserting a point on an original curved multipart leaf stores its segment 
   splitEdge(ringEntries(object)[0].shape,0);
   assert.equal(object.parts[0].vertices.length,5);assert.equal(object.parts[0].curveSegments.length,5);
   near(edgePoint(curve,0,.25),edgePoint(object.parts[0],0,.5));
+});
+
+test('materializing legacy curves preserves every segment; moving anchors translates only their own handles',()=>{
+  const shape=structuredClone(curve), original=structuredClone(shape);
+  materializeControls(shape);
+  for(let i=0;i<4;i++)for(const t of [0,.2,.5,.8,1])near(edgePoint(shape,i,t),edgePoint(original,i,t));
+  const before=Array.from({length:4},(_,i)=>vertexControls(shape,i));
+  shape.vertices[1]=shape.vertices[1].map(v=>v+3);
+  for(const side of ['incoming','outgoing'])near(vertexControls(shape,1)[side],before[1][side].map(v=>v+3));
+  for(const i of [0,2,3])assert.deepEqual(vertexControls(shape,i),before[i]);
+});
+
+test('smooth handles rotate together but retain independent lengths; corners can be restored',()=>{
+  const shape=structuredClone(curve), index=0;
+  assert.ok(controlsAligned(shape,index));
+  const controls=vertexControls(shape,index), otherLength=Math.hypot(...controls.incoming);
+  moveControl(shape,index,'outgoing',[8,3]);
+  near(vertexControls(shape,index).outgoing,[8,3]);assert.ok(controlsAligned(shape,index));
+  assert.ok(Math.abs(Math.hypot(...vertexControls(shape,index).incoming)-otherLength)<1e-9);
+  const incoming=vertexControls(shape,index).incoming;
+  moveControl(shape,index,'outgoing',[1,5],{coupled:false});
+  near(vertexControls(shape,index).incoming,incoming);assert.ok(!controlsAligned(shape,index));
+  moveControl(shape,index,'outgoing',[2,6]); // Subsequent gestures keep the corner.
+  near(vertexControls(shape,index).incoming,incoming);
+  alignControls(shape,index);assert.ok(controlsAligned(shape,index));
+});
+
+test('two-anchor curves have editable end handles and no phantom closing segment',()=>{
+  const shape={kind:'curve',vertices:[[0,0],[12,0]]};
+  assert.equal(vertexControls(shape,0).incoming,null);assert.equal(vertexControls(shape,1).outgoing,null);
+  moveControl(shape,0,'outgoing',[3,5]);
+  assert.ok(edgePoint(shape,0,.5)[1]>0);assert.equal(shape.curveSegments.length,1);
+  splitEdge(shape,0);assert.equal(shape.curveSegments.length,2);
+  for(const endpoint of [0,2]){
+    const copy=structuredClone(shape);removeVertex(copy,endpoint);
+    assert.equal(copy.curveSegments.length,1);assert.equal(copy.vertices.length,2);
+    assert.ok(edgePoint(copy,0,.5).every(Number.isFinite));
+  }
+});
+
+test('legacy two-anchor curves import with handles, including collection members',()=>{
+  const shape={kind:'curve',vertices:[[0,0],[12,0]]};
+  const geometry={type:'LineString',coordinates:shape.vertices};
+  const feature={type:'Feature',geometry,properties:{curveDefinition:{version:1,geometry:shape}}};
+  assert.equal(importGeoJSON(feature,p=>p)[0].kind,'curve');
+  const group={type:'Feature',geometry:{type:'GeometryCollection',geometries:[geometry]},properties:{curveDefinition:{version:1,geometry:{kind:'collection',parts:[shape]}}}};
+  assert.equal(importGeoJSON(group,p=>p)[0].parts[0].kind,'curve');
+  feature.geometry={type:'LineString',coordinates:[[1,0],[12,0]]};
+  assert.equal(importGeoJSON(feature,p=>p)[0].kind,'line');
+});
+
+test('angle snapping preserves handle length and collapsed handles remain finite',()=>{
+  const shape=structuredClone(curve);
+  moveControl(shape,0,'outgoing',[8,7],{snap:true});
+  const out=vertexControls(shape,0).outgoing;assert.ok(Math.abs(out[0]-out[1])<1e-9);
+  assert.ok(Math.abs(Math.hypot(...out)-Math.hypot(8,7))<1e-9);
+  moveControl(shape,0,'outgoing',[0,0]);
+  assert.ok(Object.values(vertexControls(shape,0)).flat().every(Number.isFinite));
+  alignControls(shape,0);assert.ok(controlsAligned(shape,0));
+  moveControl(shape,0,'outgoing',[0,0]);moveControl(shape,0,'incoming',[0,0]);
+  alignControls(shape,0);assert.ok(controlsAligned(shape,0));
+});
+
+test('edited handles round-trip for curved multipart boundaries and holes',()=>{
+  const hole=operatePolygons([rect(-5,-5,20,20),curve],'difference');
+  const object={kind:'multiPolygon',parts:[hole,structuredClone(curve)]};
+  for(const entry of ringEntries(object).filter(entry=>hasCurves(entry.shape))){
+    moveControl(entry.shape,0,'outgoing',[3,2],{coupled:false});
+    assert.ok(!controlsAligned(entry.shape,0));
+  }
+  const feature=toFeature(object,p=>p), [restored]=importGeoJSON(feature,p=>p);
+  assert.equal(count(restored),count(object));
+  ringEntries(object).forEach((entry,i)=>assert.deepEqual(vertexControls(ringEntries(restored)[i].shape,0),vertexControls(entry.shape,0)));
+});
+
+test('new segment definitions on hole rings are persisted on the owning polygon',()=>{
+  const object={...rect(0,0,20,20),holes:[[[2,2],[5,2],[5,5],[2,5]]]};
+  const shape=ringEntries(object)[1].shape;
+  materializeControls(shape);
+  assert.equal(object.holeCurveSegments[0],shape.curveSegments);
 });

@@ -115,6 +115,13 @@
       <div id="magneticRasterSettings">
       <div class="row"><label for="magneticRadius">Suchraum neben dem Abschnitt</label><output id="magneticRadiusValue">32 Originalpixel</output></div>
       <input id="magneticRadius" type="range" min="8" max="100" value="32" step="4" />
+      <p class="hint">Abstand von der geraden Verbindung der Anker. Der Suchraum muss die ganze Windung einschließen.</p>
+      <div class="row"><label for="magneticFidelity">Linientreue</label><output id="magneticFidelityValue">80 %</output></div>
+      <input id="magneticFidelity" type="range" min="0" max="100" value="80" step="5" aria-describedby="magneticFidelityHelp" />
+      <p id="magneticFidelityHelp" class="hint">Hoch bevorzugt deutlich passende Linien, auch bei längeren Umwegen. Ein zusammenhängender Verlauf wird immer zuerst gesucht.</p>
+      <div class="row"><label for="magneticGap">Lücken überbrücken</label><output id="magneticGapValue">8 Originalpixel</output></div>
+      <input id="magneticGap" type="range" min="0" max="40" value="8" step="1" aria-describedby="magneticGapHelp" />
+      <p id="magneticGapHelp" class="hint">Maximale Länge je Unterbrechung. 0 schaltet Überbrückungen aus. Erst wenn kein zusammenhängender Verlauf gefunden wird, sind solche Verbindungen erlaubt.</p>
       <select id="magneticColorMode" aria-label="Farbverlauf"><option value="line">Linienfarbe folgen</option><option value="boundary">Grenze zwischen Farbbereichen folgen</option></select>
       <div class="magnetic-colors">
         <div class="magnetic-color-field">
@@ -130,6 +137,7 @@
       </div>
       <div class="row"><label for="magneticTolerance">Farbtoleranz</label><output id="magneticToleranceValue">50</output></div>
       <input id="magneticTolerance" type="range" min="15" max="120" value="50" step="5" />
+      <p class="hint">Farbtoleranz wirkt auf aufgenommene Pipettenfarben. Ohne Farbvorgabe zählt der Bildkontrast.</p>
       </div>
       <div class="commands"><button id="magneticAccept" class="primary" disabled>Abschnitt übernehmen</button><button id="magneticReject" disabled>Vorschau verwerfen</button></div>
       <button id="magneticClose" disabled>Polygon schließen</button>
@@ -166,6 +174,10 @@
     <fieldset id="drawingSelection" disabled>
       <legend>Ausgewähltes Objekt</legend>
       <label for="drawingName">Name</label><input id="drawingName" type="text" maxlength="200" />
+      <div id="bezierSettings" hidden>
+        <button id="alignBezierHandles">Anfasser ausrichten</button>
+        <p class="hint">Alt/Option + Ziehen: Anfasser entkoppeln. Umschalt + Ziehen: Winkel in 45°-Schritten. „Anfasser ausrichten“ stellt einen glatten Übergang her.</p>
+      </div>
       <div class="commands"><button id="saveSelectedDrawing">Speichern</button><button id="deleteDrawing">Löschen</button></div>
       <button id="copyDrawing">In die Zwischenablage kopieren</button>
       <button id="reworkArea">Fläche weiterbearbeiten</button>

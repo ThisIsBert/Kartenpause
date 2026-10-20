@@ -53,7 +53,7 @@ export function createMagneticTool({ map, renderer, getOriginalRaster, getBasema
     const found = polygonHit(getObjects(), position, screen);
     return exact ? project(ll) : found?.hit.point || project(ll);
   }
-  const status = text => { bindText(el('magneticStatus'), () => text); };
+  const status = text => { bindText(el('magneticStatus'), typeof text === 'function' ? text : () => text); };
   const path = () => {
     const points = segments.flatMap((segment, i) => i ? segment.slice(1) : segment);
     return source?.vector ? points : removeSpurs(points);
@@ -74,6 +74,8 @@ export function createMagneticTool({ map, renderer, getOriginalRaster, getBasema
     el('magneticRasterSettings').hidden = vectorMode();
     el('basemapFollowHelp').hidden = !basemapMode();
     bindText(el('magneticRadiusValue'), () => el('magneticRadius').value + ' ' + pixelUnit());
+    bindText(el('magneticFidelityValue'), () => el('magneticFidelity').value + ' %');
+    bindText(el('magneticGapValue'), () => Number(el('magneticGap').value) ? el('magneticGap').value + ' ' + pixelUnit() : t('Aus'));
     el('polygonFollowHelp').hidden = !vectorMode();
     el('magneticSource').disabled = anchors.length > (segmentHandler ? 1 : 0) || !!preview || !!worker;
     el('magneticAccept').disabled = !preview || !!worker || picking;
@@ -145,14 +147,21 @@ export function createMagneticTool({ map, renderer, getOriginalRaster, getBasema
           });
           // Keep shared anchor coordinates exact across independently searched segments.
           preview[0] = [...anchors.at(-1)]; preview[preview.length - 1] = [...end];
-          status(close ? t('Schließstrecke ermittelt. Polygon wird übernommen.') : t('Weiterklicken übernimmt diesen Abschnitt. Ein Klick zurück in den Abschnitt korrigiert ihn. Alt: immer korrigieren; Umschalt: immer fortsetzen.'));
+          const { bridges, longestGap } = data.result;
+          status(() => {
+            const detection = bridges
+              ? tr`Lücken überbrückt: ${bridges}. Längste Unterbrechung: ${Math.ceil(longestGap - 1e-9)} ${pixelUnit()}. Bitte den Verlauf prüfen.`
+              : t('Zusammenhängender Linienverlauf gefunden.');
+            return detection + ' ' + (close ? t('Schließstrecke ermittelt. Polygon wird übernommen.') : t('Weiterklicken übernimmt diesen Abschnitt. Ein Klick zurück in den Abschnitt korrigiert ihn. Alt: immer korrigieren; Umschalt: immer fortsetzen.'));
+          });
         }
         if (autoAccept && preview) accept();
         changed();
       };
       worker.onerror = () => { if (requestId !== generation) return; stopSearch(); status(t('Die Suche konnte nicht ausgeführt werden. Bitte erneut versuchen.')); changed(); };
       worker.postMessage({ raster: crop.raster, start: crop.start, end: crop.end,
-        radius: Number(el('magneticRadius').value), color, color2: boundaryMode() ? color2 : null, tolerance: Number(el('magneticTolerance').value) }, [crop.raster.data.buffer]);
+        radius: Number(el('magneticRadius').value), color, color2: boundaryMode() ? color2 : null, tolerance: Number(el('magneticTolerance').value),
+        fidelity: Number(el('magneticFidelity').value), maxGap: Number(el('magneticGap').value) }, [crop.raster.data.buffer]);
       status(source.basemap ? tr`Suche in der Basiskarte (Zoom ${rasterSource.zoom}) …` : t('Suche in den Originalpixeln …'));
     } catch (error) { stopSearch(); status(error.message); }
     changed();
@@ -211,8 +220,11 @@ export function createMagneticTool({ map, renderer, getOriginalRaster, getBasema
   };
   el('magneticColorMode').onchange = () => { picking = false; hideLoupe(); status(''); recompute(); };
   el('magneticClearColor2').onclick = () => { color2 = null; picking = false; recompute(); };
-  for (const id of ['magneticRadius', 'magneticTolerance']) {
-    el(id).oninput = () => { bindText(el(`${id}Value`), () => el(id).value + (id === 'magneticRadius' ? ' ' + pixelUnit() : '')); };
+  for (const id of ['magneticRadius', 'magneticTolerance', 'magneticFidelity', 'magneticGap']) {
+    el(id).oninput = () => {
+      bindText(el(`${id}Value`), () => id === 'magneticGap' && !Number(el(id).value) ? t('Aus')
+        : el(id).value + (['magneticRadius', 'magneticGap'].includes(id) ? ' ' + pixelUnit() : id === 'magneticFidelity' ? ' %' : ''));
+    };
     el(id).onchange = recompute;
   }
   return {

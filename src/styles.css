@@ -86,6 +86,10 @@
     .drawing-midpoint span { position: absolute; left: 4px; top: 4px; width: 10px; height: 10px; box-sizing: border-box; background: #ffffffbb; color: #746b63; border: 1px solid #998c7e99; text-align: center; font: 10px/8px system-ui; }
     .drawing-midpoint:hover span { background: white; color: #9b3b10; }
     .drawing-vertex.draft span { background: #176c65; }
+    .drawing-mode .drawing-bezier-handle { background: transparent; border: 0; cursor: grab; }
+    .drawing-mode .drawing-bezier-handle:active { cursor: grabbing; }
+    .drawing-bezier-handle span { position: absolute; left: 4px; top: 4px; width: 10px; height: 10px; box-sizing: border-box; border: 1px solid #287ac7; border-radius: 50%; background: white; box-shadow: 0 0 0 1px #ffffffaa; }
+    .drawing-bezier-handle:hover span { background: #dcecff; }
     .selection-paint { position: absolute; inset: 0; z-index: 650; cursor: crosshair; touch-action: none; }
     #magneticSettings { margin-top: 12px; padding-top: 4px; border-top: 1px solid #ccd5d3; }
     #magneticSettings output { font-size: 12px; }
@@ -234,7 +238,10 @@ select:focus-visible, #sidebarResize:focus-visible { outline: 3px solid #287ac7;
 
 .drawing-object-row { display: flex; gap: 6px; align-items: stretch; }
 .drawing-object-select { flex: 1; min-width: 0; }
-#drawingObjects .drawing-object-delete { width: 36px; flex: 0 0 36px; display: grid; place-items: center; padding: 7px; color: #8a342b; }
+#drawingObjects .drawing-object-visibility, #drawingObjects .drawing-object-delete { width: 36px; flex: 0 0 36px; display: grid; place-items: center; padding: 7px; }
+#drawingObjects .drawing-object-delete { color: #8a342b; }
+#drawingObjects .drawing-object-visibility { color: #176c65; }
+#drawingObjects .is-hidden .drawing-object-visibility { color: #657670; background: #f1f3f2; }
 #drawingObjects .drawing-object-delete:hover { background: #fff1ee; border-color: #bf6558; }
 
 /* Settings remain available in every workspace mode. */

@@ -39,7 +39,7 @@ function format(key, values) {
 }
 const escapePattern = value => value.replace(/[.*+?^$\u007b\u007d()|[\]\\]/g, '\\$&');
 const nameTemplates = new Set([
-  'Bild: {0} ({1}×{2} px)', '„{0}“ löschen', '{0} aus Auswahl entfernen',
+  'Bild: {0} ({1}×{2} px)', '„{0}“ löschen', '„{0}“ ausblenden', '„{0}“ einblenden', '{0} aus Auswahl entfernen',
   'Die Fläche „{0}“ hat einen ungültigen Rand: {1}. Bitte zuerst korrigieren.'
 ]);
 const patterns = Object.entries(english).filter(([key]) => /\{\d+\}/.test(key)).flatMap(([key, translated]) => [key, translated].map(template => {

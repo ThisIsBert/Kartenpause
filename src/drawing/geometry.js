@@ -7,7 +7,11 @@ export const polygonParts = object => object.kind === 'multiPolygon' ? object.pa
 export const geometryLeaves = object => object.parts
   ? object.parts.flatMap(part => geometryLeaves(part.kind ? part : { ...part, kind: object.kind === 'multiPolygon' ? 'polygon' : object.kind === 'multiPoint' ? 'point' : 'line' }))
   : [object];
-export const ringEntries = object => geometryLeaves(object).flatMap((part, partIndex) => [part.vertices, ...(part.holes || [])].map((vertices, holeIndex) => ({ vertices, kind: holeIndex ? 'polygon' : part.kind, partIndex, holeIndex, owner: part, shape: holeIndex ? { kind: 'polygon', vertices, curveSegments: part.holeCurveSegments?.[holeIndex - 1] } : part })));
+export const ringEntries = object => geometryLeaves(object).flatMap((part, partIndex) => [part.vertices, ...(part.holes || [])].map((vertices, holeIndex) => ({ vertices, kind: holeIndex ? 'polygon' : part.kind, partIndex, holeIndex, owner: part, shape: holeIndex ? {
+  kind: 'polygon', vertices,
+  get curveSegments() { return part.holeCurveSegments?.[holeIndex - 1]; },
+  set curveSegments(value) { (part.holeCurveSegments ??= part.holes.map(() => null))[holeIndex - 1] = value; }
+} : part })));
 export const objectRings = object => ringEntries(object).map(entry => entry.vertices);
 
 export function segmentPoint(vertices, index, t, curved, closed) {
@@ -29,7 +33,7 @@ export function edgeControls(object, index) {
   const { vertices, kind, curveSegments } = object, n = vertices.length;
   const a = vertices[index], b = vertices[(index + 1) % n], explicit = curveSegments?.[index];
   if (curveSegments) return explicit ? [a.map((v,k) => v + explicit[0][k]), b.map((v,k) => v + explicit[1][k])] : null;
-  if (!isCurved(kind) || n < 3) return null;
+  if (!isCurved(kind) || n < 2) return null;
   const at = i => vertices[isClosed(kind) ? (i + n) % n : Math.max(0,Math.min(n-1,i))];
   const before=at(index-1), after=at(index+2);
   return [a.map((v,k)=>v+(b[k]-before[k])/6), b.map((v,k)=>v-(after[k]-a[k])/6)];
@@ -60,6 +64,10 @@ export function splitEdge(shape,index,t=.5) {
   shape.vertices.splice(index+1,0,point); return point;
 }
 export function removeVertex(shape,index) {
+  if (shape.curveSegments && !isClosed(shape.kind) && (index === 0 || index === shape.vertices.length - 1)) {
+    shape.curveSegments.splice(index === 0 ? 0 : index - 1, 1);
+    shape.vertices.splice(index, 1); return;
+  }
   if (shape.curveSegments) {
     const n=shape.vertices.length, prev=(index+n-1)%n, next=(index+1)%n;
     const a=edgeControls(shape,prev), b=edgeControls(shape,index);
